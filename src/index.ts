@@ -1,10 +1,10 @@
 import { createDebug } from '@substrate-system/debug'
-const debug = createDebug()
+const debug = createDebug('image-input')
 
 // for docuement.querySelector
 declare global {
     interface HTMLElementTagNameMap {
-        '{{component-name}}': Example
+        'image-input': Example
     }
 }
 
@@ -19,15 +19,6 @@ export class Example extends HTMLElement {
         super()
         const example = this.getAttribute('example')
         this.example = example
-
-        this.innerHTML = `<div>
-            <p>example</p>
-            <ul>
-                ${Array.from(this.children).filter(Boolean).map(node => {
-                    return `<li>${node.outerHTML}</li>`
-                }).join('')}
-            </ul>
-        </div>`
     }
 
     /**
@@ -94,5 +85,5 @@ export class Example extends HTMLElement {
 }
 
 if ('customElements' in window) {
-    customElements.define('{{component-name}}', Example)
+    customElements.define('image-input', Example)
 }
