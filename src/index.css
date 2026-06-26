@@ -1,10 +1,10 @@
+image-input {
+    background-color: red;
+}
+
 /**
  * Don't show until JavaScript is instantiated
  */
 image-input:not(:defined) {
-	display: none;
-}
-
-image-input {
-    background-color: red;
+	visibility: hidden;
 }

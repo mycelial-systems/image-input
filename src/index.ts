@@ -1,89 +1,66 @@
+import { define } from '@substrate-system/web-component/util'
 import { createDebug } from '@substrate-system/debug'
 const debug = createDebug('image-input')
 
 // for docuement.querySelector
 declare global {
     interface HTMLElementTagNameMap {
-        'image-input': Example
+        'image-input': ImageInput
     }
 }
 
-export class Example extends HTMLElement {
-    // Define the attributes to observe
-    // need this for `attributeChangedCallback`
-    static observedAttributes = ['example']
-
-    example:string|null
-
-    constructor () {
-        super()
-        const example = this.getAttribute('example')
-        this.example = example
-    }
-
-    /**
-     * Handle 'example' attribute changes
-     * @see {@link https://gomakethings.com/how-to-detect-when-attributes-change-on-a-web-component/#organizing-your-code Go Make Things article}
-     *
-     * @param  {string} oldValue The old attribute value
-     * @param  {string} newValue The new attribute value
-     */
-    handleChange_example (oldValue:string, newValue:string) {
-        debug('handling example change', oldValue, newValue)
-
-        if (newValue === null) {
-            // [example] was removed
-        } else {
-            // set [example] attribute
-        }
-    }
-
-    /**
-     * Runs when the value of an attribute is changed
-     *
-     * @param  {string} name     The attribute name
-     * @param  {string} oldValue The old attribute value
-     * @param  {string} newValue The new attribute value
-     */
-    attributeChangedCallback (name:string, oldValue:string, newValue:string) {
-        debug('an attribute changed', name)
-        const handler = this[`handleChange_${name}`];
-        (handler && handler(oldValue, newValue))
-        this.render()
-    }
+export class ImageInput extends HTMLElement {
+    private fileInput:HTMLInputElement|null = null
+    private previewImg:HTMLImageElement|null = null
 
     disconnectedCallback () {
         debug('disconnected')
+        if (this.fileInput) {
+            this.fileInput.removeEventListener('change', this.handleFileSelect)
+        }
     }
 
     connectedCallback () {
         debug('connected')
-
-        const observer = new MutationObserver(function (mutations) {
-            mutations.forEach((mutation) => {
-                if (mutation.addedNodes.length) {
-                    debug('Node added: ', mutation.addedNodes)
-                }
-            })
-        })
-
-        observer.observe(this, { childList: true })
-
         this.render()
+        this.setupEventListeners()
+    }
+
+    setupEventListeners () {
+        this.fileInput = this.querySelector('input[type="file"]')
+        this.previewImg = this.querySelector('#preview')
+
+        if (this.fileInput) {
+            this.fileInput.addEventListener('change', this.handleFileSelect)
+        }
+    }
+
+    handleFileSelect = (event:Event) => {
+        const input = event.target as HTMLInputElement
+        const file = input.files?.[0]
+
+        if (file && file.type.startsWith('image/')) {
+            debug('Image file selected:', file.name)
+            const reader = new FileReader()
+
+            reader.onload = (e) => {
+                const result = e.target?.result as string
+                if (this.previewImg) {
+                    this.previewImg.src = result
+                    this.previewImg.style.display = 'block'
+                }
+            }
+
+            reader.readAsDataURL(file)
+        }
     }
 
     render () {
         this.innerHTML = `<div>
-            <p>example</p>
-            <ul>
-                ${Array.from(this.children).filter(Boolean).map(node => {
-                    return `<li>${node.outerHTML}</li>`
-                }).join('')}
-            </ul>
+            <input type="file" accept="image/*" />
+            <img id="preview" style="display: none; max-width: 100%; margin-top: 1rem;" />
         </div>`
     }
 }
 
-if ('customElements' in window) {
-    customElements.define('image-input', Example)
-}
+define('image-input', ImageInput)
