@@ -3,6 +3,7 @@ import { waitFor } from '@substrate-system/dom'
 import '../src/index.js'
 import type { ImageInput } from '../src/index.js'
 import './crop.js'
+import './crop-math.js'
 
 test('example test', async t => {
     document.body.innerHTML += `

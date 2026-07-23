@@ -118,3 +118,153 @@ test('dims the area outside the crop rectangle', async t => {
         'left dim panel should be empty when the crop covers the ' +
         'full image')
 })
+
+function pointer (
+    type:string,
+    clientX:number,
+    clientY:number,
+    pointerId = 1
+):PointerEvent {
+    return new PointerEvent(type, {
+        clientX,
+        clientY,
+        pointerId,
+        bubbles: true,
+        cancelable: true
+    })
+}
+
+test('dragging a corner handle resizes the crop rectangle', async t => {
+    document.body.innerHTML += `
+        <image-crop class="resize-test" style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.resize-test') as ImageCrop
+    const file = await makeImageFile(200, 100)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    const frame = el.querySelector('.image-crop-frame') as HTMLElement
+    const frameRect = frame.getBoundingClientRect()
+    const handle = el.querySelector('.handle-nw') as HTMLElement
+
+    handle.dispatchEvent(pointer('pointerdown', frameRect.left, frameRect.top))
+    window.dispatchEvent(
+        pointer('pointermove', frameRect.left + 20, frameRect.top + 10)
+    )
+    window.dispatchEvent(
+        pointer('pointerup', frameRect.left + 20, frameRect.top + 10)
+    )
+
+    const rectEl = el.querySelector('.crop-rect') as HTMLElement
+    t.equal(parseFloat(rectEl.style.left), 20,
+        'left should move by the drag delta')
+    t.equal(parseFloat(rectEl.style.top), 10,
+        'top should move by the drag delta')
+    t.equal(parseFloat(rectEl.style.width), 180,
+        'width should shrink to compensate')
+    t.equal(parseFloat(rectEl.style.height), 90,
+        'height should shrink to compensate')
+})
+
+test('the crop rectangle cannot be resized below the minimum size', async t => {
+    document.body.innerHTML += `
+        <image-crop class="minsize-test" style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.minsize-test') as ImageCrop
+    const file = await makeImageFile(200, 100)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    const frame = el.querySelector('.image-crop-frame') as HTMLElement
+    const frameRect = frame.getBoundingClientRect()
+    const handle = el.querySelector('.handle-se') as HTMLElement
+
+    handle.dispatchEvent(
+        pointer('pointerdown', frameRect.right, frameRect.bottom)
+    )
+    window.dispatchEvent(pointer('pointermove', frameRect.left, frameRect.top))
+    window.dispatchEvent(pointer('pointerup', frameRect.left, frameRect.top))
+
+    const rectEl = el.querySelector('.crop-rect') as HTMLElement
+    t.equal(parseFloat(rectEl.style.width), 32,
+        'width should not shrink below 32px')
+    t.equal(parseFloat(rectEl.style.height), 32,
+        'height should not shrink below 32px')
+})
+
+test('dragging inside the rectangle moves it, clamped to image bounds', async t => {
+    document.body.innerHTML += `
+        <image-crop class="move-test" style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.move-test') as ImageCrop
+    const file = await makeImageFile(200, 100)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    const frame = el.querySelector('.image-crop-frame') as HTMLElement
+    const frameRect = frame.getBoundingClientRect()
+
+    // shrink the crop first via the se handle, so there's room to move
+    const seHandle = el.querySelector('.handle-se') as HTMLElement
+    seHandle.dispatchEvent(
+        pointer('pointerdown', frameRect.right, frameRect.bottom)
+    )
+    window.dispatchEvent(
+        pointer('pointermove', frameRect.right - 50, frameRect.bottom - 30)
+    )
+    window.dispatchEvent(
+        pointer('pointerup', frameRect.right - 50, frameRect.bottom - 30)
+    )
+
+    const rectEl = el.querySelector('.crop-rect') as HTMLElement
+    t.equal(parseFloat(rectEl.style.width), 150, 'sanity check width after shrink')
+    t.equal(parseFloat(rectEl.style.height), 70, 'sanity check height after shrink')
+
+    // now drag the body of the rect far past the bottom-right bound
+    rectEl.dispatchEvent(pointer('pointerdown', frameRect.left, frameRect.top))
+    window.dispatchEvent(
+        pointer('pointermove', frameRect.left + 1000, frameRect.top + 1000)
+    )
+    window.dispatchEvent(
+        pointer('pointerup', frameRect.left + 1000, frameRect.top + 1000)
+    )
+
+    t.equal(parseFloat(rectEl.style.left), 50,
+        'should clamp so the right edge stays inside the image')
+    t.equal(parseFloat(rectEl.style.top), 30,
+        'should clamp so the bottom edge stays inside the image')
+})
+
+test('crop state changes emit image-crop:change with natural pixel ' +
+    'coordinates', async t => {
+    document.body.innerHTML += `
+        <image-crop class="change-test" style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.change-test') as ImageCrop
+    const file = await makeImageFile(400, 200)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    const frame = el.querySelector('.image-crop-frame') as HTMLElement
+    const frameRect = frame.getBoundingClientRect()
+    const handle = el.querySelector('.handle-nw') as HTMLElement
+
+    let detail:{ x:number, y:number, width:number, height:number }|null = null
+    el.addEventListener('image-crop:change', (e:Event) => {
+        detail = (e as CustomEvent).detail
+    })
+
+    handle.dispatchEvent(pointer('pointerdown', frameRect.left, frameRect.top))
+    window.dispatchEvent(
+        pointer('pointermove', frameRect.left + 10, frameRect.top + 5)
+    )
+    window.dispatchEvent(
+        pointer('pointerup', frameRect.left + 10, frameRect.top + 5)
+    )
+
+    t.ok(detail, 'should have emitted image-crop:change')
+    t.equal(detail!.x, 20, 'x should be scaled to natural pixels')
+    t.equal(detail!.y, 10, 'y should be scaled to natural pixels')
+    t.equal(detail!.width, 380, 'width should be scaled to natural pixels')
+    t.equal(detail!.height, 190, 'height should be scaled to natural pixels')
+})

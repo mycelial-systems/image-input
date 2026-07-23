@@ -1,6 +1,16 @@
 import { WebComponent } from '@substrate-system/web-component'
 import { createDebug } from '@substrate-system/debug'
-import { fitWidth, scaleFor, toDisplayRect, type CropRect } from './crop-math.js'
+import {
+    fitWidth,
+    scaleFor,
+    toDisplayRect,
+    toNaturalRect,
+    moveRect,
+    resizeRect,
+    type CropRect,
+    type DisplaySize,
+    type HandleDir
+} from './crop-math.js'
 const debug = createDebug('image-crop')
 
 // for document.querySelector
@@ -12,7 +22,17 @@ declare global {
 
 export type { CropRect }
 
-const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
+const HANDLES:HandleDir[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
+const MIN_DISPLAY_SIZE = 32
+
+interface DragState {
+    mode:'move'|'resize'
+    handle?:HandleDir
+    pointerId:number
+    startClientX:number
+    startClientY:number
+    startRect:CropRect
+}
 
 export class ImageCrop extends WebComponent {
     static TAG = 'image-crop'
@@ -25,18 +45,35 @@ export class ImageCrop extends WebComponent {
     #naturalWidth = 0
     #naturalHeight = 0
     #crop:CropRect = { x: 0, y: 0, width: 0, height: 0 }
+    #drag:DragState|null = null
 
     connectedCallback () {
         debug('connected')
         super.connectedCallback()
         this.qs('img')?.addEventListener('load', this.#handleImageLoad)
         window.addEventListener('resize', this.#handleResize)
+        this.qs<HTMLElement>('.crop-rect')?.addEventListener(
+            'pointerdown', this.#handleMoveStart
+        )
+        Array.from(this.querySelectorAll<HTMLElement>('.handle')).forEach(
+            handle => {
+                handle.addEventListener(
+                    'pointerdown', this.#handleResizeStart
+                )
+            }
+        )
+        window.addEventListener('pointermove', this.#handlePointerMove)
+        window.addEventListener('pointerup', this.#handlePointerEnd)
+        window.addEventListener('pointercancel', this.#handlePointerEnd)
     }
 
     disconnectedCallback () {
         debug('disconnected')
         this.qs('img')?.removeEventListener('load', this.#handleImageLoad)
         window.removeEventListener('resize', this.#handleResize)
+        window.removeEventListener('pointermove', this.#handlePointerMove)
+        window.removeEventListener('pointerup', this.#handlePointerEnd)
+        window.removeEventListener('pointercancel', this.#handlePointerEnd)
         this.#revokeObjectUrl()
     }
 
@@ -71,6 +108,80 @@ export class ImageCrop extends WebComponent {
 
     #handleResize = ():void => {
         this.#layout()
+    }
+
+    #displaySize ():DisplaySize {
+        return fitWidth(
+            this.#naturalWidth, this.#naturalHeight, this.clientWidth
+        )
+    }
+
+    #handleMoveStart = (e:PointerEvent):void => {
+        if (!this.#naturalWidth) return
+        e.preventDefault()
+        const rectEl = this.qs<HTMLElement>('.crop-rect')
+        try {
+            rectEl?.setPointerCapture(e.pointerId)
+        } catch { /* not a real pointer in this environment */ }
+
+        const scale = scaleFor(this.#naturalWidth, this.clientWidth)
+        this.#drag = {
+            mode: 'move',
+            pointerId: e.pointerId,
+            startClientX: e.clientX,
+            startClientY: e.clientY,
+            startRect: toDisplayRect(this.#crop, scale)
+        }
+    }
+
+    #handleResizeStart = (e:PointerEvent):void => {
+        if (!this.#naturalWidth) return
+        e.preventDefault()
+        e.stopPropagation()
+        const handleEl = e.currentTarget as HTMLElement
+        const handle = HANDLES.find(
+            dir => handleEl.classList.contains(`handle-${dir}`)
+        )
+        if (!handle) return
+
+        try {
+            handleEl.setPointerCapture(e.pointerId)
+        } catch { /* not a real pointer in this environment */ }
+
+        const scale = scaleFor(this.#naturalWidth, this.clientWidth)
+        this.#drag = {
+            mode: 'resize',
+            handle,
+            pointerId: e.pointerId,
+            startClientX: e.clientX,
+            startClientY: e.clientY,
+            startRect: toDisplayRect(this.#crop, scale)
+        }
+    }
+
+    #handlePointerMove = (e:PointerEvent):void => {
+        const drag = this.#drag
+        if (!drag || e.pointerId !== drag.pointerId) return
+
+        const dx = e.clientX - drag.startClientX
+        const dy = e.clientY - drag.startClientY
+        const bounds = this.#displaySize()
+
+        const newDisplayRect = drag.mode === 'move' ?
+            moveRect(drag.startRect, dx, dy, bounds) :
+            resizeRect(
+                drag.startRect, drag.handle!, dx, dy, bounds, MIN_DISPLAY_SIZE
+            )
+
+        const scale = scaleFor(this.#naturalWidth, this.clientWidth)
+        this.#crop = toNaturalRect(newDisplayRect, scale)
+        this.#layout()
+        this.emit('change', { detail: { ...this.#crop } })
+    }
+
+    #handlePointerEnd = (e:PointerEvent):void => {
+        if (!this.#drag || e.pointerId !== this.#drag.pointerId) return
+        this.#drag = null
     }
 
     #layout ():void {

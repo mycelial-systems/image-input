@@ -264,3 +264,85 @@
   the corners/edges, and no dimming is visible (expected, since the
   initial crop covers the whole image). Killed the vite dev server
   and removed `.playwright-mcp/` and the scratch PNG afterwards.
+
+## 2026-07-23 - US-005
+
+- Implemented drag-to-move and drag-to-resize for `image-crop`.
+  Pointer listeners (`pointerdown`/`pointermove`/`pointerup`/
+  `pointercancel`) are wired in `connectedCallback` on `.crop-rect`
+  (move) and each `.handle` (resize, one per direction in `HANDLES`).
+  `pointerdown` on a handle calls `stopPropagation()` so the parent
+  `.crop-rect`'s move listener doesn't also fire.
+- Added pure, unit-testable coordinate/geometry functions to
+  `src/crop-math.ts`: `toNaturalRect` (inverse of the existing
+  `toDisplayRect`), `clampRect` (keep a rect inside bounds without
+  resizing it), `moveRect` (translate + clamp), and `resizeRect`
+  (grow/shrink from one of the 8 `HandleDir`s, clamped to bounds and
+  a caller-supplied `minSize`). All drag math happens in *display*
+  pixel space (matching pointer client-coordinate deltas 1:1); the
+  result is converted to natural-image pixels via `toNaturalRect`
+  only when writing back to `this.#crop` / emitting the event.
+- Drag state (`#drag`) snapshots the rect (in display coords) and
+  starting pointer position at `pointerdown`; every `pointermove`
+  recomputes the new rect from that snapshot plus the *total* delta
+  from the start (not incremental deltas), which avoids drift/
+  rounding accumulation across many small move events.
+- `this.emit('change', { detail: {...this.#crop} })` fires on every
+  `pointermove` while dragging (not just on `pointerup`), so
+  `image-crop:change` gives live natural-pixel-coordinate updates
+  matching the acceptance criteria.
+- `setPointerCapture` calls are wrapped in `try/catch` because
+  synthetic `PointerEvent`s dispatched in the tape-run test
+  environment don't correspond to a real active pointer session, and
+  some environments throw `NotFoundError`/`InvalidStateError` when
+  capture is requested for a pointer id with no active pointer. This
+  doesn't affect real mouse/touch usage in a real browser (verified
+  manually, see below).
+- **Learnings for future iterations:**
+  - `this.qsa(...)` on `WebComponent` returns a real `NodeList`
+    (`this.querySelectorAll(selector)` under the hood) despite the
+    published `.d.ts` typing it as returning a single element or
+    null — that type declaration is wrong/misleading. Don't rely on
+    `.d.ts` here; use `Array.from(this.querySelectorAll<T>(sel))`
+    directly when you need to iterate, and use `this.qs<T>(sel)` with
+    an explicit generic (not the default `Element`) whenever you plan
+    to call type-specific methods like `addEventListener('pointerdown',
+    ...)` on the result — otherwise `tsc` fails (during `npm run
+    build`'s `--emitDeclarationOnly` step, NOT during `esbuild`, so
+    `npm run build-tests`/tape-run passing doesn't guarantee the
+    typecheck used for the final `npm test` gate also passes) with a
+    "No overload matches this call" error because the inferred type is
+    the generic `Element`, whose `addEventListener` overload doesn't
+    accept a `(e: PointerEvent) => void` listener.
+  - For drag-style pointer interactions, snapshot the *start* rect and
+    pointer position on `pointerdown`, then always recompute from that
+    snapshot + `(current - start)` total delta on `pointermove` — do
+    not accumulate incremental per-event deltas onto the live rect, or
+    floating point drift and duplicate-event edge cases compound.
+  - Tested drag/resize/move/clamp/min-size/change-event behavior with
+    synthetic `PointerEvent`s in `test/crop.ts` (constructing them with
+    `new PointerEvent(type, { clientX, clientY, pointerId, bubbles:
+    true, cancelable: true })` and reading `frame.getBoundingClientRect()`
+    to anchor client coordinates to the real rendered layout) — this
+    works fine in the tape-run/real-browser test harness without needing
+    to mock pointer capture.
+  - Verified manually in the browser with the Playwright MCP tools
+    (`browser_mouse_drag_xy`) against `npm run start`, using the
+    existing example page's `#crop-file` input (already wired to
+    `image-crop` from the US-004 session) and a freshly generated
+    400x200 test PNG: confirmed dragging an `se` corner handle resizes
+    both axes, dragging the rectangle body moves it, and dragging far
+    past the image bounds clamps the rect (and the `image-crop:change`
+    event detail) to the maximum in-bounds position rather than
+    following the pointer. Killed the vite dev server and removed
+    `.playwright-mcp/` and the scratch PNG afterwards.
+- Files changed: `src/crop-math.ts`, `src/crop.ts`, `test/crop-math.ts`
+  (new), `test/crop.ts`, `test/index.ts` (import crop-math tests),
+  `specs/prd.json` (US-005 `passes: true`).
+- Tests: 8 new pure-function tests for `moveRect`/`resizeRect`/
+  `toNaturalRect` in `test/crop-math.ts`, plus 4 new integration tests
+  in `test/crop.ts` (corner-handle resize, minimum-size clamp,
+  move-with-bounds-clamp, and the `image-crop:change` event payload).
+  Full `npm test` (lint + build + typecheck + tape-run) passes with
+  78 total assertions.
+---
