@@ -1,0 +1,63 @@
+dialog#crop-dialog,
+dialog#alt-dialog {
+    border: none;
+    border-radius: 8px;
+    padding: 1rem;
+    max-width: 90vw;
+
+    & menu {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.5rem;
+        margin: 1rem 0 0;
+        padding: 0;
+    }
+}
+
+button {
+    background-color: transparent;
+    padding: 0.5rem 1rem;
+    border: 1px solid;
+    outline: 1px solid transparent;
+    transform: translate(0);
+    transition: all 0.2s;
+    cursor: pointer;
+
+    &:hover, &:focus-visible {
+        outline-color: black;
+        background-color: white;
+        transform: translate(-1px, -1px);
+    }
+
+    &:active {
+        transform: translate(1px, 1px);
+    }
+}
+
+image-input {
+    .preview {
+        width: 100%;
+        margin: 0 auto;
+
+        & img {
+            margin: 0 auto;
+            width: 100%;
+        }
+    }
+}
+
+dialog#crop-dialog image-crop {
+    display: block;
+    max-width: min(90vw, 480px);
+}
+
+dialog#alt-dialog textarea {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    margin-top: 0.5rem;
+}
+
+input {
+    margin-bottom: 1rem;
+}

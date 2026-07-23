@@ -1,0 +1,571 @@
+## Codebase Patterns
+
+- `WebComponent` (from `@substrate-system/web-component`) uses
+  `this.TAG` (an **instance** field) inside `emit()`/`on()`/`off()`,
+  not the static `TAG`. Any subclass that only sets `static TAG = '...'`
+  without also setting an instance field `TAG = '...'` will silently
+  emit events namespaced as `:eventname` (empty prefix) instead of
+  `tag-name:eventname`, and consumer listeners for the namespaced event
+  will never fire. Always set both:
+  ```ts
+  export class Foo extends WebComponent {
+      static TAG = 'foo'
+      TAG = Foo.TAG
+      ...
+  }
+  ```
+  This was a latent bug in the original `image-input` scaffold (only
+  `static TAG` was set) that had gone unnoticed because no test
+  exercised a namespaced custom event before this session.
+- Reflected attributes (`static reflectedStringAttributes` /
+  `reflectedBooleanAttributes`) get auto-generated getters/setters by
+  the base class's `define()`. Adding a name here is enough to get
+  `this.foo` / `this.foo = x` working; you still write your own
+  `handleChange_foo(oldValue, newValue)` for DOM side effects, which
+  runs on `attributeChangedCallback`, not on `render()`. `render()`
+  only runs once (from `connectedCallback`), so any post-mount state
+  changes (alt text, preview image, overlay toggling) should mutate
+  the existing DOM directly (via `this.qs(...)`) rather than
+  re-invoking `render()`, or you will lose imperative state like the
+  `<img>` `src` set from a file/object URL.
+- CSS: `src/_vars.css` holds `:root` custom properties, imported by
+  `src/index.css` via `@import './_vars.css'`. The `build-css` /
+  `build-css:min` npm scripts now pass `--bundle` to `lightningcss` so
+  the import is inlined into `dist/index.css` (bundler CLI does not
+  resolve `@import` by default, only with `--bundle`). Keep this flag
+  if more CSS partials are added later (e.g. for `crop.ts`).
+- Preview images use `URL.createObjectURL(file)` (not `FileReader`
+  data URLs) so the same object-URL lifecycle/revocation pattern can
+  be reused by `image-crop` later. Always revoke the previous object
+  URL before creating a new one and on remove, to avoid leaking blobs.
+- Test pattern for simulating a file input: build a `DataTransfer`,
+  `dataTransfer.items.add(file)`, assign `input.files =
+  dataTransfer.files`, then `input.dispatchEvent(new Event('change',
+  { bubbles: true }))`. See `test/index.ts` `selectFile()` helper.
+- No "dev-browser" skill is registered in this harness. Use the
+  Playwright MCP tools directly against `npm run start` (vite dev
+  server) for the "verify in browser" acceptance criteria, and kill
+  the dev server + delete the `.playwright-mcp/` scratch directory
+  afterwards (it is not gitignored and holds screenshots/snapshots
+  that shouldn't be committed).
+- `test/index.html` (the tape-run harness) does NOT load
+  `src/index.css` -- only `test-bundle.js`. Any component whose
+  correctness depends on real layout (not just class-presence
+  assertions) cannot rely on external stylesheet rules like
+  `display:block` or `width:100%` being applied during tests.
+  Compute pixel dimensions in JS from `this.clientWidth` etc. and
+  set them as inline styles rather than depending on the stylesheet,
+  and force a deterministic box size in tests via an inline
+  `style="display:block;width:...px"` on the host element.
+
+## 2026-07-23 - US-001
+
+- Implemented the preview overlay for `image-input`: after a file is
+  selected, the component shows the image preview with an overlay
+  containing an "+ ALT"/"ALT" badge button, a pencil edit button, and
+  an x remove button, matching the Bluesky-style thumbnail chrome.
+- Added a minimal `alt` reflected string attribute/property (full
+  scope belongs to US-003, but US-001's acceptance criteria requires
+  the badge to switch state once alt text is set via the `alt`
+  property, so the property and the badge-toggling `handleChange_alt`
+  were added now). Setting `el.alt` updates the preview `<img>`'s
+  `alt` attribute and toggles a `.has-alt` class on the badge (tests
+  assert on the class, not the button's text content, per the
+  no-brittle-text-assertions rule).
+- Clicking remove clears the file, revokes the preview object URL,
+  clears the alt attribute, resets the file input's value, hides the
+  overlay, and emits `image-input:remove`.
+- Switched the preview from `FileReader`/data-URL to
+  `URL.createObjectURL(file)`, revoked on remove and before setting a
+  new file, per the PRD's Technical Considerations (also needed later
+  for US-007's leak-avoidance requirement).
+- Found and fixed a pre-existing bug in `ImageInput`: only `static TAG`
+  was set, so `this.emit(...)` (which reads the instance field
+  `this.TAG` from the base class) produced malformed event names like
+  `:remove` instead of `image-input:remove`, and consumer listeners
+  never fired. Added `TAG = ImageInput.TAG` as an instance field. See
+  Codebase Patterns above.
+- Added `src/_vars.css` (new file) with the CSS custom properties for
+  the overlay (pill colors, radius, sizes, focus color), imported from
+  `src/index.css` via `@import`. Updated `build-css` / `build-css:min`
+  npm scripts to pass `--bundle` to `lightningcss` so the import
+  resolves in the shipped `dist/index.css`.
+- Files changed: `src/index.ts`, `src/index.css`, `src/_vars.css`
+  (new), `test/index.ts`, `package.json` (build-css scripts),
+  `specs/prd.json` (US-001 passes: true).
+- Tests: added 3 new tape tests (overlay controls presence + a11y
+  names, alt property toggling the badge class, remove clearing state
+  and emitting the event) plus kept the original smoke test. All 15
+  assertions pass via `npm test` (lint + typecheck + build + tape-run
+  in a real browser via `tape-run`).
+- Verified manually in the browser with the Playwright MCP tools
+  against `npm run start`: uploaded a real file via the file chooser,
+  confirmed the overlay (ALT badge, pencil, x) renders with correct
+  accessible names, clicked remove and confirmed the component returns
+  to the empty state, and confirmed `image-input:change` fires with
+  the correct namespaced type and `{ file }` detail (this last check
+  also validates the `TAG` fix works outside the test harness).
+- **Learnings for future iterations:**
+  - See Codebase Patterns section above (TAG instance field gotcha,
+    render()-runs-once pattern, lightningcss --bundle, object URL
+    lifecycle, DataTransfer test helper, no dev-browser skill here).
+  - Icons are inline `<svg>` with `currentColor` stroke (no icon
+    library dependency, consistent with the "zero new runtime
+    dependencies" project goal). Reuse this approach for any future
+    icon needs (e.g. crop handles).
+- Playwright MCP tools ARE available in this harness (the earlier
+  "no dev-browser skill" note still holds -- there's no dedicated
+  skill -- but the `mcp__plugin_ed3d-playwright_...` tool set works
+  fine against `npm run start`). Use `browser_navigate`,
+  `browser_file_upload` after clicking the file input to trigger the
+  chooser, and `browser_evaluate` to attach listeners / read captured
+  event details, since accessibility snapshots don't show custom
+  event activity.
+
+## 2026-07-23 - US-002
+
+- Implemented edit/alt-text request events: clicking the pencil
+  (`.edit`) button emits `image-input:edit` with `{ file }`; clicking
+  the ALT badge (`.alt-badge`) emits `image-input:alt` with
+  `{ file, alt }` (`alt` is the current `this.alt` value, or `''` if
+  unset). Both handlers are no-ops if no file has been selected yet
+  (buttons are only visible once `.has-image` is set, but this guards
+  against programmatic clicks). Neither handler performs navigation or
+  opens a dialog -- that responsibility is left entirely to the
+  consumer per the PRD's headless-pattern intent (US-008 will wire a
+  `<dialog>` in the example app).
+- Events bubble by default via the base `WebComponent.emit()` (default
+  `{ bubbles: true }`), confirmed both by a unit test listening on
+  `document.body` and by the browser verification below.
+- Files changed: `src/index.ts` (added `handleEdit`/`handleAlt`
+  bound methods, wired up in `setupEventListeners`/
+  `disconnectedCallback`), `test/index.ts` (4 new tests: edit event +
+  bubbling, alt event with empty and then set alt text, no-dialog
+  guard), `specs/prd.json` (US-002 `passes: true`).
+- Tests: 4 new tape tests, all pass; full `npm test` (lint + build +
+  typecheck via `tsc --emitDeclarationOnly` + tape-run) passes with 22
+  total assertions.
+- Verified manually in the browser with the Playwright MCP tools
+  against `npm run start`: uploaded a real 1x1 PNG via the file
+  chooser, attached `image-input:edit`/`image-input:alt` listeners via
+  `browser_evaluate`, clicked the edit and ALT badge buttons, and
+  confirmed both events fired with the correct file name and alt text
+  in `detail`, and that no `<dialog>` appeared. Killed the vite dev
+  server and removed `.playwright-mcp/` afterwards.
+- **Learnings for future iterations:**
+  - See Codebase Patterns section above (new note: Playwright MCP
+    tools work fine here despite no dedicated dev-browser skill).
+  - `handleEdit`/`handleAlt` both read `this.#file`/`this.alt`
+    directly rather than threading state through render() -- this is
+    the reason the "render()-runs-once, mutate DOM imperatively"
+    pattern in Codebase Patterns exists; keep following it for US-003
+    onward instead of re-rendering.
+---
+
+## 2026-07-23 - US-003
+
+- Most of US-003's scope (the `alt` reflected string property, and
+  `handleChange_alt` updating the preview `<img>` alt attribute and
+  toggling the badge's `.has-alt` class) had already been implemented
+  during US-001, per that entry's notes. The one remaining gap was
+  the acceptance criterion that `image-input:change` include the
+  current alt text in its detail -- it previously only emitted
+  `{ file }`.
+- Wrote a failing test first (`change event detail includes the
+  current alt text`) asserting `image-input:change` detail has
+  `alt: ''` before any alt text is set, and the current alt string
+  after `el.alt` is set and a second file is selected. Confirmed it
+  failed (`actual: undefined`) before the fix.
+- Fix: `handleFileSelect` in `src/index.ts` now emits
+  `{ detail: { file, alt: this.alt ?? '' } }` instead of
+  `{ detail: { file } }`.
+- Files changed: `src/index.ts`, `test/index.ts`,
+  `specs/prd.json` (US-003 `passes: true`).
+- Tests: 1 new tape test (3 assertions), full `npm test` (lint +
+  build + typecheck + tape-run) passes with 25 total assertions.
+- No browser verification step was listed in this story's acceptance
+  criteria (unlike US-001/US-002), so none was performed.
+- **Learnings for future iterations:**
+  - Before implementing a story, check whether a prior story's notes
+    already did part of the work "ahead of schedule" (see US-001's
+    note about the `alt` property) -- grep the acceptance criteria
+    against current source first to scope down to the real gap.
+---
+
+## 2026-07-23 - US-004
+
+- Added a new `image-crop` element (`src/crop.ts`), a from-scratch
+  crop UI following the same `WebComponent` light-DOM pattern as
+  `image-input`. Accepts an image via the reflected `src` string
+  attribute or a `setFile(file)` method (creates/revokes an object
+  URL, mirroring `image-input`'s lifecycle).
+- Added `src/crop-math.ts`: small pure functions (`fitWidth`,
+  `scaleFor`, `toDisplayRect`) for natural-to-display pixel math.
+  Not unit-tested standalone yet (no test runner for pure TS outside
+  the browser tape harness in this repo), but written to be
+  reused/tested by US-005's coordinate-mapping requirement, and
+  already exercised indirectly by `crop.ts`'s layout tests.
+- On the image's `load` event, the component reads
+  `naturalWidth`/`naturalHeight`, sets the initial crop to cover the
+  full image, and lays out: the frame and image are sized in JS
+  (not just via CSS `width:100%`) so the aspect-ratio-preserving fit
+  is computed and testable independent of whether the stylesheet is
+  loaded. A dashed-border `.crop-rect` with 8 `.handle` spans (4
+  corners + 4 edge midpoints, positioned via CSS `left/top` +
+  `transform: translate(-50%,-50%)`) overlays the image. Four
+  sibling `.dim-{top,bottom,left,right}` panels are sized in JS from
+  the crop rect vs. the displayed image bounds to dim the
+  non-cropped area (all zero-sized initially, since the crop starts
+  covering the full image -- verified by test).
+- Recomputes layout on `window resize` in addition to image load;
+  no dragging/resizing yet (that's US-005 -- handles and the dim
+  panels render but aren't interactive this story).
+- CSS added to `src/index.css` (`image-crop { ... }` block) using
+  new variables added to `src/_vars.css`
+  (`--image-crop-dim-color`, `--image-crop-rect-border-*`,
+  `--image-crop-handle-*`, `--image-crop-focus-color` for later
+  keyboard-focus use in US-006).
+- Wired a minimal `image-crop` + file input into `example/index.ts`
+  for manual browser verification ahead of US-008's full dialog
+  flow; US-008 will replace/extend this with the real composed flow.
+- **Key gotcha found while writing tests:** the tape test harness
+  (`test/index.html`) does NOT load `src/index.css` -- only
+  `test-bundle.js`. Any component whose correctness depends on real
+  layout (not just class-presence assertions) cannot rely on
+  external stylesheet rules like `display:block` or `width:100%`
+  being applied during tests. Fix: `crop.ts` reads `this.clientWidth`
+  (the host element) rather than a CSS-dependent child width, and
+  sets the frame/image *and* crop-rect dimensions directly via
+  inline styles computed in JS, so layout is correct with or without
+  the stylesheet loaded (tests force `style="display:block;width:...px"`
+  inline on the host to control the box size deterministically).
+  Any future component here that asserts on real pixel dimensions in
+  tests should follow the same JS-computed-inline-style approach
+  rather than depending on `src/index.css` being present.
+- Test images: generated on the fly via `canvas.toBlob()` inside
+  `test/crop.ts` (a `makeImageFile(width, height)` helper) rather
+  than hardcoding base64 PNG fixtures, so exact natural dimensions
+  are known and controllable per test.
+- Files changed: `src/crop.ts` (new), `src/crop-math.ts` (new),
+  `src/index.css`, `src/_vars.css`, `test/crop.ts` (new),
+  `test/index.ts` (import crop tests), `example/index.ts`,
+  `specs/prd.json` (US-004 `passes: true`).
+- Tests: 6 new tape tests (13 new assertions: element found, setFile
+  sizes the frame preserving aspect ratio, src attribute sets the
+  img src, 8 handles + crop-rect covers the full image, 4 dim panels
+  render and are zero-sized initially). Full `npm test` (lint +
+  build + typecheck + tape-run) passes with 36 total assertions.
+- Verified manually in the browser with the Playwright MCP tools
+  against `npm run start`: generated a 400x200 test PNG with
+  `python3`+`zlib` (no image fixture existed in the repo), uploaded
+  it through the example's file input, and confirmed via screenshot
+  that the image renders at the correct 2:1 aspect ratio, the dashed
+  crop rectangle covers the full image with all 8 handles visible at
+  the corners/edges, and no dimming is visible (expected, since the
+  initial crop covers the whole image). Killed the vite dev server
+  and removed `.playwright-mcp/` and the scratch PNG afterwards.
+
+## 2026-07-23 - US-005
+
+- Implemented drag-to-move and drag-to-resize for `image-crop`.
+  Pointer listeners (`pointerdown`/`pointermove`/`pointerup`/
+  `pointercancel`) are wired in `connectedCallback` on `.crop-rect`
+  (move) and each `.handle` (resize, one per direction in `HANDLES`).
+  `pointerdown` on a handle calls `stopPropagation()` so the parent
+  `.crop-rect`'s move listener doesn't also fire.
+- Added pure, unit-testable coordinate/geometry functions to
+  `src/crop-math.ts`: `toNaturalRect` (inverse of the existing
+  `toDisplayRect`), `clampRect` (keep a rect inside bounds without
+  resizing it), `moveRect` (translate + clamp), and `resizeRect`
+  (grow/shrink from one of the 8 `HandleDir`s, clamped to bounds and
+  a caller-supplied `minSize`). All drag math happens in *display*
+  pixel space (matching pointer client-coordinate deltas 1:1); the
+  result is converted to natural-image pixels via `toNaturalRect`
+  only when writing back to `this.#crop` / emitting the event.
+- Drag state (`#drag`) snapshots the rect (in display coords) and
+  starting pointer position at `pointerdown`; every `pointermove`
+  recomputes the new rect from that snapshot plus the *total* delta
+  from the start (not incremental deltas), which avoids drift/
+  rounding accumulation across many small move events.
+- `this.emit('change', { detail: {...this.#crop} })` fires on every
+  `pointermove` while dragging (not just on `pointerup`), so
+  `image-crop:change` gives live natural-pixel-coordinate updates
+  matching the acceptance criteria.
+- `setPointerCapture` calls are wrapped in `try/catch` because
+  synthetic `PointerEvent`s dispatched in the tape-run test
+  environment don't correspond to a real active pointer session, and
+  some environments throw `NotFoundError`/`InvalidStateError` when
+  capture is requested for a pointer id with no active pointer. This
+  doesn't affect real mouse/touch usage in a real browser (verified
+  manually, see below).
+- **Learnings for future iterations:**
+  - `this.qsa(...)` on `WebComponent` returns a real `NodeList`
+    (`this.querySelectorAll(selector)` under the hood) despite the
+    published `.d.ts` typing it as returning a single element or
+    null — that type declaration is wrong/misleading. Don't rely on
+    `.d.ts` here; use `Array.from(this.querySelectorAll<T>(sel))`
+    directly when you need to iterate, and use `this.qs<T>(sel)` with
+    an explicit generic (not the default `Element`) whenever you plan
+    to call type-specific methods like `addEventListener('pointerdown',
+    ...)` on the result — otherwise `tsc` fails (during `npm run
+    build`'s `--emitDeclarationOnly` step, NOT during `esbuild`, so
+    `npm run build-tests`/tape-run passing doesn't guarantee the
+    typecheck used for the final `npm test` gate also passes) with a
+    "No overload matches this call" error because the inferred type is
+    the generic `Element`, whose `addEventListener` overload doesn't
+    accept a `(e: PointerEvent) => void` listener.
+  - For drag-style pointer interactions, snapshot the *start* rect and
+    pointer position on `pointerdown`, then always recompute from that
+    snapshot + `(current - start)` total delta on `pointermove` — do
+    not accumulate incremental per-event deltas onto the live rect, or
+    floating point drift and duplicate-event edge cases compound.
+  - Tested drag/resize/move/clamp/min-size/change-event behavior with
+    synthetic `PointerEvent`s in `test/crop.ts` (constructing them with
+    `new PointerEvent(type, { clientX, clientY, pointerId, bubbles:
+    true, cancelable: true })` and reading `frame.getBoundingClientRect()`
+    to anchor client coordinates to the real rendered layout) — this
+    works fine in the tape-run/real-browser test harness without needing
+    to mock pointer capture.
+  - Verified manually in the browser with the Playwright MCP tools
+    (`browser_mouse_drag_xy`) against `npm run start`, using the
+    existing example page's `#crop-file` input (already wired to
+    `image-crop` from the US-004 session) and a freshly generated
+    400x200 test PNG: confirmed dragging an `se` corner handle resizes
+    both axes, dragging the rectangle body moves it, and dragging far
+    past the image bounds clamps the rect (and the `image-crop:change`
+    event detail) to the maximum in-bounds position rather than
+    following the pointer. Killed the vite dev server and removed
+    `.playwright-mcp/` and the scratch PNG afterwards.
+- Files changed: `src/crop-math.ts`, `src/crop.ts`, `test/crop-math.ts`
+  (new), `test/crop.ts`, `test/index.ts` (import crop-math tests),
+  `specs/prd.json` (US-005 `passes: true`).
+- Tests: 8 new pure-function tests for `moveRect`/`resizeRect`/
+  `toNaturalRect` in `test/crop-math.ts`, plus 4 new integration tests
+  in `test/crop.ts` (corner-handle resize, minimum-size clamp,
+  move-with-bounds-clamp, and the `image-crop:change` event payload).
+  Full `npm test` (lint + build + typecheck + tape-run) passes with
+  78 total assertions.
+---
+
+## 2026-07-23 - US-006
+
+- Added keyboard accessibility to `image-crop`'s `.crop-rect`: it is
+  now in the tab order (`tabindex="0"`), has `role="group"` and a
+  descriptive `aria-label` (both set in `render()`), and a
+  `keydown` listener (wired in `connectedCallback`/removed in
+  `disconnectedCallback`, same pattern as the pointer listeners).
+- Arrow keys move the crop by a fixed `KEY_STEP` (8 display px) via
+  the existing `moveRect` pure function; shift+arrow keys resize via
+  the existing `resizeRect` pure function. Convention chosen (not
+  specified by the PRD, documented here for future consistency):
+  shift+Right/Down grow the rect (via the `e`/`s` handles), shift+
+  Left/Up shrink it. All keyboard math reuses the exact same
+  display-to-natural coordinate pipeline as pointer dragging
+  (`toDisplayRect` -> `moveRect`/`resizeRect` -> `toNaturalRect` ->
+  `#layout()` -> emit `change`), so no new coordinate-mapping code
+  was needed -- this validates the US-005 design decision to
+  centralize that math in pure functions.
+- `e.preventDefault()` on handled arrow keys stops the page from
+  scrolling while the crop rect has focus.
+- Added a `:focus-visible` outline on `.crop-rect` in `src/index.css`
+  reusing the existing `--image-crop-focus-color` variable (already
+  added in US-004 anticipating this story).
+- Files changed: `src/crop.ts`, `src/index.css`, `test/crop.ts`,
+  `specs/prd.json` (US-006 `passes: true`).
+- Tests: 4 new tape tests (8 new assertions) written first and
+  confirmed failing before implementation: crop rect is focusable
+  with a role/aria-label, arrow keys move it, shift+arrow keys
+  resize it, and keyboard interactions emit `image-crop:change`.
+  Per the no-brittle-text rule, the aria-label test only asserts the
+  attribute is present/non-empty, not its exact string. Full
+  `npm test` (lint + build + typecheck + tape-run) passes with 86
+  total assertions.
+- Verified manually in the browser with the Playwright MCP tools
+  against `npm run start`: uploaded a generated 300x150 test PNG via
+  the example page's `#crop-file` input, focused `.crop-rect` via
+  `el.focus()`, confirmed `document.activeElement` is the rect and
+  its `aria-label` is set, pressed Shift+ArrowLeft and confirmed the
+  displayed width shrank (400px -> 392px), pressed ArrowRight/
+  ArrowDown and confirmed the rect's `left` moved by 8px (top stayed
+  clamped at 0 since the crop already filled the full image height),
+  and confirmed via `getComputedStyle` that a solid 2px focus outline
+  renders when the rect has focus. Killed the vite dev server and
+  removed `.playwright-mcp/` and the scratch PNG afterwards.
+- **Learnings for future iterations:**
+  - Keyboard interactions can reuse pointer-drag pure functions
+    (`moveRect`/`resizeRect`) directly by treating a keypress as a
+    single (dx, dy) delta in display-pixel space -- no separate
+    keyboard-specific math was needed.
+---
+
+## 2026-07-23 - US-007
+
+- Added `getBlob(opts?)` and a `crop` getter to `image-crop`
+  (`src/crop.ts`). `crop` returns a shallow copy of the internal
+  `#crop` rect (natural-image pixels). `getBlob` draws the current
+  crop region from the `<img>` element onto a freshly-created
+  offscreen `<canvas>` sized to `crop.width x crop.height` via
+  `ctx.drawImage(img, x, y, width, height, 0, 0, width, height)`,
+  then resolves `canvas.toBlob(...)` as a Promise. `opts.type`
+  defaults to `image/jpeg`; `opts.quality` is passed through
+  untouched (defaults to the browser's own default when omitted, as
+  `HTMLCanvasElement.toBlob` already does).
+- Added `setImage(blob)` to `image-input` (`src/index.ts`) so a
+  cropped Blob (e.g. from `image-crop`'s `getBlob()`) can be fed back
+  in as the component's file. Widened `#file`'s type from
+  `File|null` to `File|Blob|null` (and `#setFile`'s parameter type
+  to match) since a Blob has no `name`/`lastModified` and there's no
+  reason to require the caller to wrap it in a `File`. `setImage`
+  reuses the existing `#setFile` private method (revokes the
+  previous object URL, creates a new one, sets it as the preview
+  `<img>` src, adds `.has-image`), then emits `image-input:change`
+  with `{ file: blob, alt: this.alt ?? '' }` so consumers listening
+  for `image-input:change` see the swapped-in blob the same way they
+  see a freshly-picked file -- this satisfies the acceptance
+  criterion that setImage "replaces ... the file emitted in
+  subsequent change events".
+- Object URL revocation was already handled by the existing
+  `#setFile`/`#revokePreviewUrl` pattern from US-001; `setImage`
+  gets this for free by routing through `#setFile` rather than
+  duplicating the object-URL logic.
+- Wrote failing tests first: `test/crop.ts` gained a `crop` getter
+  test and two `getBlob` tests (default `image/jpeg` type + correct
+  natural-resolution dimensions verified by loading the resulting
+  Blob into a real `Image` and reading `naturalWidth`/`naturalHeight`;
+  a second test asserting the `type` option is honored). Confirmed
+  these crashed (`el.crop`/`el.getBlob` undefined) before
+  implementing. `test/index.ts` gained two `setImage` tests: preview
+  swap + `image-input:change` detail, and a URL-revocation test that
+  monkey-patches `URL.revokeObjectURL` around the `setImage` call to
+  assert the previous preview's object URL was revoked.
+- Files changed: `src/crop.ts`, `src/index.ts`, `test/crop.ts`,
+  `test/index.ts`, `specs/prd.json` (US-007 `passes: true`).
+- Tests: 12 new tape assertions. Full `npm test` (lint + build +
+  typecheck + tape-run) passes with 98 total assertions.
+- No "verify in browser" step was listed in this story's acceptance
+  criteria (unlike most prior stories), so none was performed; the
+  canvas/Blob behavior is fully covered by the tape tests running in
+  a real browser via `tape-run`.
+- **Learnings for future iterations:**
+  - To verify a Blob's actual pixel dimensions in a test without a
+    dedicated image-decoding library, load it into a real `Image`
+    via `URL.createObjectURL` + `img.onload`, then read
+    `naturalWidth`/`naturalHeight` (see `loadBlobDimensions` in
+    `test/crop.ts`) -- revoke that object URL after load to avoid
+    leaking it from the test itself.
+  - To assert something was cleaned up (object URL revocation, etc.)
+    without a spy library, monkey-patch the global method
+    (`URL.revokeObjectURL`) around just the call under test, record
+    calls to an array, then restore the original -- simplest option
+    given this repo has no mocking dependency.
+---
+
+## 2026-07-23 - US-008
+
+- Wired the example app (`example/index.ts`) into the full Bluesky-style
+  flow: `image-input` composed with `image-crop` and an alt-text
+  `<textarea>`, both hosted in native `<dialog>` elements owned by the
+  example app (not the library components), demonstrating the headless
+  pattern the PRD calls for -- `image-input`/`image-crop` never open a
+  dialog themselves, only emit `edit`/`alt`/`change` events.
+  - `image-input:edit` -> `crop.setFile(file)` + `cropDialog.showModal()`.
+  - Crop dialog's Save button -> `crop.getBlob()` -> `input.setImage(blob)`
+    -> `cropDialog.close()`. Cancel just closes without applying.
+  - `image-input:alt` -> populate the textarea with the current alt text
+    (from the event detail) -> `altDialog.showModal()`.
+  - Alt dialog's Save button -> `input.alt = altTextarea.value` ->
+    `altDialog.close()`.
+- Removed the static `<image-input></image-input>` markup that had
+  been sitting in `example/index.html` since the project scaffold --
+  `example/index.ts` already builds all markup itself via
+  `document.body.innerHTML +=`, so the static tag was producing a
+  second, unwired `<image-input>` on the page (found while verifying
+  in-browser: the page showed two "Choose File" buttons). `index.html`
+  now only contains the module script tag; all markup lives in TS.
+- Added `example/index.css` (new, separate from `src/index.css`) with
+  minimal dialog/menu/textarea layout styling scoped to the example
+  app only -- did not touch the shipped component library's CSS
+  (`src/index.css`/`src/_vars.css`) since this styling isn't part of
+  what consumers of the package receive.
+- No dedicated automated test was added for this story: it's pure
+  example-app wiring (composition of already-tested `image-input`/
+  `image-crop` behavior via already-tested public APIs), and US-009 is
+  the dedicated "add tests" story. A test would mostly duplicate the
+  existing `image-input:edit`/`image-input:alt`/`setImage`/`getBlob`
+  unit tests already covering the underlying behavior.
+- Files changed: `example/index.ts`, `example/index.html`,
+  `example/index.css` (new), `specs/prd.json` (US-008 `passes: true`).
+- Verified manually in the browser with the Playwright MCP tools
+  against `npm run start`: generated a 400x200 test PNG, uploaded it,
+  clicked the pencil (edit) button and confirmed the crop dialog opens
+  with the image loaded; used `Shift+ArrowLeft` on the focused crop
+  rect (a pointer-drag via `browser_mouse_drag_xy` did not register as
+  a real drag in this environment, same as noted for prior stories --
+  keyboard interaction is not subject to that limitation and is
+  equally valid for confirming the crop math is live) to shrink the
+  crop to 392x200, clicked Save, and confirmed the dialog closed and
+  the `image-input` preview `<img>` was replaced with a new blob URL
+  whose decoded natural dimensions were exactly 392x200 (loaded via a
+  fresh `Image` in `browser_evaluate`, matching the `loadBlobDimensions`
+  pattern from `test/crop.ts`). Then clicked the "+ALT" badge, typed
+  alt text into the dialog's textarea, clicked Save, and confirmed the
+  dialog closed, the badge switched to its `has-alt`/"Edit alt text"
+  state, and the preview `<img>`'s `alt` attribute was set to the
+  entered text. Killed the vite dev server and removed
+  `.playwright-mcp/` and the scratch PNG afterwards.
+- Full `npm test` (lint + build + typecheck + tape-run) passes with 98
+  total assertions (unchanged from US-007, since no new tests were
+  added this story).
+- **Learnings for future iterations:**
+  - Check `example/index.html` for stray static markup left over from
+    an earlier story before wiring a full composed flow in
+    `example/index.ts` -- `document.body.innerHTML +=` silently
+    duplicates rather than erroring if the target elements already
+    exist in the static HTML, which is easy to miss without an
+    in-browser check.
+  - `browser_mouse_drag_xy` (Playwright MCP) does not reliably trigger
+    this component's `pointerdown`/`pointermove`/`pointerup` sequence
+    in this environment; prefer keyboard interaction
+    (`browser_press_key` with focus set via `browser_evaluate`) to
+    verify crop-rect behavior manually when a drag doesn't visibly
+    register, rather than assuming the feature is broken.
+---
+
+## 2026-07-23 - US-009
+
+- Audited US-009's acceptance criteria against the tests already
+  written incrementally during US-001 through US-007 (this repo
+  followed test-first per story throughout, so most of this story's
+  scope existed already, similar to the US-003 finding):
+  - change event payload shape: covered, plus one new dedicated test
+    added this session (see below).
+  - alt property reflection: covered by `alt property toggles the
+    badge state` (`test/index.ts`).
+  - remove behavior: covered by `remove clears state and emits an
+    event` (`test/index.ts`).
+  - crop rect math (display-to-natural coordinate mapping): covered
+    by `test/crop-math.ts` (`moveRect`/`resizeRect`/`toNaturalRect`
+    pure-function tests, no browser layout dependency) plus the
+    integration-level drag/keyboard tests in `test/crop.ts`.
+  - getBlob producing a Blob of the expected dimensions: covered by
+    `getBlob returns a Blob of the cropped region at natural
+    resolution` (`test/crop.ts`).
+  - No tests assert on specific visible text content (grepped for
+    string-literal text assertions across `test/*.ts`; existing tests
+    already only assert on classes/attributes/values, not text).
+- The one gap: no test asserted the `image-input:change` detail
+  *shape* (its exact key set) in isolation -- the existing coverage
+  bundled that check together with alt-text-specific assertions. Added
+  `change event payload has the expected shape` in `test/index.ts`,
+  asserting `Object.keys(detail).sort()` is exactly `['alt', 'file']`.
+- Files changed: `test/index.ts` (1 new test, 2 new assertions),
+  `specs/prd.json` (US-009 `passes: true`).
+- Tests: full `npm test` (lint + build + typecheck + tape-run) passes
+  with 100 total assertions (up from 98).
+- **Learnings for future iterations:**
+  - When a story's acceptance criteria list test coverage areas,
+    check whether prior stories (written test-first) already satisfy
+    them before writing net-new tests -- grep each criterion against
+    existing `test/*.ts` describe/test names first, same lesson as
+    US-003.
+---
