@@ -108,3 +108,75 @@ test('remove clears state and emits an event', async t => {
     const input = el.querySelector('input[type="file"]') as HTMLInputElement
     t.equal(input.value, '', 'should clear the file input after remove')
 })
+
+test('edit button emits image-input:edit with the file', async t => {
+    document.body.innerHTML += `
+        <image-input class="edit-test"></image-input>
+    `
+    const el = await waitFor('image-input.edit-test') as ImageInput
+    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    selectFile(el, file)
+
+    let detail:unknown = 'not called'
+    let bubbled = false
+    document.body.addEventListener('image-input:edit', (ev:Event) => {
+        detail = (ev as CustomEvent).detail
+        bubbled = true
+    })
+
+    const editBtn = el.querySelector('.edit') as HTMLButtonElement
+    editBtn.click()
+
+    t.ok(bubbled, 'the event should bubble up to an ancestor')
+    t.equal((detail as { file:File }).file, file,
+        'should emit image-input:edit with the current file')
+})
+
+test('ALT badge emits image-input:alt with the file and alt text', async t => {
+    document.body.innerHTML += `
+        <image-input class="alt-event-test"></image-input>
+    `
+    const el = await waitFor('image-input.alt-event-test') as ImageInput
+    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    selectFile(el, file)
+
+    let detail:{ file:File, alt:string }|undefined
+    document.body.addEventListener('image-input:alt', (ev:Event) => {
+        detail = (ev as CustomEvent).detail
+    })
+
+    const altBadge = el.querySelector('.alt-badge') as HTMLButtonElement
+    altBadge.click()
+
+    t.equal(detail?.file, file,
+        'should emit image-input:alt with the current file')
+    t.equal(detail?.alt, '',
+        'should emit an empty alt string when none has been set yet')
+
+    el.alt = 'a description'
+    altBadge.click()
+
+    t.equal(detail?.alt, 'a description',
+        'should emit the current alt text once set')
+})
+
+test('edit and alt buttons do not open a dialog or navigate', async t => {
+    document.body.innerHTML += `
+        <image-input class="no-dialog-test"></image-input>
+    `
+    const el = await waitFor('image-input.no-dialog-test') as ImageInput
+    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    selectFile(el, file)
+
+    const editBtn = el.querySelector('.edit') as HTMLButtonElement
+    const altBadge = el.querySelector('.alt-badge') as HTMLButtonElement
+
+    t.equal(el.querySelector('dialog'), null,
+        'should not have a dialog element before clicking')
+
+    editBtn.click()
+    altBadge.click()
+
+    t.equal(el.querySelector('dialog'), null,
+        'should not open a dialog after clicking edit or alt buttons')
+})

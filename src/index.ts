@@ -32,12 +32,16 @@ export class ImageInput extends WebComponent {
         debug('disconnected')
         this.qs('input')?.removeEventListener('change', this.handleFileSelect)
         this.qs('.remove')?.removeEventListener('click', this.handleRemove)
+        this.qs('.edit')?.removeEventListener('click', this.handleEdit)
+        this.qs('.alt-badge')?.removeEventListener('click', this.handleAlt)
         this.#revokePreviewUrl()
     }
 
     setupEventListeners () {
         this.qs('input')?.addEventListener('change', this.handleFileSelect)
         this.qs('.remove')?.addEventListener('click', this.handleRemove)
+        this.qs('.edit')?.addEventListener('click', this.handleEdit)
+        this.qs('.alt-badge')?.addEventListener('click', this.handleAlt)
     }
 
     handleChange_accept (_old:string|null, newValue:string|null) {
@@ -85,6 +89,18 @@ export class ImageInput extends WebComponent {
         event.preventDefault()
         this.#clear()
         this.emit('remove')
+    }
+
+    handleEdit = (event:Event) => {
+        event.preventDefault()
+        if (!this.#file) return
+        this.emit('edit', { detail: { file: this.#file } })
+    }
+
+    handleAlt = (event:Event) => {
+        event.preventDefault()
+        if (!this.#file) return
+        this.emit('alt', { detail: { file: this.#file, alt: this.alt ?? '' } })
     }
 
     #setFile (file:File):void {

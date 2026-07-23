@@ -104,4 +104,51 @@
     library dependency, consistent with the "zero new runtime
     dependencies" project goal). Reuse this approach for any future
     icon needs (e.g. crop handles).
+- Playwright MCP tools ARE available in this harness (the earlier
+  "no dev-browser skill" note still holds -- there's no dedicated
+  skill -- but the `mcp__plugin_ed3d-playwright_...` tool set works
+  fine against `npm run start`). Use `browser_navigate`,
+  `browser_file_upload` after clicking the file input to trigger the
+  chooser, and `browser_evaluate` to attach listeners / read captured
+  event details, since accessibility snapshots don't show custom
+  event activity.
+
+## 2026-07-23 - US-002
+
+- Implemented edit/alt-text request events: clicking the pencil
+  (`.edit`) button emits `image-input:edit` with `{ file }`; clicking
+  the ALT badge (`.alt-badge`) emits `image-input:alt` with
+  `{ file, alt }` (`alt` is the current `this.alt` value, or `''` if
+  unset). Both handlers are no-ops if no file has been selected yet
+  (buttons are only visible once `.has-image` is set, but this guards
+  against programmatic clicks). Neither handler performs navigation or
+  opens a dialog -- that responsibility is left entirely to the
+  consumer per the PRD's headless-pattern intent (US-008 will wire a
+  `<dialog>` in the example app).
+- Events bubble by default via the base `WebComponent.emit()` (default
+  `{ bubbles: true }`), confirmed both by a unit test listening on
+  `document.body` and by the browser verification below.
+- Files changed: `src/index.ts` (added `handleEdit`/`handleAlt`
+  bound methods, wired up in `setupEventListeners`/
+  `disconnectedCallback`), `test/index.ts` (4 new tests: edit event +
+  bubbling, alt event with empty and then set alt text, no-dialog
+  guard), `specs/prd.json` (US-002 `passes: true`).
+- Tests: 4 new tape tests, all pass; full `npm test` (lint + build +
+  typecheck via `tsc --emitDeclarationOnly` + tape-run) passes with 22
+  total assertions.
+- Verified manually in the browser with the Playwright MCP tools
+  against `npm run start`: uploaded a real 1x1 PNG via the file
+  chooser, attached `image-input:edit`/`image-input:alt` listeners via
+  `browser_evaluate`, clicked the edit and ALT badge buttons, and
+  confirmed both events fired with the correct file name and alt text
+  in `detail`, and that no `<dialog>` appeared. Killed the vite dev
+  server and removed `.playwright-mcp/` afterwards.
+- **Learnings for future iterations:**
+  - See Codebase Patterns section above (new note: Playwright MCP
+    tools work fine here despite no dedicated dev-browser skill).
+  - `handleEdit`/`handleAlt` both read `this.#file`/`this.alt`
+    directly rather than threading state through render() -- this is
+    the reason the "render()-runs-once, mutate DOM imperatively"
+    pattern in Codebase Patterns exists; keep following it for US-003
+    onward instead of re-rendering.
 ---
