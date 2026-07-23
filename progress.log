@@ -459,3 +459,74 @@
     calls to an array, then restore the original -- simplest option
     given this repo has no mocking dependency.
 ---
+
+## 2026-07-23 - US-008
+
+- Wired the example app (`example/index.ts`) into the full Bluesky-style
+  flow: `image-input` composed with `image-crop` and an alt-text
+  `<textarea>`, both hosted in native `<dialog>` elements owned by the
+  example app (not the library components), demonstrating the headless
+  pattern the PRD calls for -- `image-input`/`image-crop` never open a
+  dialog themselves, only emit `edit`/`alt`/`change` events.
+  - `image-input:edit` -> `crop.setFile(file)` + `cropDialog.showModal()`.
+  - Crop dialog's Save button -> `crop.getBlob()` -> `input.setImage(blob)`
+    -> `cropDialog.close()`. Cancel just closes without applying.
+  - `image-input:alt` -> populate the textarea with the current alt text
+    (from the event detail) -> `altDialog.showModal()`.
+  - Alt dialog's Save button -> `input.alt = altTextarea.value` ->
+    `altDialog.close()`.
+- Removed the static `<image-input></image-input>` markup that had
+  been sitting in `example/index.html` since the project scaffold --
+  `example/index.ts` already builds all markup itself via
+  `document.body.innerHTML +=`, so the static tag was producing a
+  second, unwired `<image-input>` on the page (found while verifying
+  in-browser: the page showed two "Choose File" buttons). `index.html`
+  now only contains the module script tag; all markup lives in TS.
+- Added `example/index.css` (new, separate from `src/index.css`) with
+  minimal dialog/menu/textarea layout styling scoped to the example
+  app only -- did not touch the shipped component library's CSS
+  (`src/index.css`/`src/_vars.css`) since this styling isn't part of
+  what consumers of the package receive.
+- No dedicated automated test was added for this story: it's pure
+  example-app wiring (composition of already-tested `image-input`/
+  `image-crop` behavior via already-tested public APIs), and US-009 is
+  the dedicated "add tests" story. A test would mostly duplicate the
+  existing `image-input:edit`/`image-input:alt`/`setImage`/`getBlob`
+  unit tests already covering the underlying behavior.
+- Files changed: `example/index.ts`, `example/index.html`,
+  `example/index.css` (new), `specs/prd.json` (US-008 `passes: true`).
+- Verified manually in the browser with the Playwright MCP tools
+  against `npm run start`: generated a 400x200 test PNG, uploaded it,
+  clicked the pencil (edit) button and confirmed the crop dialog opens
+  with the image loaded; used `Shift+ArrowLeft` on the focused crop
+  rect (a pointer-drag via `browser_mouse_drag_xy` did not register as
+  a real drag in this environment, same as noted for prior stories --
+  keyboard interaction is not subject to that limitation and is
+  equally valid for confirming the crop math is live) to shrink the
+  crop to 392x200, clicked Save, and confirmed the dialog closed and
+  the `image-input` preview `<img>` was replaced with a new blob URL
+  whose decoded natural dimensions were exactly 392x200 (loaded via a
+  fresh `Image` in `browser_evaluate`, matching the `loadBlobDimensions`
+  pattern from `test/crop.ts`). Then clicked the "+ALT" badge, typed
+  alt text into the dialog's textarea, clicked Save, and confirmed the
+  dialog closed, the badge switched to its `has-alt`/"Edit alt text"
+  state, and the preview `<img>`'s `alt` attribute was set to the
+  entered text. Killed the vite dev server and removed
+  `.playwright-mcp/` and the scratch PNG afterwards.
+- Full `npm test` (lint + build + typecheck + tape-run) passes with 98
+  total assertions (unchanged from US-007, since no new tests were
+  added this story).
+- **Learnings for future iterations:**
+  - Check `example/index.html` for stray static markup left over from
+    an earlier story before wiring a full composed flow in
+    `example/index.ts` -- `document.body.innerHTML +=` silently
+    duplicates rather than erroring if the target elements already
+    exist in the static HTML, which is easy to miss without an
+    in-browser check.
+  - `browser_mouse_drag_xy` (Playwright MCP) does not reliably trigger
+    this component's `pointerdown`/`pointermove`/`pointerup` sequence
+    in this environment; prefer keyboard interaction
+    (`browser_press_key` with focus set via `browser_evaluate`) to
+    verify crop-rect behavior manually when a drag doesn't visibly
+    register, rather than assuming the feature is broken.
+---
