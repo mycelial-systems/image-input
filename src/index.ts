@@ -19,7 +19,7 @@ export class ImageInput extends WebComponent {
     declare alt:string|null
     declare required:boolean
 
-    #file:File|null = null
+    #file:File|Blob|null = null
     #previewUrl:string|null = null
 
     connectedCallback () {
@@ -103,7 +103,16 @@ export class ImageInput extends WebComponent {
         this.emit('alt', { detail: { file: this.#file, alt: this.alt ?? '' } })
     }
 
-    #setFile (file:File):void {
+    /**
+     * Replace the preview with a Blob (e.g. a cropped image), and use it
+     * as the file emitted in the resulting `image-input:change` event.
+     */
+    setImage (blob:Blob):void {
+        this.#setFile(blob)
+        this.emit('change', { detail: { file: blob, alt: this.alt ?? '' } })
+    }
+
+    #setFile (file:File|Blob):void {
         this.#revokePreviewUrl()
         this.#file = file
         this.#previewUrl = URL.createObjectURL(file)

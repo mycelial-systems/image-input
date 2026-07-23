@@ -189,6 +189,66 @@ test('change event detail includes the current alt text', async t => {
         'should emit the current alt text once set')
 })
 
+test('setImage replaces the preview with the given blob', async t => {
+    document.body.innerHTML += `
+        <image-input class="set-image-test"></image-input>
+    `
+    const el = await waitFor('image-input.set-image-test') as ImageInput
+    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    selectFile(el, file)
+
+    const imgBefore = el.querySelector('img') as HTMLImageElement
+    const srcBefore = imgBefore.getAttribute('src')
+
+    const blob = new Blob(['cropped'], { type: 'image/jpeg' })
+
+    let detail:{ file:Blob, alt:string }|undefined
+    el.addEventListener('image-input:change', (ev:Event) => {
+        detail = (ev as CustomEvent).detail
+    })
+
+    el.setImage(blob)
+
+    const preview = el.querySelector('.preview')
+    t.ok(preview?.classList.contains('has-image'),
+        'should keep showing the preview after setImage')
+
+    const imgAfter = el.querySelector('img') as HTMLImageElement
+    t.ok(imgAfter.getAttribute('src'), 'should set a new preview src')
+    t.notEqual(imgAfter.getAttribute('src'), srcBefore,
+        'should replace the previous preview src')
+
+    t.equal(detail?.file, blob,
+        'should emit image-input:change with the new blob as the file')
+})
+
+test('setImage revokes the previous preview object URL', async t => {
+    document.body.innerHTML += `
+        <image-input class="set-image-revoke-test"></image-input>
+    `
+    const el = await waitFor('image-input.set-image-revoke-test') as ImageInput
+    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    selectFile(el, file)
+
+    const revoked:string[] = []
+    const original = URL.revokeObjectURL
+    URL.revokeObjectURL = (url:string) => {
+        revoked.push(url)
+        return original.call(URL, url)
+    }
+
+    const imgBefore = el.querySelector('img') as HTMLImageElement
+    const srcBefore = imgBefore.getAttribute('src') as string
+
+    const blob = new Blob(['cropped'], { type: 'image/jpeg' })
+    el.setImage(blob)
+
+    URL.revokeObjectURL = original
+
+    t.ok(revoked.includes(srcBefore),
+        'should revoke the previous preview object URL')
+})
+
 test('edit and alt buttons do not open a dialog or navigate', async t => {
     document.body.innerHTML += `
         <image-input class="no-dialog-test"></image-input>

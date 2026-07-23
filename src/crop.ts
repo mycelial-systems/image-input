@@ -22,6 +22,11 @@ declare global {
 
 export type { CropRect }
 
+export interface GetBlobOptions {
+    type?:string
+    quality?:number
+}
+
 const HANDLES:HandleDir[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
 const MIN_DISPLAY_SIZE = 32
 const KEY_STEP = 8
@@ -104,6 +109,38 @@ export class ImageCrop extends WebComponent {
         this.#file = file
         this.#objectUrl = URL.createObjectURL(file)
         this.src = this.#objectUrl
+    }
+
+    /**
+     * The current crop rect, in natural-image pixel coordinates.
+     */
+    get crop ():CropRect {
+        return { ...this.#crop }
+    }
+
+    /**
+     * Render the current crop region to an offscreen canvas at the
+     * image's natural resolution and resolve it as a Blob.
+     */
+    getBlob (opts?:GetBlobOptions):Promise<Blob> {
+        const img = this.qs<HTMLImageElement>('img')
+        const { x, y, width, height } = this.#crop
+        const type = opts?.type ?? 'image/jpeg'
+
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d') as CanvasRenderingContext2D
+        if (img) {
+            ctx.drawImage(img, x, y, width, height, 0, 0, width, height)
+        }
+
+        return new Promise((resolve, reject) => {
+            canvas.toBlob(blob => {
+                if (blob) resolve(blob)
+                else reject(new Error('Failed to create blob from canvas'))
+            }, type, opts?.quality)
+        })
     }
 
     #handleImageLoad = ():void => {

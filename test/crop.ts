@@ -354,6 +354,81 @@ test('shift+arrow keys resize the crop rectangle', async t => {
         'shift+ArrowUp should shrink the crop rect height')
 })
 
+function loadBlobDimensions (blob:Blob):Promise<{ width:number, height:number }> {
+    return new Promise((resolve, reject) => {
+        const img = new Image()
+        const url = URL.createObjectURL(blob)
+        img.onload = () => {
+            URL.revokeObjectURL(url)
+            resolve({ width: img.naturalWidth, height: img.naturalHeight })
+        }
+        img.onerror = reject
+        img.src = url
+    })
+}
+
+test('the crop getter returns the current rect in natural pixels', async t => {
+    document.body.innerHTML += `
+        <image-crop class="crop-getter-test" style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.crop-getter-test') as ImageCrop
+    const file = await makeImageFile(400, 200)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    t.deepEqual(el.crop, { x: 0, y: 0, width: 400, height: 200 },
+        'crop getter should cover the full natural image initially')
+})
+
+test('getBlob returns a Blob of the cropped region at natural resolution',
+    async t => {
+        document.body.innerHTML += `
+            <image-crop class="getblob-test" style="display:block;width:200px;"></image-crop>
+        `
+        const el = await waitFor('image-crop.getblob-test') as ImageCrop
+        const file = await makeImageFile(400, 200)
+        el.setFile(file)
+        await waitForImageLoad(el)
+
+        const frame = el.querySelector('.image-crop-frame') as HTMLElement
+        const frameRect = frame.getBoundingClientRect()
+        const handle = el.querySelector('.handle-nw') as HTMLElement
+
+        handle.dispatchEvent(
+            pointer('pointerdown', frameRect.left, frameRect.top)
+        )
+        window.dispatchEvent(
+            pointer('pointermove', frameRect.left + 50, frameRect.top + 25)
+        )
+        window.dispatchEvent(
+            pointer('pointerup', frameRect.left + 50, frameRect.top + 25)
+        )
+
+        t.deepEqual(el.crop, { x: 100, y: 50, width: 300, height: 150 },
+            'sanity check crop rect after resize')
+
+        const blob = await el.getBlob()
+        t.ok(blob instanceof Blob, 'should resolve a Blob')
+        t.equal(blob.type, 'image/jpeg', 'should default to image/jpeg')
+
+        const dims = await loadBlobDimensions(blob)
+        t.equal(dims.width, 300, 'blob width should match the crop width')
+        t.equal(dims.height, 150, 'blob height should match the crop height')
+    })
+
+test('getBlob accepts a type option', async t => {
+    document.body.innerHTML += `
+        <image-crop class="getblob-type-test" style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.getblob-type-test') as ImageCrop
+    const file = await makeImageFile(100, 100)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    const blob = await el.getBlob({ type: 'image/png' })
+    t.equal(blob.type, 'image/png', 'should use the requested mime type')
+})
+
 test('keyboard interactions emit image-crop:change in natural pixels', async t => {
     document.body.innerHTML += `
         <image-crop class="key-change-test" style="display:block;width:200px;"></image-crop>

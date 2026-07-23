@@ -397,3 +397,65 @@
     single (dx, dy) delta in display-pixel space -- no separate
     keyboard-specific math was needed.
 ---
+
+## 2026-07-23 - US-007
+
+- Added `getBlob(opts?)` and a `crop` getter to `image-crop`
+  (`src/crop.ts`). `crop` returns a shallow copy of the internal
+  `#crop` rect (natural-image pixels). `getBlob` draws the current
+  crop region from the `<img>` element onto a freshly-created
+  offscreen `<canvas>` sized to `crop.width x crop.height` via
+  `ctx.drawImage(img, x, y, width, height, 0, 0, width, height)`,
+  then resolves `canvas.toBlob(...)` as a Promise. `opts.type`
+  defaults to `image/jpeg`; `opts.quality` is passed through
+  untouched (defaults to the browser's own default when omitted, as
+  `HTMLCanvasElement.toBlob` already does).
+- Added `setImage(blob)` to `image-input` (`src/index.ts`) so a
+  cropped Blob (e.g. from `image-crop`'s `getBlob()`) can be fed back
+  in as the component's file. Widened `#file`'s type from
+  `File|null` to `File|Blob|null` (and `#setFile`'s parameter type
+  to match) since a Blob has no `name`/`lastModified` and there's no
+  reason to require the caller to wrap it in a `File`. `setImage`
+  reuses the existing `#setFile` private method (revokes the
+  previous object URL, creates a new one, sets it as the preview
+  `<img>` src, adds `.has-image`), then emits `image-input:change`
+  with `{ file: blob, alt: this.alt ?? '' }` so consumers listening
+  for `image-input:change` see the swapped-in blob the same way they
+  see a freshly-picked file -- this satisfies the acceptance
+  criterion that setImage "replaces ... the file emitted in
+  subsequent change events".
+- Object URL revocation was already handled by the existing
+  `#setFile`/`#revokePreviewUrl` pattern from US-001; `setImage`
+  gets this for free by routing through `#setFile` rather than
+  duplicating the object-URL logic.
+- Wrote failing tests first: `test/crop.ts` gained a `crop` getter
+  test and two `getBlob` tests (default `image/jpeg` type + correct
+  natural-resolution dimensions verified by loading the resulting
+  Blob into a real `Image` and reading `naturalWidth`/`naturalHeight`;
+  a second test asserting the `type` option is honored). Confirmed
+  these crashed (`el.crop`/`el.getBlob` undefined) before
+  implementing. `test/index.ts` gained two `setImage` tests: preview
+  swap + `image-input:change` detail, and a URL-revocation test that
+  monkey-patches `URL.revokeObjectURL` around the `setImage` call to
+  assert the previous preview's object URL was revoked.
+- Files changed: `src/crop.ts`, `src/index.ts`, `test/crop.ts`,
+  `test/index.ts`, `specs/prd.json` (US-007 `passes: true`).
+- Tests: 12 new tape assertions. Full `npm test` (lint + build +
+  typecheck + tape-run) passes with 98 total assertions.
+- No "verify in browser" step was listed in this story's acceptance
+  criteria (unlike most prior stories), so none was performed; the
+  canvas/Blob behavior is fully covered by the tape tests running in
+  a real browser via `tape-run`.
+- **Learnings for future iterations:**
+  - To verify a Blob's actual pixel dimensions in a test without a
+    dedicated image-decoding library, load it into a real `Image`
+    via `URL.createObjectURL` + `img.onload`, then read
+    `naturalWidth`/`naturalHeight` (see `loadBlobDimensions` in
+    `test/crop.ts`) -- revoke that object URL after load to avoid
+    leaking it from the test itself.
+  - To assert something was cleaned up (object URL revocation, etc.)
+    without a spy library, monkey-patch the global method
+    (`URL.revokeObjectURL`) around just the call under test, record
+    calls to an array, then restore the original -- simplest option
+    given this repo has no mocking dependency.
+---
