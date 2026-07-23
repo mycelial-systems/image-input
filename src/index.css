@@ -1,4 +1,18 @@
-@import './_vars.css';
+@import url("./_vars.css");
+
+#alt-dialog {
+    &[open] {
+        min-width: 500px;
+        height: 50vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+
+        & textarea {
+            height: calc(100% - 8rem);
+        }
+    }
+}
 
 image-input {
     display: block;
@@ -64,7 +78,6 @@ image-input {
                 width: var(--image-input-icon-size);
                 height: var(--image-input-icon-size);
                 fill: none;
-                stroke: currentColor;
                 stroke-width: 2;
                 stroke-linecap: round;
                 stroke-linejoin: round;
@@ -143,7 +156,10 @@ image-crop {
             transform: translate(-50%, -50%);
         }
 
-        & .handle-nw { left: 0; top: 0; }
+        & .handle-nw {
+            left: 0;
+            top: 0;
+        }
         & .handle-n { left: 50%; top: 0; }
         & .handle-ne { left: 100%; top: 0; }
         & .handle-e { left: 100%; top: 50%; }
