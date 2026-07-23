@@ -11,11 +11,16 @@ declare global {
 
 export class ImageInput extends WebComponent {
     static TAG = 'image-input'
-    static reflectedStringAttributes = ['accept', 'name']
+    TAG = ImageInput.TAG
+    static reflectedStringAttributes = ['accept', 'name', 'alt']
     static reflectedBooleanAttributes = ['required']
     declare accept:string|null
     declare name:string|null
+    declare alt:string|null
     declare required:boolean
+
+    #file:File|null = null
+    #previewUrl:string|null = null
 
     connectedCallback () {
         debug('connected')
@@ -26,10 +31,13 @@ export class ImageInput extends WebComponent {
     disconnectedCallback () {
         debug('disconnected')
         this.qs('input')?.removeEventListener('change', this.handleFileSelect)
+        this.qs('.remove')?.removeEventListener('click', this.handleRemove)
+        this.#revokePreviewUrl()
     }
 
     setupEventListeners () {
         this.qs('input')?.addEventListener('change', this.handleFileSelect)
+        this.qs('.remove')?.addEventListener('click', this.handleRemove)
     }
 
     handleChange_accept (_old:string|null, newValue:string|null) {
@@ -50,25 +58,62 @@ export class ImageInput extends WebComponent {
         this.qs('input')?.toggleAttribute('required', newValue !== null)
     }
 
+    handleChange_alt (_old:string|null, newValue:string|null) {
+        const img = this.qs('img')
+        img?.setAttribute('alt', newValue ?? '')
+
+        const badge = this.qs('.alt-badge')
+        if (!badge) return
+        const hasAlt = !!newValue
+        badge.classList.toggle('has-alt', hasAlt)
+        badge.setAttribute('aria-label',
+            (hasAlt ? 'Edit alt text' : 'Add alt text'))
+    }
+
     handleFileSelect = (event:Event) => {
         const input = event.target as HTMLInputElement
         const file = input.files?.[0]
 
         if (file && file.type.startsWith('image/')) {
             debug('Image file selected:', file.name)
+            this.#setFile(file)
             this.emit('change', { detail: { file } })
-            const reader = new FileReader()
+        }
+    }
 
-            reader.onload = (e) => {
-                const result = e.target?.result as string
-                const img = this.qs('img')
-                if (img) {
-                    img.src = result
-                    img.style.display = 'block'
-                }
-            }
+    handleRemove = (event:Event) => {
+        event.preventDefault()
+        this.#clear()
+        this.emit('remove')
+    }
 
-            reader.readAsDataURL(file)
+    #setFile (file:File):void {
+        this.#revokePreviewUrl()
+        this.#file = file
+        this.#previewUrl = URL.createObjectURL(file)
+
+        const img = this.qs('img')
+        if (img) img.src = this.#previewUrl
+        this.qs('.preview')?.classList.add('has-image')
+    }
+
+    #clear ():void {
+        this.#revokePreviewUrl()
+        this.#file = null
+
+        const input = this.qs('input')
+        if (input) input.value = ''
+
+        this.qs('img')?.removeAttribute('src')
+        this.qs('.preview')?.classList.remove('has-image')
+
+        this.alt = null
+    }
+
+    #revokePreviewUrl ():void {
+        if (this.#previewUrl) {
+            URL.revokeObjectURL(this.#previewUrl)
+            this.#previewUrl = null
         }
     }
 
@@ -76,16 +121,41 @@ export class ImageInput extends WebComponent {
         const accept = this.accept ?? 'image/*'
         const name = this.name ? ` name="${this.name}"` : ''
         const required = this.required ? ' required' : ''
+        const alt = this.alt ?? ''
+        const hasAlt = !!this.alt
 
-        this.innerHTML = `<div>
+        this.innerHTML = `<div class="wrapper">
             <input
                 type="file"
                 accept="${accept}"${name}${required}
             />
-            <img
-                id="preview"
-                style="display: none; max-width: 100%; margin-top: 1rem;"
-            />
+            <div class="preview">
+                <img alt="${alt}" />
+                <div class="overlay">
+                    <button
+                        type="button"
+                        class="alt-badge${hasAlt ? ' has-alt' : ''}"
+                        aria-label="${hasAlt ? 'Edit alt text' : 'Add alt text'}"
+                    ><span class="plus" aria-hidden="true">+</span>ALT</button>
+                    <div class="controls">
+                        <button type="button" class="edit"
+                            aria-label="Edit image"
+                        >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0
+                                    -3-3L5 17v3z" />
+                            </svg>
+                        </button>
+                        <button type="button" class="remove"
+                            aria-label="Remove image"
+                        >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M5 5l14 14M19 5L5 19" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>`
     }
 }

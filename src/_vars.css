@@ -1,0 +1,12 @@
+:root {
+    --image-input-radius: 0.5rem;
+    --image-input-overlay-padding: 0.5rem;
+    --image-input-overlay-gap: 0.5rem;
+    --image-input-pill-bg: rgb(0 0 0 / 65%);
+    --image-input-pill-bg-hover: rgb(0 0 0 / 80%);
+    --image-input-pill-color: #fff;
+    --image-input-pill-radius: 999px;
+    --image-input-button-size: 2rem;
+    --image-input-icon-size: 1.125rem;
+    --image-input-focus-color: #1d9bf0;
+}

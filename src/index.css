@@ -1,5 +1,98 @@
+@import './_vars.css';
+
 image-input {
-    background-color: red;
+    display: block;
+
+    & .wrapper {
+        position: relative;
+        display: inline-block;
+    }
+
+    & .preview {
+        display: none;
+        position: relative;
+
+        &.has-image {
+            display: block;
+        }
+
+        & img {
+            display: block;
+            max-width: 100%;
+            border-radius: var(--image-input-radius);
+        }
+
+        & .overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            padding: var(--image-input-overlay-padding);
+            pointer-events: none;
+
+            & > * {
+                pointer-events: auto;
+            }
+        }
+
+        & .controls {
+            display: flex;
+            gap: var(--image-input-overlay-gap);
+        }
+
+        & button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            cursor: pointer;
+            background-color: var(--image-input-pill-bg);
+            color: var(--image-input-pill-color);
+            border-radius: var(--image-input-pill-radius);
+
+            &:hover {
+                background-color: var(--image-input-pill-bg-hover);
+            }
+
+            &:focus-visible {
+                outline: 2px solid var(--image-input-focus-color);
+                outline-offset: 2px;
+            }
+
+            & svg {
+                width: var(--image-input-icon-size);
+                height: var(--image-input-icon-size);
+                fill: none;
+                stroke: currentColor;
+                stroke-width: 2;
+                stroke-linecap: round;
+                stroke-linejoin: round;
+            }
+        }
+
+        & .alt-badge {
+            height: var(--image-input-button-size);
+            padding: 0 0.75rem;
+            font-size: 1rem;
+            font-weight: 600;
+
+            & .plus {
+                margin-right: 0.125rem;
+            }
+
+            &.has-alt .plus {
+                display: none;
+            }
+        }
+
+        & .edit,
+        & .remove {
+            width: var(--image-input-button-size);
+            height: var(--image-input-button-size);
+            padding: 0;
+        }
+    }
 }
 
 /**

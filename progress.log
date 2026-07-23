@@ -1,0 +1,107 @@
+## Codebase Patterns
+
+- `WebComponent` (from `@substrate-system/web-component`) uses
+  `this.TAG` (an **instance** field) inside `emit()`/`on()`/`off()`,
+  not the static `TAG`. Any subclass that only sets `static TAG = '...'`
+  without also setting an instance field `TAG = '...'` will silently
+  emit events namespaced as `:eventname` (empty prefix) instead of
+  `tag-name:eventname`, and consumer listeners for the namespaced event
+  will never fire. Always set both:
+  ```ts
+  export class Foo extends WebComponent {
+      static TAG = 'foo'
+      TAG = Foo.TAG
+      ...
+  }
+  ```
+  This was a latent bug in the original `image-input` scaffold (only
+  `static TAG` was set) that had gone unnoticed because no test
+  exercised a namespaced custom event before this session.
+- Reflected attributes (`static reflectedStringAttributes` /
+  `reflectedBooleanAttributes`) get auto-generated getters/setters by
+  the base class's `define()`. Adding a name here is enough to get
+  `this.foo` / `this.foo = x` working; you still write your own
+  `handleChange_foo(oldValue, newValue)` for DOM side effects, which
+  runs on `attributeChangedCallback`, not on `render()`. `render()`
+  only runs once (from `connectedCallback`), so any post-mount state
+  changes (alt text, preview image, overlay toggling) should mutate
+  the existing DOM directly (via `this.qs(...)`) rather than
+  re-invoking `render()`, or you will lose imperative state like the
+  `<img>` `src` set from a file/object URL.
+- CSS: `src/_vars.css` holds `:root` custom properties, imported by
+  `src/index.css` via `@import './_vars.css'`. The `build-css` /
+  `build-css:min` npm scripts now pass `--bundle` to `lightningcss` so
+  the import is inlined into `dist/index.css` (bundler CLI does not
+  resolve `@import` by default, only with `--bundle`). Keep this flag
+  if more CSS partials are added later (e.g. for `crop.ts`).
+- Preview images use `URL.createObjectURL(file)` (not `FileReader`
+  data URLs) so the same object-URL lifecycle/revocation pattern can
+  be reused by `image-crop` later. Always revoke the previous object
+  URL before creating a new one and on remove, to avoid leaking blobs.
+- Test pattern for simulating a file input: build a `DataTransfer`,
+  `dataTransfer.items.add(file)`, assign `input.files =
+  dataTransfer.files`, then `input.dispatchEvent(new Event('change',
+  { bubbles: true }))`. See `test/index.ts` `selectFile()` helper.
+- No "dev-browser" skill is registered in this harness. Use the
+  Playwright MCP tools directly against `npm run start` (vite dev
+  server) for the "verify in browser" acceptance criteria, and kill
+  the dev server + delete the `.playwright-mcp/` scratch directory
+  afterwards (it is not gitignored and holds screenshots/snapshots
+  that shouldn't be committed).
+
+## 2026-07-23 - US-001
+
+- Implemented the preview overlay for `image-input`: after a file is
+  selected, the component shows the image preview with an overlay
+  containing an "+ ALT"/"ALT" badge button, a pencil edit button, and
+  an x remove button, matching the Bluesky-style thumbnail chrome.
+- Added a minimal `alt` reflected string attribute/property (full
+  scope belongs to US-003, but US-001's acceptance criteria requires
+  the badge to switch state once alt text is set via the `alt`
+  property, so the property and the badge-toggling `handleChange_alt`
+  were added now). Setting `el.alt` updates the preview `<img>`'s
+  `alt` attribute and toggles a `.has-alt` class on the badge (tests
+  assert on the class, not the button's text content, per the
+  no-brittle-text-assertions rule).
+- Clicking remove clears the file, revokes the preview object URL,
+  clears the alt attribute, resets the file input's value, hides the
+  overlay, and emits `image-input:remove`.
+- Switched the preview from `FileReader`/data-URL to
+  `URL.createObjectURL(file)`, revoked on remove and before setting a
+  new file, per the PRD's Technical Considerations (also needed later
+  for US-007's leak-avoidance requirement).
+- Found and fixed a pre-existing bug in `ImageInput`: only `static TAG`
+  was set, so `this.emit(...)` (which reads the instance field
+  `this.TAG` from the base class) produced malformed event names like
+  `:remove` instead of `image-input:remove`, and consumer listeners
+  never fired. Added `TAG = ImageInput.TAG` as an instance field. See
+  Codebase Patterns above.
+- Added `src/_vars.css` (new file) with the CSS custom properties for
+  the overlay (pill colors, radius, sizes, focus color), imported from
+  `src/index.css` via `@import`. Updated `build-css` / `build-css:min`
+  npm scripts to pass `--bundle` to `lightningcss` so the import
+  resolves in the shipped `dist/index.css`.
+- Files changed: `src/index.ts`, `src/index.css`, `src/_vars.css`
+  (new), `test/index.ts`, `package.json` (build-css scripts),
+  `specs/prd.json` (US-001 passes: true).
+- Tests: added 3 new tape tests (overlay controls presence + a11y
+  names, alt property toggling the badge class, remove clearing state
+  and emitting the event) plus kept the original smoke test. All 15
+  assertions pass via `npm test` (lint + typecheck + build + tape-run
+  in a real browser via `tape-run`).
+- Verified manually in the browser with the Playwright MCP tools
+  against `npm run start`: uploaded a real file via the file chooser,
+  confirmed the overlay (ALT badge, pencil, x) renders with correct
+  accessible names, clicked remove and confirmed the component returns
+  to the empty state, and confirmed `image-input:change` fires with
+  the correct namespaced type and `{ file }` detail (this last check
+  also validates the `TAG` fix works outside the test harness).
+- **Learnings for future iterations:**
+  - See Codebase Patterns section above (TAG instance field gotcha,
+    render()-runs-once pattern, lightningcss --bundle, object URL
+    lifecycle, DataTransfer test helper, no dev-browser skill here).
+  - Icons are inline `<svg>` with `currentColor` stroke (no icon
+    library dependency, consistent with the "zero new runtime
+    dependencies" project goal). Reuse this approach for any future
+    icon needs (e.g. crop handles).
+---
