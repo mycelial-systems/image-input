@@ -346,3 +346,54 @@
   Full `npm test` (lint + build + typecheck + tape-run) passes with
   78 total assertions.
 ---
+
+## 2026-07-23 - US-006
+
+- Added keyboard accessibility to `image-crop`'s `.crop-rect`: it is
+  now in the tab order (`tabindex="0"`), has `role="group"` and a
+  descriptive `aria-label` (both set in `render()`), and a
+  `keydown` listener (wired in `connectedCallback`/removed in
+  `disconnectedCallback`, same pattern as the pointer listeners).
+- Arrow keys move the crop by a fixed `KEY_STEP` (8 display px) via
+  the existing `moveRect` pure function; shift+arrow keys resize via
+  the existing `resizeRect` pure function. Convention chosen (not
+  specified by the PRD, documented here for future consistency):
+  shift+Right/Down grow the rect (via the `e`/`s` handles), shift+
+  Left/Up shrink it. All keyboard math reuses the exact same
+  display-to-natural coordinate pipeline as pointer dragging
+  (`toDisplayRect` -> `moveRect`/`resizeRect` -> `toNaturalRect` ->
+  `#layout()` -> emit `change`), so no new coordinate-mapping code
+  was needed -- this validates the US-005 design decision to
+  centralize that math in pure functions.
+- `e.preventDefault()` on handled arrow keys stops the page from
+  scrolling while the crop rect has focus.
+- Added a `:focus-visible` outline on `.crop-rect` in `src/index.css`
+  reusing the existing `--image-crop-focus-color` variable (already
+  added in US-004 anticipating this story).
+- Files changed: `src/crop.ts`, `src/index.css`, `test/crop.ts`,
+  `specs/prd.json` (US-006 `passes: true`).
+- Tests: 4 new tape tests (8 new assertions) written first and
+  confirmed failing before implementation: crop rect is focusable
+  with a role/aria-label, arrow keys move it, shift+arrow keys
+  resize it, and keyboard interactions emit `image-crop:change`.
+  Per the no-brittle-text rule, the aria-label test only asserts the
+  attribute is present/non-empty, not its exact string. Full
+  `npm test` (lint + build + typecheck + tape-run) passes with 86
+  total assertions.
+- Verified manually in the browser with the Playwright MCP tools
+  against `npm run start`: uploaded a generated 300x150 test PNG via
+  the example page's `#crop-file` input, focused `.crop-rect` via
+  `el.focus()`, confirmed `document.activeElement` is the rect and
+  its `aria-label` is set, pressed Shift+ArrowLeft and confirmed the
+  displayed width shrank (400px -> 392px), pressed ArrowRight/
+  ArrowDown and confirmed the rect's `left` moved by 8px (top stayed
+  clamped at 0 since the crop already filled the full image height),
+  and confirmed via `getComputedStyle` that a solid 2px focus outline
+  renders when the rect has focus. Killed the vite dev server and
+  removed `.playwright-mcp/` and the scratch PNG afterwards.
+- **Learnings for future iterations:**
+  - Keyboard interactions can reuse pointer-drag pure functions
+    (`moveRect`/`resizeRect`) directly by treating a keypress as a
+    single (dx, dy) delta in display-pixel space -- no separate
+    keyboard-specific math was needed.
+---

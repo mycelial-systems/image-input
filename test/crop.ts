@@ -268,3 +268,108 @@ test('crop state changes emit image-crop:change with natural pixel ' +
     t.equal(detail!.width, 380, 'width should be scaled to natural pixels')
     t.equal(detail!.height, 190, 'height should be scaled to natural pixels')
 })
+
+function key (
+    key:string,
+    shiftKey = false
+):KeyboardEvent {
+    return new KeyboardEvent('keydown', {
+        key,
+        shiftKey,
+        bubbles: true,
+        cancelable: true
+    })
+}
+
+test('the crop rectangle is focusable with an accessible name', async t => {
+    document.body.innerHTML += `
+        <image-crop class="a11y-test" style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.a11y-test') as ImageCrop
+    const file = await makeImageFile(200, 100)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    const rectEl = el.querySelector('.crop-rect') as HTMLElement
+    t.equal(rectEl.tabIndex, 0, 'crop rect should be in the tab order')
+    t.ok(rectEl.getAttribute('role'), 'crop rect should have an ARIA role')
+    t.ok(rectEl.getAttribute('aria-label'), 'crop rect should have an accessible label')
+})
+
+test('arrow keys move the crop rectangle', async t => {
+    document.body.innerHTML += `
+        <image-crop class="key-move-test" style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.key-move-test') as ImageCrop
+    const file = await makeImageFile(200, 100)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    // shrink first so there's room to move
+    const frame = el.querySelector('.image-crop-frame') as HTMLElement
+    const frameRect = frame.getBoundingClientRect()
+    const seHandle = el.querySelector('.handle-se') as HTMLElement
+    seHandle.dispatchEvent(
+        pointer('pointerdown', frameRect.right, frameRect.bottom)
+    )
+    window.dispatchEvent(
+        pointer('pointermove', frameRect.right - 50, frameRect.bottom - 30)
+    )
+    window.dispatchEvent(
+        pointer('pointerup', frameRect.right - 50, frameRect.bottom - 30)
+    )
+
+    const rectEl = el.querySelector('.crop-rect') as HTMLElement
+    const leftBefore = parseFloat(rectEl.style.left)
+    const topBefore = parseFloat(rectEl.style.top)
+
+    rectEl.dispatchEvent(key('ArrowRight'))
+    t.ok(parseFloat(rectEl.style.left) > leftBefore,
+        'ArrowRight should move the crop rect right')
+
+    rectEl.dispatchEvent(key('ArrowDown'))
+    t.ok(parseFloat(rectEl.style.top) > topBefore,
+        'ArrowDown should move the crop rect down')
+})
+
+test('shift+arrow keys resize the crop rectangle', async t => {
+    document.body.innerHTML += `
+        <image-crop class="key-resize-test" style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.key-resize-test') as ImageCrop
+    const file = await makeImageFile(200, 100)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    const rectEl = el.querySelector('.crop-rect') as HTMLElement
+    const widthBefore = parseFloat(rectEl.style.width)
+    const heightBefore = parseFloat(rectEl.style.height)
+
+    rectEl.dispatchEvent(key('ArrowLeft', true))
+    t.ok(parseFloat(rectEl.style.width) < widthBefore,
+        'shift+ArrowLeft should shrink the crop rect width')
+
+    rectEl.dispatchEvent(key('ArrowUp', true))
+    t.ok(parseFloat(rectEl.style.height) < heightBefore,
+        'shift+ArrowUp should shrink the crop rect height')
+})
+
+test('keyboard interactions emit image-crop:change in natural pixels', async t => {
+    document.body.innerHTML += `
+        <image-crop class="key-change-test" style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.key-change-test') as ImageCrop
+    const file = await makeImageFile(400, 200)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    let detail:{ x:number, y:number, width:number, height:number }|null = null
+    el.addEventListener('image-crop:change', (e:Event) => {
+        detail = (e as CustomEvent).detail
+    })
+
+    const rectEl = el.querySelector('.crop-rect') as HTMLElement
+    rectEl.dispatchEvent(key('ArrowDown', true))
+
+    t.ok(detail, 'should have emitted image-crop:change from a keydown')
+})

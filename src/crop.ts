@@ -24,6 +24,14 @@ export type { CropRect }
 
 const HANDLES:HandleDir[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
 const MIN_DISPLAY_SIZE = 32
+const KEY_STEP = 8
+
+const MOVE_KEYS:Record<string, [number, number]> = {
+    ArrowUp: [0, -KEY_STEP],
+    ArrowDown: [0, KEY_STEP],
+    ArrowLeft: [-KEY_STEP, 0],
+    ArrowRight: [KEY_STEP, 0]
+}
 
 interface DragState {
     mode:'move'|'resize'
@@ -55,6 +63,9 @@ export class ImageCrop extends WebComponent {
         this.qs<HTMLElement>('.crop-rect')?.addEventListener(
             'pointerdown', this.#handleMoveStart
         )
+        this.qs<HTMLElement>('.crop-rect')?.addEventListener(
+            'keydown', this.#handleKeyDown
+        )
         Array.from(this.querySelectorAll<HTMLElement>('.handle')).forEach(
             handle => {
                 handle.addEventListener(
@@ -70,6 +81,9 @@ export class ImageCrop extends WebComponent {
     disconnectedCallback () {
         debug('disconnected')
         this.qs('img')?.removeEventListener('load', this.#handleImageLoad)
+        this.qs<HTMLElement>('.crop-rect')?.removeEventListener(
+            'keydown', this.#handleKeyDown
+        )
         window.removeEventListener('resize', this.#handleResize)
         window.removeEventListener('pointermove', this.#handlePointerMove)
         window.removeEventListener('pointerup', this.#handlePointerEnd)
@@ -179,6 +193,33 @@ export class ImageCrop extends WebComponent {
         this.emit('change', { detail: { ...this.#crop } })
     }
 
+    #handleKeyDown = (e:KeyboardEvent):void => {
+        if (!this.#naturalWidth) return
+        const delta = MOVE_KEYS[e.key]
+        if (!delta) return
+        e.preventDefault()
+
+        const [dx, dy] = delta
+        const bounds = this.#displaySize()
+        const scale = scaleFor(this.#naturalWidth, this.clientWidth)
+        const displayRect = toDisplayRect(this.#crop, scale)
+
+        const newDisplayRect = e.shiftKey ?
+            resizeRect(
+                displayRect,
+                (dx !== 0 ? 'e' : 's'),
+                dx,
+                dy,
+                bounds,
+                MIN_DISPLAY_SIZE
+            ) :
+            moveRect(displayRect, dx, dy, bounds)
+
+        this.#crop = toNaturalRect(newDisplayRect, scale)
+        this.#layout()
+        this.emit('change', { detail: { ...this.#crop } })
+    }
+
     #handlePointerEnd = (e:PointerEvent):void => {
         if (!this.#drag || e.pointerId !== this.#drag.pointerId) return
         this.#drag = null
@@ -278,7 +319,12 @@ export class ImageCrop extends WebComponent {
             <div class="dim dim-bottom"></div>
             <div class="dim dim-left"></div>
             <div class="dim dim-right"></div>
-            <div class="crop-rect">${handles}</div>
+            <div
+                class="crop-rect"
+                tabindex="0"
+                role="group"
+                aria-label="Crop area. Use arrow keys to move, shift plus arrow keys to resize."
+            >${handles}</div>
         </div>`
     }
 }

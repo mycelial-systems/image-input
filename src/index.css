@@ -126,6 +126,11 @@ image-crop {
             box-sizing: border-box;
             border: var(--image-crop-rect-border-width) dashed
                 var(--image-crop-rect-border-color);
+
+            &:focus-visible {
+                outline: 2px solid var(--image-crop-focus-color);
+                outline-offset: 2px;
+            }
         }
 
         & .handle {
