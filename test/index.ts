@@ -160,6 +160,33 @@ test('ALT badge emits image-input:alt with the file and alt text', async t => {
         'should emit the current alt text once set')
 })
 
+test('change event detail includes the current alt text', async t => {
+    document.body.innerHTML += `
+        <image-input class="change-alt-test"></image-input>
+    `
+    const el = await waitFor('image-input.change-alt-test') as ImageInput
+    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+
+    let detail:{ file:File, alt:string }|undefined
+    el.addEventListener('image-input:change', (ev:Event) => {
+        detail = (ev as CustomEvent).detail
+    })
+
+    selectFile(el, file)
+
+    t.equal(detail?.file, file,
+        'should emit image-input:change with the selected file')
+    t.equal(detail?.alt, '',
+        'should emit an empty alt string when none has been set yet')
+
+    el.alt = 'a description'
+    const secondFile = new File(['def'], 'photo2.png', { type: 'image/png' })
+    selectFile(el, secondFile)
+
+    t.equal(detail?.alt, 'a description',
+        'should emit the current alt text once set')
+})
+
 test('edit and alt buttons do not open a dialog or navigate', async t => {
     document.body.innerHTML += `
         <image-input class="no-dialog-test"></image-input>

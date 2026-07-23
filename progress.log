@@ -152,3 +152,32 @@
     pattern in Codebase Patterns exists; keep following it for US-003
     onward instead of re-rendering.
 ---
+
+## 2026-07-23 - US-003
+
+- Most of US-003's scope (the `alt` reflected string property, and
+  `handleChange_alt` updating the preview `<img>` alt attribute and
+  toggling the badge's `.has-alt` class) had already been implemented
+  during US-001, per that entry's notes. The one remaining gap was
+  the acceptance criterion that `image-input:change` include the
+  current alt text in its detail -- it previously only emitted
+  `{ file }`.
+- Wrote a failing test first (`change event detail includes the
+  current alt text`) asserting `image-input:change` detail has
+  `alt: ''` before any alt text is set, and the current alt string
+  after `el.alt` is set and a second file is selected. Confirmed it
+  failed (`actual: undefined`) before the fix.
+- Fix: `handleFileSelect` in `src/index.ts` now emits
+  `{ detail: { file, alt: this.alt ?? '' } }` instead of
+  `{ detail: { file } }`.
+- Files changed: `src/index.ts`, `test/index.ts`,
+  `specs/prd.json` (US-003 `passes: true`).
+- Tests: 1 new tape test (3 assertions), full `npm test` (lint +
+  build + typecheck + tape-run) passes with 25 total assertions.
+- No browser verification step was listed in this story's acceptance
+  criteria (unlike US-001/US-002), so none was performed.
+- **Learnings for future iterations:**
+  - Before implementing a story, check whether a prior story's notes
+    already did part of the work "ahead of schedule" (see US-001's
+    note about the `alt` property) -- grep the acceptance criteria
+    against current source first to scope down to the real gap.

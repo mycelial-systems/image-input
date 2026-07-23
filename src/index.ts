@@ -81,7 +81,7 @@ export class ImageInput extends WebComponent {
         if (file && file.type.startsWith('image/')) {
             debug('Image file selected:', file.name)
             this.#setFile(file)
-            this.emit('change', { detail: { file } })
+            this.emit('change', { detail: { file, alt: this.alt ?? '' } })
         }
     }
 
