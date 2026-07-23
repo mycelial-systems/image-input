@@ -530,3 +530,42 @@
     verify crop-rect behavior manually when a drag doesn't visibly
     register, rather than assuming the feature is broken.
 ---
+
+## 2026-07-23 - US-009
+
+- Audited US-009's acceptance criteria against the tests already
+  written incrementally during US-001 through US-007 (this repo
+  followed test-first per story throughout, so most of this story's
+  scope existed already, similar to the US-003 finding):
+  - change event payload shape: covered, plus one new dedicated test
+    added this session (see below).
+  - alt property reflection: covered by `alt property toggles the
+    badge state` (`test/index.ts`).
+  - remove behavior: covered by `remove clears state and emits an
+    event` (`test/index.ts`).
+  - crop rect math (display-to-natural coordinate mapping): covered
+    by `test/crop-math.ts` (`moveRect`/`resizeRect`/`toNaturalRect`
+    pure-function tests, no browser layout dependency) plus the
+    integration-level drag/keyboard tests in `test/crop.ts`.
+  - getBlob producing a Blob of the expected dimensions: covered by
+    `getBlob returns a Blob of the cropped region at natural
+    resolution` (`test/crop.ts`).
+  - No tests assert on specific visible text content (grepped for
+    string-literal text assertions across `test/*.ts`; existing tests
+    already only assert on classes/attributes/values, not text).
+- The one gap: no test asserted the `image-input:change` detail
+  *shape* (its exact key set) in isolation -- the existing coverage
+  bundled that check together with alt-text-specific assertions. Added
+  `change event payload has the expected shape` in `test/index.ts`,
+  asserting `Object.keys(detail).sort()` is exactly `['alt', 'file']`.
+- Files changed: `test/index.ts` (1 new test, 2 new assertions),
+  `specs/prd.json` (US-009 `passes: true`).
+- Tests: full `npm test` (lint + build + typecheck + tape-run) passes
+  with 100 total assertions (up from 98).
+- **Learnings for future iterations:**
+  - When a story's acceptance criteria list test coverage areas,
+    check whether prior stories (written test-first) already satisfy
+    them before writing net-new tests -- grep each criterion against
+    existing `test/*.ts` describe/test names first, same lesson as
+    US-003.
+---

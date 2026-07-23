@@ -162,6 +162,25 @@ test('ALT badge emits image-input:alt with the file and alt text', async t => {
         'should emit the current alt text once set')
 })
 
+test('change event payload has the expected shape', async t => {
+    document.body.innerHTML += `
+        <image-input class="change-shape-test"></image-input>
+    `
+    const el = await waitFor('image-input.change-shape-test') as ImageInput
+    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+
+    let detail:unknown
+    el.addEventListener('image-input:change', (ev:Event) => {
+        detail = (ev as CustomEvent).detail
+    })
+
+    selectFile(el, file)
+
+    t.ok(detail, 'should emit a detail object')
+    t.deepEqual(Object.keys(detail as object).sort(), ['alt', 'file'],
+        'detail should only contain file and alt keys')
+})
+
 test('change event detail includes the current alt text', async t => {
     document.body.innerHTML += `
         <image-input class="change-alt-test"></image-input>
