@@ -12,8 +12,8 @@
     "build-tests": "esbuild test/index.ts --target=es2020 --bundle --keep-names > test/test-bundle.js",
     "test": "npm run lint && npm run build && npm run build-tests && npm run test-tape-run",
     "test-tape-run": "cat test/index.html | tape-run --input=html --static=test | tap-spec",
-    "build-css": "postcss src/index.css --use postcss-nesting > dist/index.css",
-    "build-css:min": "postcss src/index.css --use cssnano postcss-nesting > dist/index.min.css",
+    "build-css": "lightningcss --targets '>= 0.25%' src/index.css -o dist/index.css",
+    "build-css:min": "lightningcss --minify --targets '>= 0.25%' src/index.css -o dist/index.min.css",
     "build-cjs": "esbuild src/*.ts --format=cjs --keep-names --tsconfig=tsconfig.build.json --outdir=./dist --out-extension:.js=.cjs --sourcemap",
     "build-esm": "esbuild src/*.ts --format=esm --metafile=dist/meta.json --keep-names --tsconfig=tsconfig.build.json --outdir=./dist --sourcemap && tsc --emitDeclarationOnly --project tsconfig.build.json --outDir dist",
     "build-esm:min": "esbuild ./src/*.ts --format=esm --keep-names --bundle --tsconfig=tsconfig.build.json --minify --out-extension:.js=.min.js --outdir=./dist --sourcemap",
@@ -46,32 +46,27 @@
     }
   },
   "dependencies": {
-    "@substrate-system/drag-drop": "^0.4.3",
-    "@substrate-system/web-component": "^0.0.38"
+    "@substrate-system/drag-drop": "^0.4.12"
   },
   "devDependencies": {
-    "@substrate-system/debug": "^0.9.0",
-    "@substrate-system/dom": "^0.1.7",
-    "@substrate-system/tapzero": "^0.10.15",
-    "@typescript-eslint/eslint-plugin": "^8.7.0",
-    "@typescript-eslint/parser": "^8.7.0",
-    "auto-changelog": "^2.4.0",
-    "cssnano": "^7.0.3",
-    "esbuild": "^0.27.0",
-    "eslint": "^8.57.0",
-    "eslint-config-standard": "^17.1.0",
+    "@substrate-system/debug": "^0.9.67",
+    "@substrate-system/dom": "^0.1.13",
+    "@substrate-system/tapzero": "^0.10.16",
+    "@substrate-system/web-component": "^0.0.56",
+    "auto-changelog": "^2.6.0",
+    "esbuild": "^0.28.1",
+    "eslint": "^10.7.0",
+    "lightningcss": "^1.33.0",
+    "lightningcss-cli": "^1.33.0",
     "markdown-toc": "^1.2.0",
-    "postcss": "^8.5.1",
-    "postcss-cli": "^11.0.0",
-    "postcss-nesting": "^13.0.1",
-    "stylelint": "^16.19.1",
-    "stylelint-config-standard": "^39.0.1",
+    "newneostandard": "^0.14.1",
+    "stylelint": "^17.14.1",
+    "stylelint-config-standard": "^40.0.0",
     "tap-spec": "^5.0.0",
     "tape-run": "^11.0.0",
-    "typedoc": "^0.28.1",
-    "typescript": "^5.7.3",
-    "vite": "^7.0.0"
+    "typedoc": "^0.28.20",
+    "typescript": "^5.9.3",
+    "vite": "^8.1.5"
   },
-  "author": "nichoth <nichoth@nichoth.com> (https://nichoth.com)",
-  "license": "MIT"
+  "author": "nichoth <nichoth@nichoth.com> (https://nichoth.com)"
 }
