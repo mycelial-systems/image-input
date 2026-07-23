@@ -48,6 +48,15 @@
   the dev server + delete the `.playwright-mcp/` scratch directory
   afterwards (it is not gitignored and holds screenshots/snapshots
   that shouldn't be committed).
+- `test/index.html` (the tape-run harness) does NOT load
+  `src/index.css` -- only `test-bundle.js`. Any component whose
+  correctness depends on real layout (not just class-presence
+  assertions) cannot rely on external stylesheet rules like
+  `display:block` or `width:100%` being applied during tests.
+  Compute pixel dimensions in JS from `this.clientWidth` etc. and
+  set them as inline styles rather than depending on the stylesheet,
+  and force a deterministic box size in tests via an inline
+  `style="display:block;width:...px"` on the host element.
 
 ## 2026-07-23 - US-001
 
@@ -181,3 +190,77 @@
     already did part of the work "ahead of schedule" (see US-001's
     note about the `alt` property) -- grep the acceptance criteria
     against current source first to scope down to the real gap.
+---
+
+## 2026-07-23 - US-004
+
+- Added a new `image-crop` element (`src/crop.ts`), a from-scratch
+  crop UI following the same `WebComponent` light-DOM pattern as
+  `image-input`. Accepts an image via the reflected `src` string
+  attribute or a `setFile(file)` method (creates/revokes an object
+  URL, mirroring `image-input`'s lifecycle).
+- Added `src/crop-math.ts`: small pure functions (`fitWidth`,
+  `scaleFor`, `toDisplayRect`) for natural-to-display pixel math.
+  Not unit-tested standalone yet (no test runner for pure TS outside
+  the browser tape harness in this repo), but written to be
+  reused/tested by US-005's coordinate-mapping requirement, and
+  already exercised indirectly by `crop.ts`'s layout tests.
+- On the image's `load` event, the component reads
+  `naturalWidth`/`naturalHeight`, sets the initial crop to cover the
+  full image, and lays out: the frame and image are sized in JS
+  (not just via CSS `width:100%`) so the aspect-ratio-preserving fit
+  is computed and testable independent of whether the stylesheet is
+  loaded. A dashed-border `.crop-rect` with 8 `.handle` spans (4
+  corners + 4 edge midpoints, positioned via CSS `left/top` +
+  `transform: translate(-50%,-50%)`) overlays the image. Four
+  sibling `.dim-{top,bottom,left,right}` panels are sized in JS from
+  the crop rect vs. the displayed image bounds to dim the
+  non-cropped area (all zero-sized initially, since the crop starts
+  covering the full image -- verified by test).
+- Recomputes layout on `window resize` in addition to image load;
+  no dragging/resizing yet (that's US-005 -- handles and the dim
+  panels render but aren't interactive this story).
+- CSS added to `src/index.css` (`image-crop { ... }` block) using
+  new variables added to `src/_vars.css`
+  (`--image-crop-dim-color`, `--image-crop-rect-border-*`,
+  `--image-crop-handle-*`, `--image-crop-focus-color` for later
+  keyboard-focus use in US-006).
+- Wired a minimal `image-crop` + file input into `example/index.ts`
+  for manual browser verification ahead of US-008's full dialog
+  flow; US-008 will replace/extend this with the real composed flow.
+- **Key gotcha found while writing tests:** the tape test harness
+  (`test/index.html`) does NOT load `src/index.css` -- only
+  `test-bundle.js`. Any component whose correctness depends on real
+  layout (not just class-presence assertions) cannot rely on
+  external stylesheet rules like `display:block` or `width:100%`
+  being applied during tests. Fix: `crop.ts` reads `this.clientWidth`
+  (the host element) rather than a CSS-dependent child width, and
+  sets the frame/image *and* crop-rect dimensions directly via
+  inline styles computed in JS, so layout is correct with or without
+  the stylesheet loaded (tests force `style="display:block;width:...px"`
+  inline on the host to control the box size deterministically).
+  Any future component here that asserts on real pixel dimensions in
+  tests should follow the same JS-computed-inline-style approach
+  rather than depending on `src/index.css` being present.
+- Test images: generated on the fly via `canvas.toBlob()` inside
+  `test/crop.ts` (a `makeImageFile(width, height)` helper) rather
+  than hardcoding base64 PNG fixtures, so exact natural dimensions
+  are known and controllable per test.
+- Files changed: `src/crop.ts` (new), `src/crop-math.ts` (new),
+  `src/index.css`, `src/_vars.css`, `test/crop.ts` (new),
+  `test/index.ts` (import crop tests), `example/index.ts`,
+  `specs/prd.json` (US-004 `passes: true`).
+- Tests: 6 new tape tests (13 new assertions: element found, setFile
+  sizes the frame preserving aspect ratio, src attribute sets the
+  img src, 8 handles + crop-rect covers the full image, 4 dim panels
+  render and are zero-sized initially). Full `npm test` (lint +
+  build + typecheck + tape-run) passes with 36 total assertions.
+- Verified manually in the browser with the Playwright MCP tools
+  against `npm run start`: generated a 400x200 test PNG with
+  `python3`+`zlib` (no image fixture existed in the repo), uploaded
+  it through the example's file input, and confirmed via screenshot
+  that the image renders at the correct 2:1 aspect ratio, the dashed
+  crop rectangle covers the full image with all 8 handles visible at
+  the corners/edges, and no dimming is visible (expected, since the
+  initial crop covers the whole image). Killed the vite dev server
+  and removed `.playwright-mcp/` and the scratch PNG afterwards.

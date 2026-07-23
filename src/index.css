@@ -101,3 +101,54 @@ image-input {
 image-input:not(:defined) {
 	visibility: hidden;
 }
+
+image-crop {
+    display: block;
+
+    & .image-crop-frame {
+        position: relative;
+        width: 100%;
+
+        & img {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+
+        & .dim {
+            position: absolute;
+            background-color: var(--image-crop-dim-color);
+            pointer-events: none;
+        }
+
+        & .crop-rect {
+            position: absolute;
+            box-sizing: border-box;
+            border: var(--image-crop-rect-border-width) dashed
+                var(--image-crop-rect-border-color);
+        }
+
+        & .handle {
+            position: absolute;
+            width: var(--image-crop-handle-size);
+            height: var(--image-crop-handle-size);
+            background-color: var(--image-crop-handle-color);
+            border: 1px solid var(--image-crop-handle-border-color);
+            border-radius: 999px;
+            transform: translate(-50%, -50%);
+        }
+
+        & .handle-nw { left: 0; top: 0; }
+        & .handle-n { left: 50%; top: 0; }
+        & .handle-ne { left: 100%; top: 0; }
+        & .handle-e { left: 100%; top: 50%; }
+        & .handle-se { left: 100%; top: 100%; }
+        & .handle-s { left: 50%; top: 100%; }
+        & .handle-sw { left: 0; top: 100%; }
+        & .handle-w { left: 0; top: 50%; }
+    }
+}
+
+image-crop:not(:defined) {
+	visibility: hidden;
+}
