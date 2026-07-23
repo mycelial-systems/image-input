@@ -1,0 +1,151 @@
+{
+  "project": "image-input",
+  "branchName": "ralph/image-crop-alt-text",
+  "description": "Image Input with Crop and Alt Text (Bluesky-style) -- extend the image-input web component with preview overlay controls, alt text flow, and a new from-scratch image-crop element that exports a cropped Blob",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Preview with overlay controls",
+      "description": "As a user, I want to see my selected image as a thumbnail with ALT, edit, and remove controls overlaid, so I can manage the attachment like on Bluesky.",
+      "acceptanceCriteria": [
+        "After file selection, image-input shows the image preview",
+        "Overlay shows three controls: an '+ ALT' badge button, an edit (pencil) button, and a remove (x) button",
+        "The ALT badge reads 'ALT' (instead of '+ ALT') once alt text has been set via the alt property",
+        "Clicking remove clears the file, preview, and alt text, and returns the component to its empty state",
+        "Remove emits an image-input:remove event",
+        "All overlay buttons are keyboard focusable with accessible names",
+        "Overlay styles live in src/index.css, use CSS variables from a variables file, and use nested selectors",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Edit and alt-text request events",
+      "description": "As a consuming developer, I want events when the user clicks the edit or ALT buttons, so I can open my own editing UI.",
+      "acceptanceCriteria": [
+        "Clicking the pencil button emits image-input:edit with { file } in detail",
+        "Clicking the ALT badge emits image-input:alt with { file, alt } in detail (current alt text, may be empty)",
+        "The component performs no navigation and opens no dialogs itself",
+        "Events bubble so consumers can listen on ancestors",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Alt text property",
+      "description": "As a consuming developer, I want to set and read alt text on the component, so my own alt text input stays in sync.",
+      "acceptanceCriteria": [
+        "image-input has an alt string property (and reflected attribute) that consumers can set after collecting alt text",
+        "Setting alt updates the preview img element's alt attribute and switches the badge from '+ ALT' to 'ALT'",
+        "image-input:change event detail includes the current alt text: { file, alt }",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Crop component renders crop rectangle",
+      "description": "As a user, I want to see my image with an adjustable crop rectangle, so I can choose which part of the image to keep.",
+      "acceptanceCriteria": [
+        "New image-crop element in src/crop.ts accepts an image via a src attribute (object URL or data URL) or a setFile(file) method",
+        "Uses the existing WebComponent base class and light-DOM render() pattern, no shadow DOM, no new runtime dependencies",
+        "Image renders at a size that fits the element while preserving aspect ratio",
+        "A crop rectangle renders over the image with a dashed border and 8 handles (4 corners, 4 edge midpoints); initial crop covers the full image",
+        "The area outside the crop rectangle is dimmed",
+        "Component ships CSS in src/index.css using variables from a _vars.css file",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Drag to move and resize the crop",
+      "description": "As a user, I want to drag the rectangle to move it and drag its handles to resize it, so I can crop freely like on Bluesky.",
+      "acceptanceCriteria": [
+        "Dragging inside the rectangle moves it; the rectangle cannot leave the image bounds",
+        "Dragging a corner handle resizes in both axes; dragging an edge handle resizes in one axis",
+        "Crop has a minimum size of 32x32 display pixels",
+        "Works with mouse and touch, using pointer events with setPointerCapture",
+        "Display-to-natural coordinate mapping is centralized in pure functions (unit-testable without browser layout)",
+        "Crop state changes emit image-crop:change with the crop rect in natural-image pixel coordinates: { x, y, width, height }",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "Keyboard-accessible crop",
+      "description": "As a keyboard user, I want to adjust the crop without a pointer, so the component is accessible.",
+      "acceptanceCriteria": [
+        "The crop rectangle is focusable; arrow keys move it, and shift+arrow keys resize it",
+        "Focus styles are visible",
+        "The rectangle has an appropriate ARIA role and label",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Export cropped Blob",
+      "description": "As a consuming developer, I want to get the cropped image as a Blob, so I can upload it.",
+      "acceptanceCriteria": [
+        "image-crop exposes getBlob(opts?) returning Promise<Blob> of the crop region, rendered via an offscreen canvas at the image's natural resolution",
+        "opts supports type (default image/jpeg) and quality",
+        "image-crop exposes a crop getter returning the current rect in natural-image pixels",
+        "image-input exposes setImage(blob) which replaces the preview and the file emitted in subsequent change events",
+        "Object URLs are revoked on remove/replace to avoid leaks",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "Example page wiring it all together",
+      "description": "As a developer evaluating the package, I want the example app to demonstrate the full Bluesky-style flow, so I can see how to compose the pieces.",
+      "acceptanceCriteria": [
+        "example/index.ts composes image-input, image-crop, and an alt text textarea using a native dialog element owned by the example app (demonstrating the headless pattern)",
+        "Flow works end to end: pick image, open crop dialog via edit button, adjust crop, save, see cropped preview; open alt dialog via ALT badge, enter text, see badge change to 'ALT'",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "title": "Tests",
+      "description": "As a maintainer, I want automated tests for the new behavior, so regressions are caught in CI.",
+      "acceptanceCriteria": [
+        "Tape tests cover: change event payload shape, alt property reflection, remove behavior, crop rect math (display-to-natural coordinate mapping), and getBlob producing a Blob of the expected dimensions",
+        "No tests assert on specific visible text content",
+        "npm test passes",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}

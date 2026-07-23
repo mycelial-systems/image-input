@@ -45,9 +45,6 @@
       ]
     }
   },
-  "dependencies": {
-    "@substrate-system/drag-drop": "^0.4.12"
-  },
   "devDependencies": {
     "@substrate-system/debug": "^0.9.67",
     "@substrate-system/dom": "^0.1.13",

@@ -1,6 +1,6 @@
 import '../src/index.css'
-import '../src/index.js'
+import { ImageInput } from '../src/index.js'
 
 document.body.innerHTML += `
-    <image-input></image-input>
+    <${ImageInput.TAG}></${ImageInput.TAG}>
 `

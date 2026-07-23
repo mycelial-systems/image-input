@@ -1,38 +1,53 @@
-import { define } from '@substrate-system/web-component/util'
+import { WebComponent } from '@substrate-system/web-component'
 import { createDebug } from '@substrate-system/debug'
 const debug = createDebug('image-input')
 
-// for docuement.querySelector
+// for document.querySelector
 declare global {
     interface HTMLElementTagNameMap {
         'image-input': ImageInput
     }
 }
 
-export class ImageInput extends HTMLElement {
-    private fileInput:HTMLInputElement|null = null
-    private previewImg:HTMLImageElement|null = null
-
-    disconnectedCallback () {
-        debug('disconnected')
-        if (this.fileInput) {
-            this.fileInput.removeEventListener('change', this.handleFileSelect)
-        }
-    }
+export class ImageInput extends WebComponent {
+    static TAG = 'image-input'
+    static reflectedStringAttributes = ['accept', 'name']
+    static reflectedBooleanAttributes = ['required']
+    declare accept:string|null
+    declare name:string|null
+    declare required:boolean
 
     connectedCallback () {
         debug('connected')
-        this.render()
+        super.connectedCallback()
         this.setupEventListeners()
     }
 
-    setupEventListeners () {
-        this.fileInput = this.querySelector('input[type="file"]')
-        this.previewImg = this.querySelector('#preview')
+    disconnectedCallback () {
+        debug('disconnected')
+        this.qs('input')?.removeEventListener('change', this.handleFileSelect)
+    }
 
-        if (this.fileInput) {
-            this.fileInput.addEventListener('change', this.handleFileSelect)
+    setupEventListeners () {
+        this.qs('input')?.addEventListener('change', this.handleFileSelect)
+    }
+
+    handleChange_accept (_old:string|null, newValue:string|null) {
+        this.qs('input')?.setAttribute('accept', newValue ?? 'image/*')
+    }
+
+    handleChange_name (_old:string|null, newValue:string|null) {
+        const input = this.qs('input')
+        if (!input) return
+        if (newValue === null) {
+            input.removeAttribute('name')
+        } else {
+            input.setAttribute('name', newValue)
         }
+    }
+
+    handleChange_required (_old:string|null, newValue:string|null) {
+        this.qs('input')?.toggleAttribute('required', newValue !== null)
     }
 
     handleFileSelect = (event:Event) => {
@@ -41,13 +56,15 @@ export class ImageInput extends HTMLElement {
 
         if (file && file.type.startsWith('image/')) {
             debug('Image file selected:', file.name)
+            this.emit('change', { detail: { file } })
             const reader = new FileReader()
 
             reader.onload = (e) => {
                 const result = e.target?.result as string
-                if (this.previewImg) {
-                    this.previewImg.src = result
-                    this.previewImg.style.display = 'block'
+                const img = this.qs('img')
+                if (img) {
+                    img.src = result
+                    img.style.display = 'block'
                 }
             }
 
@@ -56,11 +73,21 @@ export class ImageInput extends HTMLElement {
     }
 
     render () {
+        const accept = this.accept ?? 'image/*'
+        const name = this.name ? ` name="${this.name}"` : ''
+        const required = this.required ? ' required' : ''
+
         this.innerHTML = `<div>
-            <input type="file" accept="image/*" />
-            <img id="preview" style="display: none; max-width: 100%; margin-top: 1rem;" />
+            <input
+                type="file"
+                accept="${accept}"${name}${required}
+            />
+            <img
+                id="preview"
+                style="display: none; max-width: 100%; margin-top: 1rem;"
+            />
         </div>`
     }
 }
 
-define('image-input', ImageInput)
+ImageInput.define()
