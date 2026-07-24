@@ -160,13 +160,41 @@ image-crop {
             left: 0;
             top: 0;
         }
-        & .handle-n { left: 50%; top: 0; }
-        & .handle-ne { left: 100%; top: 0; }
-        & .handle-e { left: 100%; top: 50%; }
-        & .handle-se { left: 100%; top: 100%; }
-        & .handle-s { left: 50%; top: 100%; }
-        & .handle-sw { left: 0; top: 100%; }
-        & .handle-w { left: 0; top: 50%; }
+
+        & .handle-n {
+            left: 50%;
+            top: 0;
+        }
+
+        & .handle-ne {
+            left: 100%;
+            top: 0;
+        }
+
+        & .handle-e {
+            left: 100%;
+            top: 50%;
+        }
+
+        & .handle-se {
+            left: 100%;
+            top: 100%;
+        }
+
+        & .handle-s {
+            left: 50%;
+            top: 100%;
+        }
+
+        & .handle-sw {
+            left: 0;
+            top: 100%;
+        }
+
+        & .handle-w {
+            left: 0;
+            top: 50%;
+        }
     }
 }
 

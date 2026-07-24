@@ -67,11 +67,14 @@ export class ImageInput extends WebComponent {
         img?.setAttribute('alt', newValue ?? '')
 
         const badge = this.qs('.alt-badge')
-        if (!badge) return
-        const hasAlt = !!newValue
-        badge.classList.toggle('has-alt', hasAlt)
-        badge.setAttribute('aria-label',
-            (hasAlt ? 'Edit alt text' : 'Add alt text'))
+        if (badge) {
+            const hasAlt = !!newValue
+            badge.classList.toggle('has-alt', hasAlt)
+            badge.setAttribute('aria-label',
+                (hasAlt ? 'Edit alt text' : 'Add alt text'))
+        }
+
+        this.emit('alt-change', { detail: { alt: newValue ?? '' } })
     }
 
     handleFileSelect = (event:Event) => {

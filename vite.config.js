@@ -15,7 +15,7 @@ export default defineConfig({
         transformer: 'lightningcss'
     },
     server: {
-        port: 8888,
+        port: 8901,
         host: true,
         open: true,
     },

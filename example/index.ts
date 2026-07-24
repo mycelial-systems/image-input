@@ -5,6 +5,7 @@ import { ImageCrop } from '../src/crop.js'
 
 document.body.innerHTML += `
     <${ImageInput.TAG} id="input"></${ImageInput.TAG}>
+    <div id="alt-display">The alt text: <span id="alt-value"></span></div>
 
     <dialog id="crop-dialog">
         <${ImageCrop.TAG} id="crop"></${ImageCrop.TAG}>
@@ -41,6 +42,7 @@ const altTextarea = document.getElementById(
 ) as HTMLTextAreaElement
 const altSave = document.getElementById('alt-save') as HTMLButtonElement
 const altCancel = document.getElementById('alt-cancel') as HTMLButtonElement
+const altValue = document.getElementById('alt-value') as HTMLSpanElement
 
 input.addEventListener('image-input:edit', ((e:CustomEvent) => {
     const { file } = e.detail
@@ -69,3 +71,7 @@ altSave.addEventListener('click', () => {
 })
 
 altCancel.addEventListener('click', () => altDialog.close())
+
+input.addEventListener('image-input:alt-change', ((e:CustomEvent) => {
+    altValue.textContent = e.detail.alt
+}) as EventListener)

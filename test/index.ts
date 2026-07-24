@@ -162,6 +162,47 @@ test('ALT badge emits image-input:alt with the file and alt text', async t => {
         'should emit the current alt text once set')
 })
 
+test('setting alt emits image-input:alt-change', async t => {
+    document.body.innerHTML += `
+        <image-input class="alt-change-test"></image-input>
+    `
+    const el = await waitFor('image-input.alt-change-test') as ImageInput
+
+    let detail:{ alt:string }|undefined
+    el.addEventListener('image-input:alt-change', (ev:Event) => {
+        detail = (ev as CustomEvent).detail
+    })
+
+    el.alt = 'a description'
+
+    t.deepEqual(detail, { alt: 'a description' },
+        'should emit alt-change with the new alt text')
+})
+
+test('clearing alt emits image-input:alt-change with an empty string',
+    async t => {
+        document.body.innerHTML += `
+            <image-input class="alt-change-clear-test"></image-input>
+        `
+        const el = await waitFor(
+            'image-input.alt-change-clear-test'
+        ) as ImageInput
+        const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+        selectFile(el, file)
+        el.alt = 'a description'
+
+        let detail:{ alt:string }|undefined
+        el.addEventListener('image-input:alt-change', (ev:Event) => {
+            detail = (ev as CustomEvent).detail
+        })
+
+        const removeBtn = el.querySelector('.remove') as HTMLButtonElement
+        removeBtn.click()
+
+        t.deepEqual(detail, { alt: '' },
+            'should emit alt-change with an empty string on clear')
+    })
+
 test('change event payload has the expected shape', async t => {
     document.body.innerHTML += `
         <image-input class="change-shape-test"></image-input>
