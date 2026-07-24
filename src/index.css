@@ -14,6 +14,10 @@
     }
 }
 
+#drop-zone {
+    margin-bottom: 1rem;
+}
+
 image-input {
     display: block;
 
@@ -59,7 +63,7 @@ image-input {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            border: none;
+            border: 1px solid var(--image-input-pill-border-color);
             cursor: pointer;
             background-color: var(--image-input-pill-bg);
             color: var(--image-input-pill-color);

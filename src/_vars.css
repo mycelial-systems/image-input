@@ -5,6 +5,7 @@
     --image-input-pill-bg: rgb(0 0 0 / 65%);
     --image-input-pill-bg-hover: rgb(0 0 0 / 80%);
     --image-input-pill-color: #fff;
+    --image-input-pill-border-color: rgb(255 255 255 / 35%);
     --image-input-pill-radius: 999px;
     --image-input-button-size: 2rem;
     --image-input-icon-size: 1.125rem;

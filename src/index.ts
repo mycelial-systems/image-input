@@ -1,5 +1,7 @@
 import { WebComponent } from '@substrate-system/web-component'
 import { createDebug } from '@substrate-system/debug'
+import { html } from './html.js'
+import { ImageInputClient } from './client.js'
 const debug = createDebug('image-input')
 
 // for document.querySelector
@@ -19,29 +21,22 @@ export class ImageInput extends WebComponent {
     declare alt:string|null
     declare required:boolean
 
-    #file:File|Blob|null = null
-    #previewUrl:string|null = null
+    #client:ImageInputClient|null = null
 
     connectedCallback () {
         debug('connected')
         super.connectedCallback()
-        this.setupEventListeners()
+        this.#client = new ImageInputClient(this, {
+            emit: (type, detail) => this.emit(type, { detail }),
+            getAlt: () => this.alt ?? '',
+            resetAlt: () => { this.alt = null }
+        })
     }
 
     disconnectedCallback () {
         debug('disconnected')
-        this.qs('input')?.removeEventListener('change', this.handleFileSelect)
-        this.qs('.remove')?.removeEventListener('click', this.handleRemove)
-        this.qs('.edit')?.removeEventListener('click', this.handleEdit)
-        this.qs('.alt-badge')?.removeEventListener('click', this.handleAlt)
-        this.#revokePreviewUrl()
-    }
-
-    setupEventListeners () {
-        this.qs('input')?.addEventListener('change', this.handleFileSelect)
-        this.qs('.remove')?.addEventListener('click', this.handleRemove)
-        this.qs('.edit')?.addEventListener('click', this.handleEdit)
-        this.qs('.alt-badge')?.addEventListener('click', this.handleAlt)
+        this.#client?.destroy()
+        this.#client = null
     }
 
     handleChange_accept (_old:string|null, newValue:string|null) {
@@ -77,33 +72,13 @@ export class ImageInput extends WebComponent {
         this.emit('alt-change', { detail: { alt: newValue ?? '' } })
     }
 
-    handleFileSelect = (event:Event) => {
-        const input = event.target as HTMLInputElement
-        const file = input.files?.[0]
-
-        if (file && file.type.startsWith('image/')) {
-            debug('Image file selected:', file.name)
-            this.#setFile(file)
-            this.emit('change', { detail: { file, alt: this.alt ?? '' } })
-        }
-    }
-
-    handleRemove = (event:Event) => {
-        event.preventDefault()
-        this.#clear()
-        this.emit('remove')
-    }
-
-    handleEdit = (event:Event) => {
-        event.preventDefault()
-        if (!this.#file) return
-        this.emit('edit', { detail: { file: this.#file } })
-    }
-
-    handleAlt = (event:Event) => {
-        event.preventDefault()
-        if (!this.#file) return
-        this.emit('alt', { detail: { file: this.#file, alt: this.alt ?? '' } })
+    /**
+     * Replace the preview on the given instance with a Blob (e.g. a
+     * cropped or dropped image), and use it as the file emitted in the
+     * resulting `image-input:change` event.
+     */
+    static setImage (instance:ImageInput, blob:Blob):void {
+        instance.#client?.setImage(blob)
     }
 
     /**
@@ -111,80 +86,16 @@ export class ImageInput extends WebComponent {
      * as the file emitted in the resulting `image-input:change` event.
      */
     setImage (blob:Blob):void {
-        this.#setFile(blob)
-        this.emit('change', { detail: { file: blob, alt: this.alt ?? '' } })
-    }
-
-    #setFile (file:File|Blob):void {
-        this.#revokePreviewUrl()
-        this.#file = file
-        this.#previewUrl = URL.createObjectURL(file)
-
-        const img = this.qs('img')
-        if (img) img.src = this.#previewUrl
-        this.qs('.preview')?.classList.add('has-image')
-    }
-
-    #clear ():void {
-        this.#revokePreviewUrl()
-        this.#file = null
-
-        const input = this.qs('input')
-        if (input) input.value = ''
-
-        this.qs('img')?.removeAttribute('src')
-        this.qs('.preview')?.classList.remove('has-image')
-
-        this.alt = null
-    }
-
-    #revokePreviewUrl ():void {
-        if (this.#previewUrl) {
-            URL.revokeObjectURL(this.#previewUrl)
-            this.#previewUrl = null
-        }
+        ImageInput.setImage(this, blob)
     }
 
     render () {
-        const accept = this.accept ?? 'image/*'
-        const name = this.name ? ` name="${this.name}"` : ''
-        const required = this.required ? ' required' : ''
-        const alt = this.alt ?? ''
-        const hasAlt = !!this.alt
-
-        this.innerHTML = `<div class="wrapper">
-            <input
-                type="file"
-                accept="${accept}"${name}${required}
-            />
-            <div class="preview">
-                <img alt="${alt}" />
-                <div class="overlay">
-                    <button
-                        type="button"
-                        class="alt-badge${hasAlt ? ' has-alt' : ''}"
-                        aria-label="${hasAlt ? 'Edit alt text' : 'Add alt text'}"
-                    ><span class="plus" aria-hidden="true">+</span>ALT</button>
-                    <div class="controls">
-                        <button type="button" class="edit"
-                            aria-label="Edit image"
-                        >
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0
-                                    -3-3L5 17v3z" />
-                            </svg>
-                        </button>
-                        <button type="button" class="remove"
-                            aria-label="Remove image"
-                        >
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M5 5l14 14M19 5L5 19" />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>`
+        this.innerHTML = html({
+            accept: this.accept,
+            name: this.name,
+            required: this.required,
+            alt: this.alt
+        })
     }
 }
 

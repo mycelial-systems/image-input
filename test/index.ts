@@ -282,6 +282,34 @@ test('setImage replaces the preview with the given blob', async t => {
         'should emit image-input:change with the new blob as the file')
 })
 
+test('ImageInput.setImage sets the image on the given instance', async t => {
+    document.body.innerHTML += `
+        <image-input class="static-set-image-test"></image-input>
+    `
+    const el = await waitFor(
+        'image-input.static-set-image-test'
+    ) as ImageInput
+
+    const blob = new Blob(['cropped'], { type: 'image/jpeg' })
+
+    let detail:{ file:Blob, alt:string }|undefined
+    el.addEventListener('image-input:change', (ev:Event) => {
+        detail = (ev as CustomEvent).detail
+    })
+
+    ;(el.constructor as typeof ImageInput).setImage(el, blob)
+
+    const preview = el.querySelector('.preview')
+    t.ok(preview?.classList.contains('has-image'),
+        'should show the preview after the static setImage')
+
+    const img = el.querySelector('img') as HTMLImageElement
+    t.ok(img.getAttribute('src'), 'should set the preview src')
+
+    t.equal(detail?.file, blob,
+        'should emit image-input:change with the blob as the file')
+})
+
 test('setImage revokes the previous preview object URL', async t => {
     document.body.innerHTML += `
         <image-input class="set-image-revoke-test"></image-input>

@@ -27,6 +27,30 @@ export function fitWidth (
 }
 
 /**
+ * Given an available box (max width and max height) and an image's
+ * natural dimensions, compute the largest display size that fits inside
+ * the box while preserving the aspect ratio. A `maxHeight` of 0 (or
+ * less) means the height is unconstrained, in which case this behaves
+ * like `fitWidth`. Pure function so it is unit-testable without a real
+ * DOM layout.
+ */
+export function fitWithin (
+    naturalWidth:number,
+    naturalHeight:number,
+    maxWidth:number,
+    maxHeight:number
+):DisplaySize {
+    if (naturalWidth <= 0 || naturalHeight <= 0) {
+        return { width: maxWidth, height: 0 }
+    }
+    const scaleW = maxWidth / naturalWidth
+    const scale = maxHeight > 0 ?
+        Math.min(scaleW, maxHeight / naturalHeight) :
+        scaleW
+    return { width: naturalWidth * scale, height: naturalHeight * scale }
+}
+
+/**
  * Scale factor between natural-image pixels and displayed pixels,
  * given the current displayed width.
  */

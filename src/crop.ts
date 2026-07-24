@@ -1,8 +1,7 @@
 import { WebComponent } from '@substrate-system/web-component'
 import { createDebug } from '@substrate-system/debug'
 import {
-    fitWidth,
-    scaleFor,
+    fitWithin,
     toDisplayRect,
     toNaturalRect,
     moveRect,
@@ -161,10 +160,26 @@ export class ImageCrop extends WebComponent {
         this.#layout()
     }
 
-    #displaySize ():DisplaySize {
-        return fitWidth(
-            this.#naturalWidth, this.#naturalHeight, this.clientWidth
+    /**
+     * The displayed image size, fitted to the element's available width
+     * *and* height so a tall image never overflows its container.
+     */
+    #fitted ():DisplaySize {
+        return fitWithin(
+            this.#naturalWidth,
+            this.#naturalHeight,
+            this.clientWidth,
+            this.clientHeight
         )
+    }
+
+    /**
+     * Scale factor from natural-image pixels to the current display,
+     * consistent with `#fitted()`.
+     */
+    #scale ():number {
+        if (this.#naturalWidth <= 0) return 1
+        return this.#fitted().width / this.#naturalWidth
     }
 
     #handleMoveStart = (e:PointerEvent):void => {
@@ -175,7 +190,7 @@ export class ImageCrop extends WebComponent {
             rectEl?.setPointerCapture(e.pointerId)
         } catch { /* not a real pointer in this environment */ }
 
-        const scale = scaleFor(this.#naturalWidth, this.clientWidth)
+        const scale = this.#scale()
         this.#drag = {
             mode: 'move',
             pointerId: e.pointerId,
@@ -199,7 +214,7 @@ export class ImageCrop extends WebComponent {
             handleEl.setPointerCapture(e.pointerId)
         } catch { /* not a real pointer in this environment */ }
 
-        const scale = scaleFor(this.#naturalWidth, this.clientWidth)
+        const scale = this.#scale()
         this.#drag = {
             mode: 'resize',
             handle,
@@ -216,7 +231,7 @@ export class ImageCrop extends WebComponent {
 
         const dx = e.clientX - drag.startClientX
         const dy = e.clientY - drag.startClientY
-        const bounds = this.#displaySize()
+        const bounds = this.#fitted()
 
         const newDisplayRect = drag.mode === 'move' ?
             moveRect(drag.startRect, dx, dy, bounds) :
@@ -224,7 +239,7 @@ export class ImageCrop extends WebComponent {
                 drag.startRect, drag.handle!, dx, dy, bounds, MIN_DISPLAY_SIZE
             )
 
-        const scale = scaleFor(this.#naturalWidth, this.clientWidth)
+        const scale = this.#scale()
         this.#crop = toNaturalRect(newDisplayRect, scale)
         this.#layout()
         this.emit('change', { detail: { ...this.#crop } })
@@ -237,8 +252,8 @@ export class ImageCrop extends WebComponent {
         e.preventDefault()
 
         const [dx, dy] = delta
-        const bounds = this.#displaySize()
-        const scale = scaleFor(this.#naturalWidth, this.clientWidth)
+        const bounds = this.#fitted()
+        const scale = this.#scale()
         const displayRect = toDisplayRect(this.#crop, scale)
 
         const newDisplayRect = e.shiftKey ?
@@ -268,16 +283,13 @@ export class ImageCrop extends WebComponent {
         const rect = this.qs<HTMLElement>('.crop-rect')
         if (!frame || !img || !rect || !this.#naturalWidth) return
 
-        const displayWidth = this.clientWidth
-        const displaySize = fitWidth(
-            this.#naturalWidth, this.#naturalHeight, displayWidth
-        )
+        const displaySize = this.#fitted()
         frame.style.width = `${displaySize.width}px`
         frame.style.height = `${displaySize.height}px`
         img.style.width = `${displaySize.width}px`
         img.style.height = `${displaySize.height}px`
 
-        const scale = scaleFor(this.#naturalWidth, displayWidth)
+        const scale = this.#scale()
         const displayRect = toDisplayRect(this.#crop, scale)
 
         rect.style.left = `${displayRect.x}px`

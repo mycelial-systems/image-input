@@ -2,8 +2,30 @@ import { test } from '@substrate-system/tapzero'
 import {
     moveRect,
     resizeRect,
-    toNaturalRect
+    toNaturalRect,
+    fitWithin
 } from '../src/crop-math.js'
+
+test('fitWithin fits to the width when height is unconstrained', t => {
+    const size = fitWithin(400, 200, 200, 0)
+    t.equal(size.width, 200, 'width should fill the available width')
+    t.equal(size.height, 100, 'height should preserve the aspect ratio')
+})
+
+test('fitWithin constrains by height when the image is too tall', t => {
+    // A 400x1200 image in a 480x800 box must fit the height.
+    const size = fitWithin(400, 1200, 480, 800)
+    t.equal(size.height, 800, 'height should be capped at the available height')
+    t.equal(size.width, 400 * (800 / 1200),
+        'width should shrink to preserve the aspect ratio')
+})
+
+test('fitWithin constrains by width when the image is too wide', t => {
+    const size = fitWithin(1200, 400, 480, 800)
+    t.equal(size.width, 480, 'width should be capped at the available width')
+    t.equal(size.height, 400 * (480 / 1200),
+        'height should shrink to preserve the aspect ratio')
+})
 
 test('moveRect shifts the rect by dx, dy within bounds', t => {
     const rect = { x: 10, y: 10, width: 50, height: 50 }
