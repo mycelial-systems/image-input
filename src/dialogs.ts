@@ -27,6 +27,19 @@ export interface DialogText {
 }
 
 /**
+ * The copy every dialog renders with unless a caller overrides it.
+ * `ImageInput.TEXT` starts as a copy of this, so reassigning that
+ * static cannot mutate the default other callers see.
+ */
+export const DEFAULT_TEXT:DialogText = {
+    altHeading: 'Alt text',
+    altLabel: 'Describe this image',
+    cropHeading: 'Crop image',
+    save: 'Save',
+    cancel: 'Cancel'
+}
+
+/**
  * Markup for the alt-text dialog. Closed by default -- callers decide
  * when to open it.
  */

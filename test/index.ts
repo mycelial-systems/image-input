@@ -10,6 +10,7 @@ import {
 } from './helpers.js'
 import './crop.js'
 import './crop-math.js'
+import './html.js'
 
 test('renders a .box div instead of .wrapper', async t => {
     document.body.innerHTML += `

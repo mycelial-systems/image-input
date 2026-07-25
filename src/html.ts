@@ -1,16 +1,38 @@
+import {
+    altDialogMarkup,
+    cropDialogMarkup,
+    DEFAULT_TEXT,
+    type DialogText
+} from './dialogs.js'
+
+/**
+ * Prompt text for an empty box, and the file input's `aria-label`.
+ */
+export const DEFAULT_LABEL = 'Drop an image, or click to choose one'
+
 export interface ImageInputHtmlOptions {
     accept?:string|null;
     name?:string|null;
     required?:boolean;
     alt?:string|null;
+    label?:string|null;
+    text?:DialogText;
+    /**
+     * Emit the built-in alt and crop dialogs. On by default. Pass
+     * `false` when the consumer supplies its own editing UI and
+     * cancels `image-input:edit` / `image-input:alt`.
+     */
+    dialogs?:boolean;
 }
 
 /**
  * Produce the markup for an image input.
  *
- * This is presentation only -- it does not attach any behavior. Put the
- * resulting HTML in the document, then wire it up with
- * `ImageInputClient` (see `./client.ts`).
+ * This is the only place this package writes that markup.
+ * `ImageInput.render()` calls it too, so the custom element and the
+ * server-rendered page cannot drift apart. It is presentation only --
+ * it attaches no behavior. Put the result in the document, then wire
+ * it up with `ImageInputClient` (see `./client.ts`).
  */
 export function html (opts:ImageInputHtmlOptions = {}):string {
     const accept = opts.accept ?? 'image/*'
@@ -18,21 +40,41 @@ export function html (opts:ImageInputHtmlOptions = {}):string {
     const required = opts.required ? ' required' : ''
     const alt = opts.alt ?? ''
     const hasAlt = !!opts.alt
+    const label = opts.label ?? DEFAULT_LABEL
+    const text = opts.text ?? DEFAULT_TEXT
+    const wantsDialogs = opts.dialogs ?? true
 
-    return `<div class="wrapper">
-            <input
-                type="file"
-                accept="${accept}"
-                ${name}
-                ${required}
-            />
+    const dialogs = wantsDialogs ?
+        `${altDialogMarkup(text)}${cropDialogMarkup(text)}` :
+        ''
+
+    return `<div class="box">
+            <label class="picker">
+                <input
+                    type="file"
+                    accept="${accept}"${name}${required}
+                    aria-label="${label}"
+                />
+                <span class="prompt">
+                    <svg class="prompt-icon" aria-hidden="true"
+                        viewBox="0 0 24 24"
+                    >
+                        <path d="M12 16V4M12 4l-5 5M12 4l5 5" />
+                        <path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0
+                            0 1-1v-3" />
+                    </svg>
+                    <span class="prompt-text">${label}</span>
+                </span>
+            </label>
             <div class="preview">
                 <img alt="${alt}" />
                 <div class="overlay">
                     <button
                         type="button"
                         class="alt-badge${hasAlt ? ' has-alt' : ''}"
-                        aria-label="${hasAlt ? 'Edit alt text' : 'Add alt text'}"
+                        aria-label="${hasAlt ?
+                            'Edit alt text' :
+                            'Add alt text'}"
                     ><span class="plus" aria-hidden="true">+</span>ALT</button>
                     <div class="controls">
                         <button type="button" class="edit"
@@ -53,5 +95,6 @@ export function html (opts:ImageInputHtmlOptions = {}):string {
                     </div>
                 </div>
             </div>
-        </div>`
+        </div>
+        ${dialogs}`
 }
