@@ -54,16 +54,17 @@ image-input {
     }
 }
 
-dialog#crop-dialog image-crop {
+#crop-dialog image-crop {
     display: block;
     max-width: min(90vw, 480px);
 }
 
-dialog#alt-dialog textarea {
+#alt-dialog textarea {
     display: block;
     width: 100%;
     box-sizing: border-box;
     margin-top: 0.5rem;
+    padding: 1rem;
 }
 
 input {

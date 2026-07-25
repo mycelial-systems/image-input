@@ -36,6 +36,11 @@ image-input {
         & .prompt-icon {
             width: var(--image-input-prompt-icon-size);
             height: var(--image-input-prompt-icon-size);
+            fill: none;
+            stroke: currentcolor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
         }
     }
 
@@ -137,6 +142,7 @@ image-input {
                 width: var(--image-input-icon-size);
                 height: var(--image-input-icon-size);
                 fill: none;
+                stroke: currentcolor;
                 stroke-width: 2;
                 stroke-linecap: round;
                 stroke-linejoin: round;

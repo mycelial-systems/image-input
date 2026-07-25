@@ -45,7 +45,12 @@
       ]
     }
   },
+  "dependencies": {
+    "@substrate-system/drag-drop": "^0.4.12",
+    "microtags": "^0.0.12"
+  },
   "devDependencies": {
+    "@preact/signals": "^2.10.0",
     "@substrate-system/debug": "^0.9.67",
     "@substrate-system/dom": "^0.1.13",
     "@substrate-system/tapzero": "^0.10.16",
@@ -53,10 +58,12 @@
     "auto-changelog": "^2.6.0",
     "esbuild": "^0.28.1",
     "eslint": "^10.7.0",
+    "htm": "^3.1.1",
     "lightningcss": "^1.33.0",
     "lightningcss-cli": "^1.33.0",
     "markdown-toc": "^1.2.0",
     "newneostandard": "^0.14.1",
+    "preact": "^10.29.7",
     "stylelint": "^17.14.1",
     "stylelint-config-standard": "^40.0.0",
     "tap-spec": "^5.0.0",
@@ -66,8 +73,5 @@
     "vite": "^8.1.5"
   },
   "license": "SEE LICENSE IN LICENSE",
-  "author": "nichoth <nichoth@nichoth.com> (https://nichoth.com)",
-  "dependencies": {
-    "@substrate-system/drag-drop": "^0.4.12"
-  }
+  "author": "nichoth <nichoth@nichoth.com> (https://nichoth.com)"
 }
