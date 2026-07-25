@@ -1319,3 +1319,59 @@
     surrounding component; this only works in a text child position,
     not as an attribute value or inside string concatenation.
 ---
+
+## 2026-07-25 - EP-003
+
+- Wired the demo panel live: `example/state.ts` gains six handler
+  functions (`handleChange`, `handleAltChange`, `handleRemove`,
+  `handleError`, `handleEdit`, `handleAlt`), one per
+  `image-input:*` event, each reading `event.detail` and writing the
+  relevant signals. Any handler touching more than one signal wraps
+  the writes in `batch` from `@preact/signals` per the repo's
+  frontend-state rule. `handleEdit`/`handleAlt` only set `lastEvent`,
+  so the panel shows those events still fire even though the
+  component now opens its own dialogs in response.
+- `example/index.ts`'s `App` takes a `useRef<ImageInput>` on the
+  `<image-input>` vnode (`ref=${ref}`) and wires all six listeners
+  with `addEventListener` inside a `useEffect` with `[]` deps; the
+  effect's cleanup removes every listener it added. Listeners are
+  NOT `on*` preact props -- per the spec, a colon in an event name
+  (`image-input:change`) can't survive as a prop name, so ref +
+  useEffect is the only workable route, not a style choice.
+- `handleRemove` deliberately does not touch `altText`: the
+  component's `#clear()` (`src/index.ts:153-156`) ends by setting
+  `this.alt = null`, which fires `handleChange_alt` and emits
+  `image-input:alt-change` with an empty string, so `handleAltChange`
+  already clears `altText` through that event. Clearing it a second
+  time in the remove handler would be redundant and would hide that
+  behavior from a reader.
+- Files changed: `example/state.ts`, `example/index.ts`,
+  `specs/example-preact.json` (EP-003 `passes: true`), `progress.log`.
+- No test-first step: `specs/tasks/example-preact.md`'s
+  "Verification" section explicitly overrides test-first for this
+  whole spec (`test/` covers the component, not `example/`, and the
+  project rule forbids testing docs/demo pages). Ran the spec's own
+  obligations instead: `npx eslint example/*.ts` clean, `npm run
+  build-example` succeeds (vite build, 28 modules), `npm test` passes
+  at 253 assertions (lint + build + build-tests + tape-run),
+  unchanged from before this session.
+- Left untouched, per the EP-001/EP-002 sessions' note: pre-existing
+  uncommitted changes to `src/index.ts`, `test/index.ts`, and
+  `ralph_claude.sh` that predate this branch's `example/`-scoped work
+  and are out of this story's scope. Verified again this session that
+  they are still present and still not part of this commit.
+- **Learnings for future iterations:**
+  - A custom event's `detail` shape varies per event name on the same
+    element (`image-input:change` -> `{file, alt}`,
+    `image-input:error` -> `{reason}`, `image-input:remove` -> no
+    detail) -- check `src/index.ts`'s `emit()` call sites rather than
+    assuming a uniform detail shape across a component's whole event
+    surface.
+  - Passing `ref=${ref}` to a custom element in an `htm/preact`
+    template is not a "dynamic prop" in EP-001's forbidden sense --
+    that rule is about vdom-driven attributes/properties fighting the
+    component's own internal writes (e.g. `alt`). A `ref` never writes
+    to the DOM node itself, so it doesn't create a dual-writer hazard
+    and is the documented, required mechanism for EP-003's listener
+    wiring.
+---

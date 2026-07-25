@@ -54,7 +54,7 @@
         "npm test still passes end to end"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "Preact lowercases event prop names and a colon cannot survive as a prop name, so there is no onImage-input:change to write -- the ref plus useEffect is the only workable route, not a stylistic preference. The batch requirement comes from the repo's frontend state rule in CLAUDE.md."
     },
     {
