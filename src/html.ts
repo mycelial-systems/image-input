@@ -45,7 +45,8 @@ export function html (opts:ImageInputHtmlOptions = {}):string {
     const wantsDialogs = opts.dialogs ?? true
 
     const dialogs = wantsDialogs ?
-        `${altDialogMarkup(text)}${cropDialogMarkup(text)}` :
+        `${altDialogMarkup(text)}
+        ${cropDialogMarkup(text)}` :
         ''
 
     return `<div class="box">
