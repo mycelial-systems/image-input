@@ -837,8 +837,8 @@ test('setImage accepts an explicit filename', async t => {
         'should use the caller-supplied filename')
 })
 
-test('edit and alt buttons do not open a dialog until later stories ' +
-    'wire them up', async t => {
+test('the edit button does not open a dialog until a later story ' +
+    'wires it up', async t => {
     document.body.innerHTML += `
         <image-input class="no-dialog-test"></image-input>
     `
@@ -847,22 +847,44 @@ test('edit and alt buttons do not open a dialog until later stories ' +
     selectFile(el, file)
 
     const editBtn = el.querySelector('.edit') as HTMLButtonElement
-    const altBadge = el.querySelector('.alt-badge') as HTMLButtonElement
-    const altDialog = el.querySelector('.alt-dialog') as HTMLDialogElement
     const cropDialog = el.querySelector('.crop-dialog') as HTMLDialogElement
 
-    t.equal(altDialog.open, false,
-        'the alt dialog should be closed before clicking')
     t.equal(cropDialog.open, false,
         'the crop dialog should be closed before clicking')
 
     editBtn.click()
-    altBadge.click()
 
-    t.equal(altDialog.open, false,
-        'clicking the alt badge should not open the alt dialog yet')
     t.equal(cropDialog.open, false,
         'clicking edit should not open the crop dialog yet')
+})
+
+test('clicking the ALT badge opens the alt dialog, seeded with the ' +
+    'current alt text', async t => {
+    document.body.innerHTML += `
+        <image-input class="alt-dialog-open-test"></image-input>
+    `
+    const el = await waitFor(
+        'image-input.alt-dialog-open-test'
+    ) as ImageInput
+    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    selectFile(el, file)
+    el.alt = 'a description'
+
+    const altBadge = el.querySelector('.alt-badge') as HTMLButtonElement
+    const altDialog = el.querySelector('.alt-dialog') as HTMLDialogElement
+    const textarea = altDialog.querySelector(
+        'textarea'
+    ) as HTMLTextAreaElement
+
+    t.equal(altDialog.open, false,
+        'the alt dialog should be closed before clicking')
+
+    altBadge.click()
+
+    t.equal(altDialog.open, true,
+        'clicking the ALT badge should open the alt dialog')
+    t.equal(textarea.value, 'a description',
+        'the textarea should be seeded with the current alt text')
 })
 
 test('render() emits the alt and crop dialogs as siblings of .box, ' +

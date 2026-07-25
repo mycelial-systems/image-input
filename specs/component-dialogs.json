@@ -36,7 +36,7 @@
         "Typecheck passes"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "The two Cancel buttons must keep distinct class names (.alt-cancel, .crop-cancel), and likewise .alt-save and .crop-save. this.qs() is querySelector() and returns only the first match, so a shared .dialog-cancel class would wire one dialog's Cancel and leave the other silently dead."
     },
     {

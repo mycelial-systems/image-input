@@ -4,6 +4,7 @@ import { dragDrop, type DropRecord } from '@substrate-system/drag-drop'
 import {
     altDialogMarkup,
     cropDialogMarkup,
+    openDialog,
     type DialogText
 } from './dialogs.js'
 const debug = createDebug('image-input')
@@ -146,7 +147,15 @@ export class ImageInput extends WebComponent {
     handleAlt = (event:Event) => {
         event.preventDefault()
         if (!this.#file) return
-        this.emit('alt', { detail: { file: this.#file, alt: this.alt ?? '' } })
+        const notCanceled = this.emit('alt', {
+            detail: { file: this.#file, alt: this.alt ?? '' }
+        })
+        if (!notCanceled) return
+
+        const dialog = this.qs<HTMLDialogElement>('.alt-dialog')
+        const textarea = dialog?.querySelector('textarea')
+        if (textarea) textarea.value = this.alt ?? ''
+        if (dialog) openDialog(dialog)
     }
 
     handleDrop = (record:DropRecord):void => {
