@@ -17,15 +17,18 @@ tool, and `alt` text input.
 <!-- toc -->
 
 - [Install](#install)
-- [API](#api)
   * [ESM](#esm)
   * [Common JS](#common-js)
 - [CSS](#css)
   * [Import CSS](#import-css)
-- [Use](#use)
+  * [CSS variables](#css-variables)
+- [Example](#example)
+  * [Drop target](#drop-target)
   * [Attributes](#attributes)
   * [Events](#events)
   * [`image-crop`](#image-crop)
+- [API](#api)
+- [API](#api-1)
   * [JS](#js)
   * [HTML](#html)
   * [pre-built](#pre-built)
@@ -61,6 +64,37 @@ Or minified:
 import '@substrate-system/image-input/css/min'
 ```
 
+### CSS variables
+
+`image-input` sets no width, height, min-height or aspect-ratio on
+the box -- size it yourself:
+
+```css
+image-input .box {
+    width: 100%;
+    max-width: 480px;
+    min-height: 200px;
+}
+```
+
+Everything else is a CSS custom property, defined in `_vars.css` and
+overridable from your own stylesheet:
+
+* `--image-input-border-width`, `--image-input-border-style`,
+  `--image-input-border-color` -- the box's border.
+* `--image-input-border-color-drag`, `--image-input-border-style-drag`
+  -- the border while a file is dragged over the box.
+* `--image-input-box-bg`, `--image-input-box-bg-drag` -- box
+  background, default and while dragging.
+* `--image-input-box-padding` -- padding around the prompt in the
+  empty box.
+* `--image-input-prompt-color`, `--image-input-prompt-icon-size`,
+  `--image-input-prompt-gap` -- the empty box's icon and text.
+* `--image-input-radius` -- corner radius, shared by the box and the
+  preview image.
+* `--image-input-focus-color` -- the keyboard focus ring, shared with
+  the overlay buttons.
+
 ## Example
 
 This calls the global function `customElements.define`. Just import, then use
@@ -81,6 +115,18 @@ input.addEventListener('image-input:edit', ev => {
 })
 ```
 
+### Drop target
+
+`image-input` renders as a bordered box that is both the file picker
+and the drop target. Click the box, or focus it with Tab and press
+Space, to open the native file picker -- or drag an image file onto
+the box and drop it. Click and drop are equivalent: both result in
+the same preview, the same `image-input:change` event, and the same
+entry in `input.files` for form submission. The box's border and
+background change while a file is dragged over it, and clicking the
+box again after an image is loaded reopens the picker and replaces
+it.
+
 ### Attributes
 
 All attributes are reflected as properties, so `input.alt = 'a photo'`
@@ -94,6 +140,9 @@ is the same as setting the attribute in HTML.
   `image-input:alt-change` event and updates the ALT badge state.
 * `required` -- Boolean. Marks the internal file input as required
   for form validation.
+* `label` -- Prompt text shown in the empty box, and used as the file
+  input's `aria-label`. Defaults to `Drop an image, or click to
+  choose one`.
 
 ```html
 <image-input
@@ -110,17 +159,20 @@ All events are namespaced with the tag name, e.g. `image-input:change`.
 They bubble, so you can listen on the element or an ancestor.
 
 * `image-input:change` -- A file was selected, or `setImage(blob)` was
-  called. `detail` is `{ file:File|Blob, alt:string }`.
+  called. `detail` is `{ file:File, alt:string }`.
 * `image-input:remove` -- The remove button was clicked. The preview
   and file have already been cleared. No `detail`.
 * `image-input:edit` -- The edit button was clicked. `detail` is
-  `{ file:File|Blob }`. Use this to open a crop/edit UI, then call
+  `{ file:File }`. Use this to open a crop/edit UI, then call
   `setImage(blob)` with the result.
 * `image-input:alt` -- The ALT badge was clicked. `detail` is
-  `{ file:File|Blob, alt:string }`. Use this to open an alt text
+  `{ file:File, alt:string }`. Use this to open an alt text
   editor, then set the `alt` property with the result.
 * `image-input:alt-change` -- The `alt` attribute or property changed.
   `detail` is `{ alt:string }`.
+* `image-input:error` -- A picked or dropped file was not an image.
+  `detail` is `{ reason:'not-an-image' }`. The component shows no
+  message of its own; use this event to report the error yourself.
 
 ### `image-crop`
 

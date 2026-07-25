@@ -60,6 +60,26 @@
   variable first -- `const files:File[] = Object.values(record)` --
   then call `.find`/etc. on that. This class of bug won't show up in
   `esbuild`/tape-run, only in the `tsc` build step.
+- `#syncInputFiles(file:File)` writes a picked/dropped/cropped file
+  into the native `<input>`'s `.files` so a surrounding `<form>` sees
+  it: build a `new DataTransfer()`, `dt.items.add(file)`, then assign
+  `input.files = dt.files` (a `FileList` cannot be constructed or
+  assigned to directly). Wrap the `DataTransfer` construction in
+  `try/catch` -- it is not constructible in every environment -- and
+  let the emitted `image-input:change` carry the file regardless of
+  whether the sync succeeded, since consumers should not depend on
+  `input.files` alone.
+- `@substrate-system/drag-drop`'s `dragDrop(elem, listeners)` (used for
+  the box's drop target) returns a cleanup function that removes all
+  four of its listeners (`dragenter`/`dragover`/`dragleave`/`drop`) --
+  call it in `disconnectedCallback`. It adds the class `drag` to the
+  element itself on `dragenter` and removes it on `dragleave`/`drop`,
+  so the drag-over border is pure CSS; do not add hand-written
+  `dragenter`/`dragleave` handlers. Its `onDrop(record, ...)` callback
+  is `async`, so tests dispatching a synthetic `drop` `DragEvent` must
+  await a tick before asserting. `record` is `Record<string, File>`
+  and covers files recursed out of a dropped *directory*; the raw
+  `dataTransfer.files` does not, so scan `record`, not `files`.
 - `#setFile(file:File|Blob, name?:string)` is the single place that
   normalizes every input path (pick, drop, `setImage()`) to a `File`
   and calls `#syncInputFiles`. A plain `Blob` (or a `File` passed with

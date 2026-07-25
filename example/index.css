@@ -37,6 +37,12 @@ button {
 image-input {
     margin-bottom: 1rem;
 
+    .box {
+        width: 100%;
+        max-width: 480px;
+        min-height: 200px;
+    }
+
     .preview {
         width: 100%;
         margin: 0 auto;

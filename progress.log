@@ -1144,3 +1144,68 @@
     ordering gotcha -- relevant for DT-011 and any future CSS work in
     this file, since `npm test` won't catch it.
 ---
+
+## 2026-07-25 - DT-011
+
+- Documentation-only story (plus one example CSS tweak); no test-first
+  step was applicable since none of the acceptance criteria describe
+  testable component behavior -- they describe README content, an
+  example stylesheet, and an AGENTS.md file. Verification here is
+  `npm run lint`, `npm test`, and `npm run preversion` staying green,
+  plus manually re-reading the rendered README sections.
+- `README.md`: added a "Drop target" paragraph under `## Example`
+  describing that click and drop are equivalent (same preview, same
+  `image-input:change`, same `input.files` entry); added the new
+  `label` attribute to the Attributes list; added `image-input:error`
+  to the Events list; added a new "CSS variables" subsection under
+  `## CSS` listing all `--image-input-*` box/prompt/drag variables and
+  stating the box has no default width/height/min-height/aspect-ratio
+  (the consumer must size it), with a short example rule. Updated the
+  three `File|Blob` references in the Events list (`change`, `edit`,
+  `alt`) to `File`, per DT-009's normalize-to-File change -- grepped
+  the whole file for `File|Blob` first and found exactly 3 literal
+  occurrences, not the 4 DT-009's `notes` field mentioned; fixed what
+  actually exists rather than inventing a fourth.
+  Ran `npm run toc` (the project's existing `markdown-toc` script)
+  afterward to regenerate the `<!-- toc -->` block for the new/moved
+  headings (`CSS variables`, `Drop target`) -- this also happened to
+  pick up `## Example` (the actual heading) where the stale TOC had
+  said `Use`, a pre-existing drift not caused by this session.
+- `example/index.css`: added a `.box` rule (nested under the existing
+  `image-input` block) giving the box `width: 100%; max-width: 480px;
+  min-height: 200px` so the demo shows a real, visibly-sized drop
+  target -- previously only `.preview` was sized, and `.box` itself
+  (per DT-010, deliberately) ships with no intrinsic size. Left the
+  crop dialog and alt dialog wiring in `example/index.ts` untouched,
+  as required.
+- `src/AGENTS.md`: the div-not-label constraint and the clipped-not-
+  hidden input rationale were already documented (from DT-001/DT-002
+  sessions). Added the two genuinely missing notes this story asked
+  for: the `#syncInputFiles`/`DataTransfer` trick (build a
+  `DataTransfer`, `items.add(file)`, assign `input.files = dt.files`,
+  wrapped in try/catch), and the `@substrate-system/drag-drop` library
+  facts (cleanup function removes all four listeners; the library adds/
+  removes its own `drag` class so no hand-written dragenter/dragleave
+  handlers are needed; `onDrop` is async so tests must await a tick;
+  `record` covers directory contents while `dataTransfer.files` does
+  not).
+- Files changed: `README.md`, `example/index.css`, `src/AGENTS.md`,
+  `specs/drop-target.json` (DT-011 `passes: true`).
+- Tests: no new tests (docs/config story, see above). Full `npm test`
+  (lint + build + typecheck + tape-run) passes unchanged at 162 total
+  assertions. `npm run preversion` (lint + stylelint on `src/*.css`)
+  passes clean; `example/index.css` isn't in stylelint's glob, but its
+  syntax was hand-verified against the existing nested-selector style
+  in that file.
+- All eleven stories in `specs/drop-target.json` now have
+  `passes: true` -- this branch's spec is complete.
+- **Learnings for future iterations:**
+  - `npm run toc` (via `markdown-toc`) is safe to run after any README
+    heading change on this project; it regenerates the whole
+    `<!-- toc -->`/`<!-- tocstop -->` block in place and also repairs
+    pre-existing drift between actual headings and a stale TOC.
+  - When a prior story's `notes` field cites a specific count (e.g.
+    "File|Blob in four places"), verify it with a fresh grep before
+    trusting it -- the actual count here was three, and the fix should
+    match reality, not the cited number.
+---
