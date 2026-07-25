@@ -97,7 +97,7 @@
         "Typecheck passes"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "The picker path is reachable despite accept, because a user can choose All Files in the native dialog."
     },
     {

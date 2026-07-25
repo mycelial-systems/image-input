@@ -343,6 +343,70 @@ test('a drop with several files uses the first image/* one', async t => {
         'should select the first image/* file and ignore the rest')
 })
 
+test('dropping a non-image file emits image-input:error and leaves ' +
+    'the preview hidden', async t => {
+    document.body.innerHTML += `
+        <image-input class="drop-error-test"></image-input>
+    `
+    const el = await waitFor('image-input.drop-error-test') as ImageInput
+    const box = el.querySelector('.box') as HTMLElement
+    const textFile = new File(['abc'], 'readme.txt', {
+        type: 'text/plain'
+    })
+
+    let errorDetail:{ reason:string }|null = null
+    let bubbled = false
+    document.body.addEventListener('image-input:error', ((ev:CustomEvent) => {
+        errorDetail = ev.detail
+        bubbled = true
+    }) as EventListener)
+
+    const dt = new DataTransfer()
+    dt.items.add(textFile)
+
+    box.dispatchEvent(new DragEvent('drop', {
+        dataTransfer: dt,
+        bubbles: true,
+        cancelable: true
+    }))
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    t.ok(bubbled, 'image-input:error should bubble')
+    t.deepEqual(errorDetail, { reason: 'not-an-image' },
+        'should emit the not-an-image reason')
+
+    const preview = el.querySelector('.preview')
+    t.equal(preview?.classList.contains('has-image'), false,
+        'the preview should stay hidden')
+})
+
+test('picking a non-image file emits image-input:error', async t => {
+    document.body.innerHTML += `
+        <image-input class="pick-error-test"></image-input>
+    `
+    const el = await waitFor('image-input.pick-error-test') as ImageInput
+    const textFile = new File(['abc'], 'readme.txt', {
+        type: 'text/plain'
+    })
+
+    let errorDetail:{ reason:string }|null = null
+    let bubbled = false
+    document.body.addEventListener('image-input:error', ((ev:CustomEvent) => {
+        errorDetail = ev.detail
+        bubbled = true
+    }) as EventListener)
+
+    selectFile(el, textFile)
+
+    t.ok(bubbled, 'image-input:error should bubble')
+    t.deepEqual(errorDetail, { reason: 'not-an-image' },
+        'should emit the not-an-image reason')
+
+    const preview = el.querySelector('.preview')
+    t.equal(preview?.classList.contains('has-image'), false,
+        'the preview should stay hidden')
+})
+
 test('clicking the ALT, edit or remove buttons does not open the ' +
     'file picker', async t => {
     document.body.innerHTML += `

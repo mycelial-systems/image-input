@@ -877,3 +877,34 @@
     not done this session, since only DT-005's own scope (drop ->
     input.files sync) was in scope.
 ---
+
+## 2026-07-24 - DT-006
+
+- `handleDrop` now emits `image-input:error` with
+  `{ reason: 'not-an-image' }` and returns early when no `image/*`
+  file is found in the dropped record (previously a silent no-op).
+  `handleFileSelect` gained the matching `else` branch so the picker
+  path (reachable when a user picks "All Files" in the native dialog,
+  defeating `accept`) behaves the same way instead of silently
+  dropping the file.
+- No CSS or markup changes -- this story is purely the two emit
+  points plus their tests, per its acceptance criteria (the component
+  shows no message of its own; that's the consumer's job).
+- Wrote 2 failing tests first in `test/index.ts` (confirmed the drop
+  test's "should bubble" assertion failed before the fix; the picker
+  test would have failed the same way): dropping a non-image file
+  emits `image-input:error` (bubbled, `{ reason: 'not-an-image' }`)
+  and leaves `.preview` without `has-image`; picking a non-image file
+  via `selectFile()` does the same.
+- Files changed: `src/index.ts`, `test/index.ts`,
+  `specs/drop-target.json` (DT-006 `passes: true`).
+- Tests: 2 new tape tests (6 new assertions). Full `npm test` (lint +
+  build + typecheck + tape-run) passes with 145 total assertions (up
+  from 139 recorded at the end of the DT-005 entry).
+- No "verify in browser" step was listed in DT-006's acceptance
+  criteria, so none was performed.
+- **Learnings for future iterations:**
+  - Both file-input paths (`handleFileSelect` and `handleDrop`) now
+    follow the same if-image/else-error shape; keep them symmetric if
+    either path gains new logic later.
+---

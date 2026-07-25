@@ -87,10 +87,14 @@ export class ImageInput extends WebComponent {
         const input = event.target as HTMLInputElement
         const file = input.files?.[0]
 
-        if (file && file.type.startsWith('image/')) {
+        if (!file) return
+
+        if (file.type.startsWith('image/')) {
             debug('Image file selected:', file.name)
             this.#setFile(file)
             this.emit('change', { detail: { file, alt: this.alt ?? '' } })
+        } else {
+            this.emit('error', { detail: { reason: 'not-an-image' } })
         }
     }
 
@@ -115,7 +119,10 @@ export class ImageInput extends WebComponent {
     handleDrop = (record:DropRecord):void => {
         const files:File[] = Object.values(record)
         const file = files.find(f => f.type.startsWith('image/'))
-        if (!file) return
+        if (!file) {
+            this.emit('error', { detail: { reason: 'not-an-image' } })
+            return
+        }
 
         debug('Image file dropped:', file.name)
         this.#syncInputFiles(file)
