@@ -103,10 +103,21 @@ export class ImageCrop extends WebComponent {
 
     /**
      * Load a file into the cropper, replacing any previously-set image.
+     *
+     * The natural size and the crop rect are reset here, not only in
+     * `#handleImageLoad`. The load event is asynchronous, so between
+     * this call and that event the element would otherwise still be
+     * reporting the *previous* image's rect in the *previous* image's
+     * coordinates. Zeroing them makes the in-between state obviously
+     * empty instead of plausibly wrong, and `getBlob()` rejects rather
+     * than returning a blank blob at stale dimensions.
      */
     setFile (file:File):void {
         this.#revokeObjectUrl()
         this.#file = file
+        this.#naturalWidth = 0
+        this.#naturalHeight = 0
+        this.#crop = { x: 0, y: 0, width: 0, height: 0 }
         this.#objectUrl = URL.createObjectURL(file)
         this.src = this.#objectUrl
     }
@@ -121,8 +132,18 @@ export class ImageCrop extends WebComponent {
     /**
      * Render the current crop region to an offscreen canvas at the
      * image's natural resolution and resolve it as a Blob.
+     *
+     * Rejects if no image has finished loading -- drawing an image
+     * with no decoded data is a silent no-op, which would otherwise
+     * resolve a blank blob.
      */
     getBlob (opts?:GetBlobOptions):Promise<Blob> {
+        if (!this.#naturalWidth) {
+            return Promise.reject(new Error(
+                'No image is loaded yet, so there is nothing to crop'
+            ))
+        }
+
         const img = this.qs<HTMLImageElement>('img')
         const { x, y, width, height } = this.#crop
         const type = opts?.type ?? 'image/jpeg'

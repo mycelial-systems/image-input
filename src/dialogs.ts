@@ -10,6 +10,12 @@
  * `aria-label` instead, and the alt textarea relies on implicit
  * labelling: a `<textarea>` is its wrapping `<label>`'s own control,
  * so no `for`/`id` pair is needed. See the note in src/AGENTS.md.
+ *
+ * Each dialog's buttons sit in `<li>` wrappers inside the `<menu>`.
+ * `<menu>`'s content model is `li` plus script-supporting elements,
+ * and it maps to `role="list"`, so bare buttons would be announced as
+ * a list with no items. `src/index.css` removes the list markers and
+ * the UA indent.
  */
 
 export interface DialogText {
@@ -32,27 +38,28 @@ export function altDialogMarkup (text:DialogText):string {
             <textarea rows="4"></textarea>
         </label>
         <menu>
-            <button type="button" class="alt-cancel"
-            >${text.cancel}</button>
-            <button type="button" class="alt-save"
-            >${text.save}</button>
+            <li><button type="button" class="alt-cancel"
+            >${text.cancel}</button></li>
+            <li><button type="button" class="alt-save"
+            >${text.save}</button></li>
         </menu>
     </dialog>`
 }
 
 /**
- * Markup for the crop dialog. `.crop-slot` starts empty; a later
- * story fills it with a lazily created `<image-crop>`.
+ * Markup for the crop dialog. `.crop-slot` starts empty; `ImageInput`
+ * fills it with a lazily created `<image-crop>` the first time the
+ * dialog is opened.
  */
 export function cropDialogMarkup (text:DialogText):string {
     return `<dialog class="crop-dialog" aria-label="${text.cropHeading}">
         <h2>${text.cropHeading}</h2>
         <div class="crop-slot"></div>
         <menu>
-            <button type="button" class="crop-cancel"
-            >${text.cancel}</button>
-            <button type="button" class="crop-save"
-            >${text.save}</button>
+            <li><button type="button" class="crop-cancel"
+            >${text.cancel}</button></li>
+            <li><button type="button" class="crop-save"
+            >${text.save}</button></li>
         </menu>
     </dialog>`
 }

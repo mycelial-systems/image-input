@@ -90,6 +90,27 @@
   light-DOM subtree, so a shared class name would mean `this.qs('.save')`
   silently binds only the first dialog's button, leaving the other
   dialog's Save permanently unwired.
+- Each dialog's Cancel/Save buttons sit in `<li>` wrappers inside the
+  `<menu>`. `<menu>`'s content model is `li` plus script-supporting
+  elements, and it maps to `role="list"`, so bare buttons make
+  assistive tech announce a list with zero items. `src/index.css`
+  turns the `<menu>` into an end-justified flex row with `padding: 0`
+  and `list-style: none`, which is where the UA's 40px indent, block
+  margin and markers get removed.
+- `ImageCrop.setFile()` zeroes `#naturalWidth`, `#naturalHeight` and
+  `#crop`, not just `#handleImageLoad`. The `<img>` load event is
+  asynchronous, and `ImageInput.handleEdit` opens the crop dialog
+  synchronously right after calling `setFile()`, so without the reset
+  there is a real window in which Save is clickable while the crop
+  rect still describes the *previous* image. `ctx.drawImage` with an
+  undecoded image is a silent no-op, so that window used to produce a
+  blank blob at stale dimensions and destroy the user's image.
+  `getBlob()` rejects while `#naturalWidth` is 0, and
+  `handleCropSave` catches that, leaves the dialog open, and reports
+  through `debug()`. `handleCropSave` also holds a `#cropInFlight`
+  boolean across its `await`, so a double Save click, or an Esc press
+  mid-crop, cannot apply the crop twice or apply it to a dismissed
+  dialog.
 - The dialog open/close animation (`src/index.css`) uses
   `@starting-style` and `transition-behavior: allow-discrete`, both
   Baseline since 2024-08-06, so the entry fade/scale works in every

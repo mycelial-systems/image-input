@@ -33,7 +33,7 @@ export class ImageInput extends WebComponent {
 
     static TEXT:DialogText = {
         altHeading: 'Alt text',
-        altLabel: 'Description',
+        altLabel: 'Describe this image',
         cropHeading: 'Crop image',
         save: 'Save',
         cancel: 'Cancel'
@@ -50,6 +50,7 @@ export class ImageInput extends WebComponent {
     #file:File|null = null
     #previewUrl:string|null = null
     #cleanupDrop:(() => void)|null = null
+    #cropInFlight = false
 
     connectedCallback () {
         debug('connected')
@@ -202,8 +203,28 @@ export class ImageInput extends WebComponent {
         const dialog = this.qs<HTMLDialogElement>('.crop-dialog')
         const cropEl = dialog?.querySelector<ImageCrop>(ImageCrop.TAG)
         if (!cropEl) return
+        // A second Save click, or an Esc press, while getBlob() is
+        // still running would otherwise apply the crop twice, or apply
+        // it to a dialog the user has already dismissed.
+        if (this.#cropInFlight) return
+        this.#cropInFlight = true
 
-        const blob = await cropEl.getBlob()
+        let blob:Blob
+        try {
+            blob = await cropEl.getBlob()
+        } catch (err) {
+            // The image is not decoded yet, or the canvas refused to
+            // produce a blob. Leave the dialog open and the current
+            // image untouched.
+            debug('crop save failed', err)
+            return
+        } finally {
+            this.#cropInFlight = false
+        }
+
+        // The dialog closing during the await means the user canceled.
+        if (dialog && !dialog.open) return
+
         this.setImage(blob)
         if (dialog) closeDialog(dialog)
     }

@@ -1,19 +1,5 @@
 @import url("./_vars.css");
 
-#alt-dialog {
-    &[open] {
-        min-width: 500px;
-        height: 50vh;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-
-        & textarea {
-            height: calc(100% - 8rem);
-        }
-    }
-}
-
 image-input {
     display: block;
 
@@ -173,17 +159,69 @@ image-input {
     }
 
     & dialog {
+        box-sizing: border-box;
         background: var(--image-input-dialog-bg);
         border: none;
         border-radius: var(--image-input-dialog-radius);
         padding: var(--image-input-dialog-padding);
-        max-width: var(--image-input-dialog-max-width);
+
+        /**
+         * The author-facing max width, clamped so it can never be
+         * wider than the viewport. Overriding the UA's
+         * `max-width: calc(100% - 6px - 2em)` with a fixed length
+         * alone would overflow a narrow screen.
+         */
+        max-width: min(
+            var(--image-input-dialog-max-width),
+            var(--image-input-dialog-max-width-viewport)
+        );
         opacity: 0;
         transform: scale(var(--image-input-dialog-scale-from));
         transition-property: opacity, transform, display, overlay;
         transition-duration: var(--image-input-dialog-duration);
         transition-timing-function: ease-out;
         transition-behavior: allow-discrete;
+
+        /**
+         * `<menu>` is a list, so the UA gives it a 40px inline start
+         * padding, a block margin and markers. Lay the buttons out
+         * flush to the end instead.
+         */
+        & menu {
+            display: flex;
+            justify-content: flex-end;
+            gap: var(--image-input-dialog-menu-gap);
+            margin: var(--image-input-dialog-menu-margin) 0 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        & label {
+            display: block;
+
+            & span {
+                display: block;
+            }
+
+            & textarea {
+                display: block;
+                box-sizing: border-box;
+                width: 100%;
+                margin-top: var(--image-input-dialog-field-gap);
+                padding: var(--image-input-dialog-textarea-padding);
+                font-family: inherit;
+                font-size: 1rem;
+            }
+        }
+
+        /**
+         * Clamp the slot rather than the `<image-crop>` inside it. The
+         * crop element is block-level, so it fills the slot, and
+         * `ImageCrop` lays its frame out from `clientWidth`.
+         */
+        & .crop-slot {
+            max-width: var(--image-input-dialog-crop-max-width);
+        }
 
         &[open] {
             opacity: 1;

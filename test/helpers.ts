@@ -22,7 +22,9 @@ export function makeImageFile (
 
     return new Promise((resolve) => {
         canvas.toBlob(blob => {
-            resolve(new File([blob as Blob], 'photo.png', { type: 'image/png' }))
+            resolve(new File([blob as Blob], 'photo.png', {
+                type: 'image/png'
+            }))
         }, 'image/png')
     })
 }
@@ -38,4 +40,19 @@ export function waitForImageLoad (el:ImageCrop):Promise<void> {
         if (img.complete && img.naturalWidth) return resolve()
         img.addEventListener('load', () => resolve(), { once: true })
     })
+}
+
+/**
+ * Wait until an `<image-crop>`'s crop rect reports the given natural
+ * width. Unlike `waitForImageLoad`, this works for the *second* image
+ * loaded into the same element, where the `<img>` may report itself
+ * complete from the previous load before the new one has decoded.
+ */
+export async function waitForCropRect (
+    el:ImageCrop,
+    width:number
+):Promise<void> {
+    while (el.crop.width !== width) {
+        await new Promise(resolve => setTimeout(resolve, 10))
+    }
 }

@@ -100,6 +100,18 @@ overridable from your own stylesheet:
   `--image-input-dialog-backdrop-color` -- the built-in alt-text and
   crop dialogs' background, corner radius (defaults to
   `--image-input-radius`), padding, max width, and backdrop color.
+* `--image-input-dialog-max-width-viewport` -- the second half of the
+  dialog width clamp, `90vw` by default. The dialog is never wider
+  than the smaller of this and `--image-input-dialog-max-width`, so it
+  cannot overflow a narrow screen.
+* `--image-input-dialog-menu-gap`, `--image-input-dialog-menu-margin`
+  -- the gap between the dialogs' Cancel and Save buttons, and the
+  space above that row.
+* `--image-input-dialog-field-gap`,
+  `--image-input-dialog-textarea-padding` -- the space between the alt
+  dialog's label and its textarea, and the textarea's own padding.
+* `--image-input-dialog-crop-max-width` -- the widest the
+  `<image-crop>` inside the crop dialog will render.
 * `--image-input-dialog-duration`, `--image-input-dialog-scale-from`
   -- the duration of the dialogs' open/close fade-and-scale, and the
   scale they animate in from.
@@ -225,10 +237,12 @@ other `image-input` on the page. Each dialog is labeled with
 #### Changing the dialog copy
 
 `ImageInput.TEXT` is a static object with keys `altHeading`,
-`altLabel`, `cropHeading`, `save` and `cancel`. It is read once, at
-render time, so it must be reassigned before the first `image-input`
-element upgrades to have an effect, and it changes the copy for
-every `image-input` on the page, not one element at a time:
+`altLabel`, `cropHeading`, `save` and `cancel`. Each element reads it
+when it renders, so reassigning it affects every `image-input` that
+upgrades afterwards, and leaves already-rendered elements on the old
+copy. Set it before the first `image-input` upgrades -- next to the
+import is the simplest place -- and the whole page is consistent. The
+copy is page-wide, not per element:
 
 ```js
 import { ImageInput } from '@substrate-system/image-input'

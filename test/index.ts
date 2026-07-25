@@ -3,7 +3,11 @@ import { waitFor } from '@substrate-system/dom'
 import '../src/index.js'
 import type { ImageInput } from '../src/index.js'
 import type { ImageCrop } from '../src/crop.js'
-import { makeImageFile, waitForImageLoad } from './helpers.js'
+import {
+    makeImageFile,
+    waitForCropRect,
+    waitForImageLoad
+} from './helpers.js'
 import './crop.js'
 import './crop-math.js'
 
@@ -949,6 +953,91 @@ test('clicking .crop-save calls getBlob, applies the crop via ' +
     const input = el.querySelector('input[type="file"]') as HTMLInputElement
     t.equal(input.files?.[0], detail.file,
         'should sync input.files with the cropped file')
+})
+
+test('reopening the crop dialog on a different image does not carry ' +
+    'over the previous image\'s crop rect', async t => {
+    document.body.innerHTML += `
+        <image-input class="crop-stale-rect-test"></image-input>
+    `
+    const el = await waitFor(
+        'image-input.crop-stale-rect-test'
+    ) as ImageInput
+
+    const editBtn = el.querySelector('.edit') as HTMLButtonElement
+    const cropDialog = el.querySelector('.crop-dialog') as HTMLDialogElement
+    const saveBtn = cropDialog.querySelector(
+        '.crop-save'
+    ) as HTMLButtonElement
+
+    // crop and save a first, wide image
+    selectFile(el, await makeImageFile(400, 200))
+    editBtn.click()
+    const cropEl = el.querySelector('image-crop') as ImageCrop
+    await waitForImageLoad(cropEl)
+
+    const firstRect = cropEl.crop
+    t.equal(firstRect.width, 400,
+        'sanity check: the first image fills the crop rect')
+
+    const changed = new Promise<void>(resolve => {
+        el.addEventListener('image-input:change', () => resolve(), {
+            once: true
+        })
+    })
+    saveBtn.click()
+    await changed
+    t.equal(cropDialog.open, false, 'sanity check: saving closed the dialog')
+
+    // open the crop dialog again on a second, smaller image
+    selectFile(el, await makeImageFile(200, 100))
+    editBtn.click()
+
+    t.notDeepEqual(cropEl.crop, firstRect,
+        'the crop rect should not still be the first image\'s rect ' +
+        'while the second image is still loading')
+
+    await waitForCropRect(cropEl, 200)
+    t.deepEqual(cropEl.crop, { x: 0, y: 0, width: 200, height: 100 },
+        'the crop rect should match the second image once it loads')
+})
+
+test('saving the crop before the image has loaded leaves the current ' +
+    'image alone and keeps the dialog open', async t => {
+    document.body.innerHTML += `
+        <image-input class="crop-save-too-early-test"></image-input>
+    `
+    const el = await waitFor(
+        'image-input.crop-save-too-early-test'
+    ) as ImageInput
+
+    selectFile(el, await makeImageFile(200, 100))
+
+    const editBtn = el.querySelector('.edit') as HTMLButtonElement
+    const cropDialog = el.querySelector('.crop-dialog') as HTMLDialogElement
+    const saveBtn = cropDialog.querySelector(
+        '.crop-save'
+    ) as HTMLButtonElement
+
+    editBtn.click()
+
+    const img = el.querySelector('img') as HTMLImageElement
+    const srcBefore = img.getAttribute('src')
+
+    let changeFired = false
+    el.addEventListener('image-input:change', () => { changeFired = true })
+
+    // click Save in the window before the crop element's image has
+    // decoded, so there is no crop rect yet
+    saveBtn.click()
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    t.equal(changeFired, false,
+        'should not emit image-input:change when there is nothing to crop')
+    t.equal(img.getAttribute('src'), srcBefore,
+        'should leave the preview image unchanged')
+    t.equal(cropDialog.open, true,
+        'should leave the dialog open so the user can retry')
 })
 
 test('clicking .crop-cancel closes the dialog and leaves the current ' +
