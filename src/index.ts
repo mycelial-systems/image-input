@@ -55,11 +55,7 @@ export class ImageInput extends WebComponent {
     connectedCallback () {
         debug('connected')
         super.connectedCallback()
-        this.#client = new ImageInputClient(this, {
-            emit: (type, detail) => this.emit(type, { detail }),
-            getAlt: () => this.alt ?? '',
-            resetAlt: () => { this.alt = null }
-        })
+        this.setupEventListeners()
     }
 
     disconnectedCallback () {

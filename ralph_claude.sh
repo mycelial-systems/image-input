@@ -12,7 +12,7 @@ set -uo pipefail   # NOT -e: we handle per-iteration failures ourselves.
 
 # --- Config -----------------------------------------------------------------
 PROMPT_FILE="PROMPT.md"
-PRD_FILE="specs/drop-target.json"
+PRD_FILE="specs/example-preact.json"
 LOG_FILE="progress.log"
 MODEL="sonnet"
 MAX_ITERATIONS=${1:-10}
