@@ -121,7 +121,7 @@
         "No CSS unrelated to the dialogs is changed"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": "Top-layer promotion changes painting and stacking, not the DOM tree, so image-input dialog and image-input dialog::backdrop keep matching while the dialog is open. Reduced motion must not use transition: none, because allow-discrete still has to fire for the dialog to become visible at all. 250ms and 0.95 match @substrate-system/dialog's SHOW-OVERLAY and SHOW-DIALOG keyframes. @starting-style and transition-behavior are Baseline since 2024-08-06; overlay is Chromium-only, so Firefox and Safari get the entry fade and an instant exit, which is acceptable because only an entry animation is specified."
     },
     {

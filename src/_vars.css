@@ -27,4 +27,11 @@
     --image-crop-handle-color: #fff;
     --image-crop-handle-border-color: #1d9bf0;
     --image-crop-focus-color: #1d9bf0;
+    --image-input-dialog-bg: #fff;
+    --image-input-dialog-radius: var(--image-input-radius);
+    --image-input-dialog-padding: 1.5rem;
+    --image-input-dialog-max-width: 32rem;
+    --image-input-dialog-backdrop-color: rgb(0 0 0 / 55%);
+    --image-input-dialog-duration: 250ms;
+    --image-input-dialog-scale-from: 0.95;
 }

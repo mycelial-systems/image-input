@@ -171,6 +171,63 @@ image-input {
             padding: 0;
         }
     }
+
+    & dialog {
+        background: var(--image-input-dialog-bg);
+        border: none;
+        border-radius: var(--image-input-dialog-radius);
+        padding: var(--image-input-dialog-padding);
+        max-width: var(--image-input-dialog-max-width);
+        opacity: 0;
+        transform: scale(var(--image-input-dialog-scale-from));
+        transition-property: opacity, transform, display, overlay;
+        transition-duration: var(--image-input-dialog-duration);
+        transition-timing-function: ease-out;
+        transition-behavior: allow-discrete;
+
+        &[open] {
+            opacity: 1;
+            transform: scale(1);
+
+            @starting-style {
+                opacity: 0;
+                transform: scale(var(--image-input-dialog-scale-from));
+            }
+        }
+
+        &::backdrop {
+            background: transparent;
+            transition-property: background, display, overlay;
+            transition-duration: var(--image-input-dialog-duration);
+            transition-timing-function: ease-out;
+            transition-behavior: allow-discrete;
+        }
+
+        &[open]::backdrop {
+            background: var(--image-input-dialog-backdrop-color);
+
+            @starting-style {
+                background: transparent;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            transform: none;
+            transition-duration: 0.01ms;
+
+            &::backdrop {
+                transition-duration: 0.01ms;
+            }
+
+            &[open] {
+                transform: none;
+
+                @starting-style {
+                    transform: none;
+                }
+            }
+        }
+    }
 }
 
 /**
