@@ -135,7 +135,7 @@ image-input {
         }
 
         & .alt-badge {
-            height: var(--image-input-button-size);
+            height: 2rem;
             padding: 0 0.75rem;
             font-size: 1rem;
             font-weight: 600;
@@ -163,7 +163,7 @@ image-input {
         border: none;
         border-radius: var(--image-input-dialog-radius);
         padding: var(--image-input-dialog-padding);
-        width: 600px;
+        width: 800px;
 
         /**
          * The author-facing max width, clamped so it can never be
@@ -337,41 +337,49 @@ image-crop {
         & .handle-nw {
             left: 0;
             top: 0;
+            cursor: nw-resize;
         }
 
         & .handle-n {
             left: 50%;
             top: 0;
+            cursor: n-resize;
         }
 
         & .handle-ne {
             left: 100%;
             top: 0;
+            cursor: ne-resize;
         }
 
         & .handle-e {
             left: 100%;
             top: 50%;
+            cursor: e-resize;
         }
 
         & .handle-se {
             left: 100%;
             top: 100%;
+            cursor: se-resize;
         }
 
         & .handle-s {
             left: 50%;
             top: 100%;
+            cursor: s-resize;
         }
 
         & .handle-sw {
             left: 0;
             top: 100%;
+            cursor: sw-resize;
         }
 
         & .handle-w {
             left: 0;
             top: 50%;
+            cursor: w-resize;
         }
     }
 }

@@ -42,6 +42,12 @@ button {
     }
 }
 
+image-input {
+    & .box {
+        width: 400px;
+    }
+}
+
 #drop-zone image-input {
     display: block;
     width: 100%;

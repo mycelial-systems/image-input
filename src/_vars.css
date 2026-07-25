@@ -32,7 +32,7 @@
     --image-input-dialog-bg: #fff;
     --image-input-dialog-radius: var(--image-input-radius);
     --image-input-dialog-padding: 1.5rem;
-    --image-input-dialog-max-width: 600px;
+    --image-input-dialog-max-width: 90vw;
     --image-input-dialog-menu-gap: var(--image-input-overlay-gap);
     --image-input-dialog-menu-margin: 1rem;
     --image-input-dialog-field-gap: 0.5rem;
