@@ -35,7 +35,7 @@
         "npm test still passes end to end"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "A signal read inside App would subscribe App, so every event would re-render the tree containing the <image-input> vnode. That is harmless given EP-001's static-props rule, but reading signals as deep as possible keeps it harmless by construction instead of by accident. At this point the panel shows initial empty values; EP-003 makes it live."
     },
     {

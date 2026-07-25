@@ -1271,3 +1271,51 @@
     spec, and documents five preact/custom-element contract rules that
     EP-004 will transcribe into `example/AGENTS.md`.
 ---
+
+## 2026-07-25 - EP-002
+
+- Added `example/state.ts` (five `@preact/signals` signals: `altText`,
+  `fileName`, `fileSize`, `lastEvent`, `errorReason`, all initialized
+  to empty string / 0) and `example/panel.ts` (a `Panel` component
+  that renders a `<dl>` with all five, using `htm/preact`'s `html`
+  tag). `example/index.ts`'s `App` now renders `<${Panel} />` as a
+  sibling of `<${ImageInput.TAG} .../>`, inside a single `html`
+  template literal with two top-level tags -- preact/htm handle this
+  as an implicit fragment, no explicit `Fragment` import needed.
+- Signals are imported and read only inside `Panel`; `App` never
+  imports `example/state.ts`, so it cannot subscribe to signal
+  changes, matching the spec's "signals read only inside Panel"
+  criterion. Each signal is interpolated directly into `<dd>` text
+  position (`${altText}`, not `${altText.value}`), so
+  `@preact/signals` binds the text node directly rather than
+  re-rendering `Panel` on change.
+- No listeners wired yet -- panel shows only the signals' initial
+  values (empty strings, `0`). That is EP-003's job per the spec's
+  own notes field for this story; out of scope here.
+- Files changed: `example/state.ts` (new), `example/panel.ts` (new),
+  `example/index.ts`, `specs/example-preact.json` (EP-002
+  `passes: true`), `progress.log`.
+- No test-first step: `specs/tasks/example-preact.md`'s "Verification"
+  section explicitly overrides test-first for this whole spec (no
+  `test/` coverage for `example/`, and the project rule forbids
+  testing docs/demo pages). Ran the spec's own obligations instead:
+  `npx eslint example/*.ts` clean, `npm run build-example` succeeds
+  (vite build, 28 modules), `npm test` passes at 253 assertions
+  (lint + build + build-tests + tape-run), unchanged from before this
+  session.
+- Left untouched, per the prior EP-001 session's note: pre-existing
+  uncommitted changes to `src/index.ts`, `test/index.ts`, and
+  `ralph_claude.sh` that predate this session and are out of this
+  story's scope (`example/` only). Verified again this session that
+  they are still present and still not part of this commit.
+- **Learnings for future iterations:**
+  - `htm/preact`'s `html` tag accepts multiple top-level tags in one
+    template literal and preact renders them as an implicit fragment
+    from a component's return value -- no need to import `Fragment`
+    explicitly or wrap in an extra element.
+  - Interpolating a signal object directly into JSX/htm text position
+    (`${mySignal}`, not `${mySignal.value}`) is what lets
+    `@preact/signals` bind a text node and skip re-rendering the
+    surrounding component; this only works in a text child position,
+    not as an attribute value or inside string concatenation.
+---
