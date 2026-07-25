@@ -988,6 +988,32 @@ test('clicking .crop-cancel closes the dialog and leaves the current ' +
         'canceling should leave input.files unchanged')
 })
 
+test('canceling image-input:edit stops the crop dialog opening and ' +
+    'creates no image-crop element', async t => {
+    document.body.innerHTML += `
+        <image-input class="edit-cancelable-test"></image-input>
+    `
+    const el = await waitFor(
+        'image-input.edit-cancelable-test'
+    ) as ImageInput
+    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    selectFile(el, file)
+
+    el.addEventListener('image-input:edit', (ev:Event) => {
+        ev.preventDefault()
+    })
+
+    const editBtn = el.querySelector('.edit') as HTMLButtonElement
+    const cropDialog = el.querySelector('.crop-dialog') as HTMLDialogElement
+
+    editBtn.click()
+
+    t.equal(cropDialog.open, false,
+        'the crop dialog should stay closed when edit is canceled')
+    t.equal(el.querySelector('image-crop'), null,
+        'no image-crop should be created when edit is canceled')
+})
+
 test('clicking the ALT badge opens the alt dialog, seeded with the ' +
     'current alt text', async t => {
     document.body.innerHTML += `
@@ -1099,6 +1125,29 @@ test('clicking .alt-cancel closes the dialog and leaves alt unchanged',
         t.equal(changeFired, false,
             'canceling should not emit image-input:alt-change')
     })
+
+test('canceling image-input:alt stops the alt dialog opening', async t => {
+    document.body.innerHTML += `
+        <image-input class="alt-cancelable-test"></image-input>
+    `
+    const el = await waitFor(
+        'image-input.alt-cancelable-test'
+    ) as ImageInput
+    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    selectFile(el, file)
+
+    el.addEventListener('image-input:alt', (ev:Event) => {
+        ev.preventDefault()
+    })
+
+    const altBadge = el.querySelector('.alt-badge') as HTMLButtonElement
+    const altDialog = el.querySelector('.alt-dialog') as HTMLDialogElement
+
+    altBadge.click()
+
+    t.equal(altDialog.open, false,
+        'the alt dialog should stay closed when alt is canceled')
+})
 
 test('render() emits the alt and crop dialogs as siblings of .box, ' +
     'closed by default', async t => {
