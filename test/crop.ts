@@ -2,33 +2,7 @@ import { test } from '@substrate-system/tapzero'
 import { waitFor } from '@substrate-system/dom'
 import '../src/crop.js'
 import type { ImageCrop } from '../src/crop.js'
-
-function makeImageFile (
-    width:number,
-    height:number,
-    color = '#ff0000'
-):Promise<File> {
-    const canvas = document.createElement('canvas')
-    canvas.width = width
-    canvas.height = height
-    const ctx = canvas.getContext('2d') as CanvasRenderingContext2D
-    ctx.fillStyle = color
-    ctx.fillRect(0, 0, width, height)
-
-    return new Promise((resolve) => {
-        canvas.toBlob(blob => {
-            resolve(new File([blob as Blob], 'photo.png', { type: 'image/png' }))
-        }, 'image/png')
-    })
-}
-
-function waitForImageLoad (el:ImageCrop):Promise<void> {
-    return new Promise(resolve => {
-        const img = el.querySelector('img') as HTMLImageElement
-        if (img.complete && img.naturalWidth) return resolve()
-        img.addEventListener('load', () => resolve(), { once: true })
-    })
-}
+import { makeImageFile, waitForImageLoad } from './helpers.js'
 
 test('example test', async t => {
     document.body.innerHTML += `

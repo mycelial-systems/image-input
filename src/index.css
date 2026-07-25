@@ -1,34 +1,80 @@
 @import url("./_vars.css");
 
-#alt-dialog {
-    &[open] {
-        min-width: 500px;
-        height: 50vh;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-
-        & textarea {
-            height: calc(100% - 8rem);
-        }
-    }
-}
-
-#drop-zone {
-    margin-bottom: 1rem;
-}
-
 image-input {
     display: block;
 
-    & .wrapper {
+    & .picker {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: var(--image-input-box-padding);
+        cursor: pointer;
+    }
+
+    & .prompt {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--image-input-prompt-gap);
+        color: var(--image-input-prompt-color);
+        font-size: 1rem;
+
+        & .prompt-icon {
+            width: var(--image-input-prompt-icon-size);
+            height: var(--image-input-prompt-icon-size);
+            fill: none;
+            stroke: currentcolor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+    }
+
+    & .box {
         position: relative;
         display: inline-block;
+        border: var(--image-input-border-width)
+            var(--image-input-border-style) var(--image-input-border-color);
+        background: var(--image-input-box-bg);
+
+        &:has(input:focus-visible) {
+            outline: 2px solid var(--image-input-focus-color);
+            outline-offset: 2px;
+        }
+
+        &.has-image .picker {
+            position: absolute;
+            inset: 0;
+            padding: 0;
+        }
+
+        &.has-image .prompt {
+            display: none;
+        }
+
+        &.drag {
+            border-color: var(--image-input-border-color-drag);
+            border-style: var(--image-input-border-style-drag);
+            background: var(--image-input-box-bg-drag);
+        }
+    }
+
+    & input[type="file"] {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+        border: 0;
     }
 
     & .preview {
         display: none;
         position: relative;
+        pointer-events: none;
 
         &.has-image {
             display: block;
@@ -82,6 +128,7 @@ image-input {
                 width: var(--image-input-icon-size);
                 height: var(--image-input-icon-size);
                 fill: none;
+                stroke: currentcolor;
                 stroke-width: 2;
                 stroke-linecap: round;
                 stroke-linejoin: round;
@@ -108,6 +155,115 @@ image-input {
             width: var(--image-input-button-size);
             height: var(--image-input-button-size);
             padding: 0;
+        }
+    }
+
+    & dialog {
+        box-sizing: border-box;
+        background: var(--image-input-dialog-bg);
+        border: none;
+        border-radius: var(--image-input-dialog-radius);
+        padding: var(--image-input-dialog-padding);
+
+        /**
+         * The author-facing max width, clamped so it can never be
+         * wider than the viewport. Overriding the UA's
+         * `max-width: calc(100% - 6px - 2em)` with a fixed length
+         * alone would overflow a narrow screen.
+         */
+        max-width: min(
+            var(--image-input-dialog-max-width),
+            var(--image-input-dialog-max-width-viewport)
+        );
+        opacity: 0;
+        transform: scale(var(--image-input-dialog-scale-from));
+        transition-property: opacity, transform, display, overlay;
+        transition-duration: var(--image-input-dialog-duration);
+        transition-timing-function: ease-out;
+        transition-behavior: allow-discrete;
+
+        /**
+         * `<menu>` is a list, so the UA gives it a 40px inline start
+         * padding, a block margin and markers. Lay the buttons out
+         * flush to the end instead.
+         */
+        & menu {
+            display: flex;
+            justify-content: flex-end;
+            gap: var(--image-input-dialog-menu-gap);
+            margin: var(--image-input-dialog-menu-margin) 0 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        & label {
+            display: block;
+
+            & span {
+                display: block;
+            }
+
+            & textarea {
+                display: block;
+                box-sizing: border-box;
+                width: 100%;
+                margin-top: var(--image-input-dialog-field-gap);
+                padding: var(--image-input-dialog-textarea-padding);
+                font-family: inherit;
+                font-size: 1rem;
+            }
+        }
+
+        /**
+         * Clamp the slot rather than the `<image-crop>` inside it. The
+         * crop element is block-level, so it fills the slot, and
+         * `ImageCrop` lays its frame out from `clientWidth`.
+         */
+        & .crop-slot {
+            max-width: var(--image-input-dialog-crop-max-width);
+        }
+
+        &[open] {
+            opacity: 1;
+            transform: scale(1);
+
+            @starting-style {
+                opacity: 0;
+                transform: scale(var(--image-input-dialog-scale-from));
+            }
+        }
+
+        &::backdrop {
+            background: transparent;
+            transition-property: background, display, overlay;
+            transition-duration: var(--image-input-dialog-duration);
+            transition-timing-function: ease-out;
+            transition-behavior: allow-discrete;
+        }
+
+        &[open]::backdrop {
+            background: var(--image-input-dialog-backdrop-color);
+
+            @starting-style {
+                background: transparent;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            transform: none;
+            transition-duration: 0.01ms;
+
+            &::backdrop {
+                transition-duration: 0.01ms;
+            }
+
+            &[open] {
+                transform: none;
+
+                @starting-style {
+                    transform: none;
+                }
+            }
         }
     }
 }

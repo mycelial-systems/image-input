@@ -1,0 +1,189 @@
+{
+  "project": "image-input",
+  "branchName": "rewrite",
+  "description": "Render image-input as a drop target -- a bordered box that accepts dropped images and opens the file picker on click, replacing the default file input visual while keeping the input, the preview, and the overlay controls. Detailed spec and rationale live in docs/tasks/drop-target.md; read it before starting.",
+  "userStories": [
+    {
+      "id": "DT-001",
+      "title": "Bordered drop box replaces the file input visual",
+      "description": "As a user, I want image-input to render as a bordered box instead of a browser file input, so it looks like a place to put an image rather than a form control.",
+      "acceptanceCriteria": [
+        "render() produces a .box div containing a .picker label and the existing .preview subtree",
+        "The .wrapper div is gone; .box takes over its position: relative role",
+        "The native input still exists in the DOM and still carries accept, name and required",
+        "The input is visually hidden with position/clip-path, NOT display:none, visibility:hidden or the hidden attribute, so it stays focusable and required validation can report on it",
+        "The .preview, .overlay, .alt-badge, .edit and .remove class names are unchanged, and .preview.has-image still drives preview visibility",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "The box must be a div, not a label. button is labelable content and a label may not contain labelable descendants other than its own control."
+    },
+    {
+      "id": "DT-002",
+      "title": "Click and keyboard open the file picker",
+      "description": "As a user, I want clicking anywhere on the box to open the file picker, and I want to reach it with the keyboard, so I do not need a visible file input.",
+      "acceptanceCriteria": [
+        "The .picker label wraps the file input, so clicking the box opens the picker with no JS click forwarding",
+        "The box is reachable by Tab and activates with Space, via the native label and input, with no tabindex or role=button added",
+        ".box:has(input:focus-visible) shows a visible focus ring using --image-input-focus-color",
+        "Clicking the box while an image is showing reopens the picker and replaces the image",
+        "Clicking the ALT, edit or remove buttons does NOT open the picker",
+        "A test asserts the input is inside the label and is not display:none",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Clicks reach the label through the image because .preview gets pointer-events: none while .overlay > * keeps pointer-events: auto."
+    },
+    {
+      "id": "DT-003",
+      "title": "Border changes while dragging over the box",
+      "description": "As a user, I want the box border to change while I drag a file over it, so I know it will accept the drop.",
+      "acceptanceCriteria": [
+        "dragDrop() from @substrate-system/drag-drop is attached to the .box element in setupEventListeners",
+        "The cleanup function returned by dragDrop is stored and called in disconnectedCallback",
+        "No hand-written dragenter, dragover or dragleave handlers are added; the library adds and removes the drag class itself",
+        "CSS .box.drag swaps border color, border style and background using variables",
+        "A test asserts dragenter on the box adds the drag class and dragleave removes it",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "Verified in node_modules: the library adds class 'drag' on dragenter and removes it on dragleave and drop."
+    },
+    {
+      "id": "DT-004",
+      "title": "Dropping an image selects it",
+      "description": "As a user, I want to drop an image onto the box and have it selected, exactly as if I had picked it from the file dialog.",
+      "acceptanceCriteria": [
+        "The drop handler scans Object.values(record) and uses the first file whose type starts with image/",
+        "record is scanned rather than the raw FileList, so files inside a dropped directory are found",
+        "Dropping an image renders the preview and emits image-input:change with detail { file, alt }, the same payload shape as a picked file",
+        "A drop containing several files uses the first image/* one and ignores the rest",
+        "Tests dispatch a real DragEvent with a constructed DataTransfer and await a tick, because the library's onDrop is async",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": "record is Record<string, File>; every value is a real File. accept is deliberately NOT enforced on drop."
+    },
+    {
+      "id": "DT-005",
+      "title": "Dropped files reach a surrounding form",
+      "description": "As a consuming developer, I want a dropped file to submit with my form, so drop and pick behave identically inside a form.",
+      "acceptanceCriteria": [
+        "#syncInputFiles builds a DataTransfer, adds the file, and assigns dt.files to input.files",
+        "The DataTransfer call is wrapped in try/catch, since the constructor is not available in every environment, and the change event still carries the file if it throws",
+        "After a drop, input.files has exactly one entry",
+        "required is satisfied by a dropped file, with no picker interaction",
+        "#clear() continues to reset input.value, which also clears input.files",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "DT-006",
+      "title": "Unusable drops report an error",
+      "description": "As a user, I want feedback when I drop something that is not an image, instead of nothing happening.",
+      "acceptanceCriteria": [
+        "A drop with no image/* file emits image-input:error with detail { reason: 'not-an-image' } and leaves the preview hidden",
+        "handleFileSelect emits the same error when a picked file is not an image, so both input paths behave alike",
+        "The event bubbles, matching the other component events",
+        "The component shows no message of its own; reporting is the consumer's job",
+        "A test asserts the event fires with the expected payload shape",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": "The picker path is reachable despite accept, because a user can choose All Files in the native dialog."
+    },
+    {
+      "id": "DT-007",
+      "title": "Preview renders inside the box",
+      "description": "As a user, I want the selected image to appear inside the same box I dropped it on, with the ALT, edit and remove controls still available.",
+      "acceptanceCriteria": [
+        "The box border stays visible around the image, and the box remains a drop target so dropping again replaces the image",
+        ".picker is in normal flow while empty, so the icon and prompt text give the empty box its height",
+        ".box.has-image .picker becomes position: absolute; inset: 0 and .box.has-image .prompt is display: none, so the image sizes the box",
+        "#setFile adds has-image to .box as well as .preview, and #clear removes it from both",
+        "The ALT badge, edit and remove buttons still emit image-input:alt, :edit and :remove as before",
+        "All existing tests in test/index.ts still pass unchanged",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": true,
+      "notes": "Without the in-flow-then-absolute switch, an empty box collapses to zero height, since the component sets no intrinsic size."
+    },
+    {
+      "id": "DT-008",
+      "title": "Box content is overridable",
+      "description": "As a consuming developer, I want to change the prompt text in the empty box, so it fits my application's wording.",
+      "acceptanceCriteria": [
+        "A new reflected string attribute 'label' is added to reflectedStringAttributes with a declare label:string|null",
+        "The default prompt text is 'Drop an image, or click to choose one'",
+        "handleChange_label updates both the .prompt-text content and the input's aria-label",
+        "The input carries an explicit aria-label so it keeps an accessible name after .prompt is display:none'd",
+        "The default icon is an inline SVG with aria-hidden=true, hideable via CSS",
+        "A test asserts setting the label attribute updates the input's aria-label",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": true,
+      "notes": "A slot is not an option: the component has no shadow DOM and render() overwrites innerHTML."
+    },
+    {
+      "id": "DT-009",
+      "title": "Cropped images submit with the form",
+      "description": "As a consuming developer, I want a cropped image to submit with my form, instead of the original uncropped file.",
+      "acceptanceCriteria": [
+        "#setFile normalizes its argument to a File, so picking, dropping and setImage() all converge on one File and one #syncInputFiles call",
+        "A Blob is promoted with new File([blob], name, { type: blob.type })",
+        "The generated filename takes its base from the previously selected file and its extension from the MIME type, since cropping a photo.png yields image/jpeg by default",
+        "The base name falls back to 'image' when nothing was picked first, and the extension falls back to 'jpg' for an unrecognized type",
+        "setImage(blob, name?) takes an optional filename; existing single-argument calls keep working",
+        "After setImage(), input.files has one entry whose name extension matches the blob type",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": true,
+      "notes": "This makes #file always a File, so detail.file on change/edit/alt narrows from File|Blob to File. Backward compatible, since File extends Blob, but the README says File|Blob in four places."
+    },
+    {
+      "id": "DT-010",
+      "title": "Box styling is variable-driven and author-sized",
+      "description": "As a consuming developer, I want to control the box's size and appearance from my own CSS, so it fits my layout.",
+      "acceptanceCriteria": [
+        "New variables in src/_vars.css cover border width, style and color, the drag border color and style, box background and drag background, box padding, prompt color, prompt icon size and prompt gap",
+        "--image-input-radius and --image-input-focus-color are reused rather than duplicated",
+        "The .box rule sets no width, height, min-height or aspect-ratio; the consumer sizes it",
+        "All new CSS uses nested selectors under the existing image-input block",
+        "No font size below 1rem",
+        "The image-crop and #alt-dialog blocks are untouched",
+        "stylelint passes via npm run preversion"
+      ],
+      "priority": 10,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "DT-011",
+      "title": "Documentation and example reflect the new component",
+      "description": "As a consuming developer, I want the README and demo to show the drop behavior, so I can tell what the component does without reading the source.",
+      "acceptanceCriteria": [
+        "README documents the drop-target behavior and that click and drop are equivalent",
+        "README documents the new label attribute and the image-input:error event",
+        "README documents the new CSS variables and states that the consumer must size the box",
+        "README's four File|Blob references are updated to File, per DT-009",
+        "example/index.css gives the box a size so the demo shows a real drop target, and the existing crop and alt dialog wiring is left alone",
+        "src/AGENTS.md gains notes on the div-not-label constraint, the clipped-not-hidden input, the DataTransfer files sync, and the drag-drop library facts (async onDrop, record covers directories while files does not)",
+        "npm test passes end to end"
+      ],
+      "priority": 11,
+      "passes": true,
+      "notes": ""
+    }
+  ]
+}

@@ -1,0 +1,146 @@
+{
+  "project": "image-input",
+  "branchName": "rewrite",
+  "description": "Move the alt-text and crop modals out of example/ and into the image-input component, so consumers get both dialogs for free instead of rebuilding the wiring. Dialogs are native <dialog> elements that fade and scale in on open. image-input:edit and image-input:alt keep firing and stay cancelable, so the existing bring-your-own-dialog path still works. Detailed spec and rationale live in specs/tasks/component-dialogs.md; read it before starting. The components stay on @substrate-system/web-component -- microtags is a dependency in package.json but is NOT used by this work.",
+  "userStories": [
+    {
+      "id": "CD-001",
+      "title": "The component renders its own alt and crop dialogs",
+      "description": "As a consuming developer, I want image-input to render the two dialogs itself, so I do not have to write dialog markup to use the component.",
+      "acceptanceCriteria": [
+        "New file src/dialogs.ts exports the markup builders for the alt dialog and the crop dialog, plus small open/close helpers; src/index.ts keeps the event wiring",
+        "render() emits both <dialog> elements as siblings of .box, inside image-input, closed by default",
+        "The alt dialog contains a heading, a <label> that wraps its own <textarea rows=\"4\">, and a menu with .alt-cancel and .alt-save buttons",
+        "The crop dialog contains a heading, an empty .crop-slot div, and a menu with .crop-cancel and .crop-save buttons",
+        "ImageInput gains a static TEXT object with altHeading, altLabel, cropHeading, save and cancel keys, read at render time",
+        "There are no id or for attributes and no aria-labelledby anywhere in the dialog markup; each dialog carries aria-label instead",
+        "The textarea has no name attribute and every dialog button is type=\"button\", so an image-input inside a <form> submits exactly what it did before",
+        "A test asserts two image-input elements on one page each render their own two dialogs and produce no duplicate ids",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "No ids is a hard requirement, not a style preference: ten image-input elements on a page would otherwise emit ten duplicate ids. Implicit labelling is valid here because a textarea is the label's own control -- see the existing note in src/AGENTS.md about labelable descendants. src/index.ts is 282 lines before this work; the dialogs.ts split exists to keep it from passing 400. esbuild src/*.ts is not bundled and the exports map has a ./* catch-all, so a new source file needs no build change."
+    },
+    {
+      "id": "CD-002",
+      "title": "The ALT badge opens the built-in alt dialog",
+      "description": "As a user, I want clicking the ALT badge to open a dialog with the current alt text, so I can edit it without the page author wiring anything up.",
+      "acceptanceCriteria": [
+        "handleAlt still emits image-input:alt with its current detail payload before opening anything",
+        "When the event is not canceled, the alt dialog's textarea is seeded from that element's current alt value and the dialog is opened with showModal()",
+        "Both open paths check dialog.open first, because showModal() throws InvalidStateError on an already-open dialog",
+        "The textarea is the first focusable element in the dialog, so showModal()'s native autofocus lands on it with no explicit focus() call",
+        "The new listeners are attached in setupEventListeners and removed in disconnectedCallback, alongside the existing .remove, .edit and .alt-badge listeners",
+        "A test asserts that clicking .alt-badge with a file loaded sets dialog.open to true and that the textarea value equals the element's alt",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "The two Cancel buttons must keep distinct class names (.alt-cancel, .crop-cancel), and likewise .alt-save and .crop-save. this.qs() is querySelector() and returns only the first match, so a shared .dialog-cancel class would wire one dialog's Cancel and leave the other silently dead."
+    },
+    {
+      "id": "CD-003",
+      "title": "Saving alt text updates the element",
+      "description": "As a user, I want Save to apply my alt text and Cancel to discard it, so the dialog behaves the way dialogs normally do.",
+      "acceptanceCriteria": [
+        "Clicking .alt-save assigns the textarea value to this.alt and closes the dialog",
+        "Assigning this.alt goes through the existing handleChange_alt, so image-input:alt-change fires and the img alt attribute and badge has-alt state update with no new code",
+        "Clicking .alt-cancel closes the dialog and leaves alt unchanged, and emits nothing",
+        "Pressing Esc closes the dialog and leaves alt unchanged, via native <dialog> behavior with no key handler",
+        "No new event types are added",
+        "Tests assert the save path sets alt and emits image-input:alt-change, and that the cancel path closes the dialog with alt unchanged",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "Tests must assert behavior, not rendered text: check dialog.open and the alt property, never the button or heading strings."
+    },
+    {
+      "id": "CD-004",
+      "title": "The edit button opens a crop dialog with a lazily created image-crop",
+      "description": "As a user, I want clicking edit to open a crop dialog, and as a developer I do not want idle crop machinery on pages where nobody crops.",
+      "acceptanceCriteria": [
+        "src/index.ts gains import './crop.js', so importing image-input defines both image-input and image-crop",
+        "handleEdit still emits image-input:edit with its current detail payload before opening anything",
+        "No <image-crop> element exists anywhere in the DOM until the crop dialog is opened for the first time",
+        "On first open, an <image-crop> is created and appended to .crop-slot, then setFile() is called with the current file and the dialog is opened with showModal()",
+        "On subsequent opens the existing <image-crop> is reused and only setFile() and showModal() are called",
+        "A test asserts no image-crop exists before the first edit click and exactly one exists after it",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": "ImageCrop.connectedCallback attaches four window listeners (resize, pointermove, pointerup, pointercancel). Rendering an image-crop eagerly inside every image-input would mean forty idle window listeners on a page with ten inputs. The lazily created element is left in place after close so reopening is cheap, and it unregisters naturally when the host image-input disconnects and takes the subtree with it."
+    },
+    {
+      "id": "CD-005",
+      "title": "Saving the crop replaces the image",
+      "description": "As a user, I want Save in the crop dialog to apply my crop to the preview, so the crop flow completes without the page author writing any glue.",
+      "acceptanceCriteria": [
+        "Clicking .crop-save calls getBlob() on the image-crop, passes the resulting Blob to this.setImage(blob), then closes the dialog",
+        "setImage() already emits image-input:change and already syncs input.files, so no new event and no new file plumbing is added",
+        "Clicking .crop-cancel closes the dialog and leaves the current image and file unchanged",
+        "Pressing Esc closes the dialog and leaves the current image and file unchanged",
+        "A test asserts that the crop save path emits image-input:change and closes the dialog",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": "getBlob() returns a Promise, so the save handler is async and the dialog closes only after the blob resolves. Tests must await it."
+    },
+    {
+      "id": "CD-006",
+      "title": "Consumers can opt out of the built-in dialogs",
+      "description": "As a consuming developer with my own crop or alt UI, I want to suppress the built-in dialogs, so upgrading does not force the component's UI on me.",
+      "acceptanceCriteria": [
+        "Calling preventDefault() on image-input:edit stops the crop dialog opening and creates no image-crop element",
+        "Calling preventDefault() on image-input:alt stops the alt dialog opening",
+        "Both handlers read emit()'s boolean return and bail early when it is false, rather than inspecting the event object",
+        "setImage() and the alt property remain public and unchanged, so the opt-out path is still complete",
+        "Tests assert that a canceling listener on each event leaves the corresponding dialog closed",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": "WebComponent.emit() already defaults to { bubbles: true, cancelable: true } and returns false when a listener calls preventDefault(), so this is a two-line change per handler and needs no change to the emit call sites."
+    },
+    {
+      "id": "CD-007",
+      "title": "Dialogs fade and scale in when they open",
+      "description": "As a user, I want the dialogs to fade in rather than snap into place, so opening one does not feel jarring.",
+      "acceptanceCriteria": [
+        "src/index.css styles the dialogs nested under the existing image-input block, so the rules cannot match a consumer's own dialogs",
+        "The dialog transitions opacity 0 to 1 and transform scale(var(--image-input-dialog-scale-from)) to scale(1), with transition-property listing opacity, transform, display and overlay, and transition-behavior: allow-discrete written after any shorthand",
+        "The entry animation uses @starting-style nested inside the &[open] rule",
+        "The backdrop transitions from transparent to --image-input-dialog-backdrop-color with its own @starting-style inside &[open]::backdrop",
+        "src/_vars.css gains --image-input-dialog-bg, --image-input-dialog-radius defaulting to var(--image-input-radius), --image-input-dialog-padding, --image-input-dialog-max-width, --image-input-dialog-backdrop-color, --image-input-dialog-duration set to 250ms, and --image-input-dialog-scale-from set to 0.95",
+        "Every color and size in the new CSS comes from a variable, and existing variables are reused rather than duplicated",
+        "A prefers-reduced-motion: reduce block drops the transform and cuts the duration to 0.01ms, and does NOT set transition: none",
+        "stylelint passes on src/*.css",
+        "No CSS unrelated to the dialogs is changed"
+      ],
+      "priority": 7,
+      "passes": true,
+      "notes": "Top-layer promotion changes painting and stacking, not the DOM tree, so image-input dialog and image-input dialog::backdrop keep matching while the dialog is open. Reduced motion must not use transition: none, because allow-discrete still has to fire for the dialog to become visible at all. 250ms and 0.95 match @substrate-system/dialog's SHOW-OVERLAY and SHOW-DIALOG keyframes. @starting-style and transition-behavior are Baseline since 2024-08-06; overlay is Chromium-only, so Firefox and Safari get the entry fade and an instant exit, which is acceptable because only an entry animation is specified."
+    },
+    {
+      "id": "CD-008",
+      "title": "Documentation and example reflect the built-in dialogs",
+      "description": "As a consuming developer, I want the README and demo to show that the dialogs come with the component, so I can tell what I get without reading the source.",
+      "acceptanceCriteria": [
+        "README gains a section describing the two built-in dialogs and the static TEXT object for changing their copy",
+        "README's image-input:edit and image-input:alt entries document that both are cancelable and that preventDefault() suppresses the built-in dialog",
+        "README's existing 'open a crop dialog, then setImage(croppedBlob)' snippet is reframed as the documented opt-out rather than the default path",
+        "README's CSS variable list gains the seven new --image-input-dialog-* variables",
+        "example/index.ts drops its dialog markup and all its dialog wiring, keeping the image-input element and the alt-change display",
+        "example/index.css drops the rules for the removed #crop-dialog and #alt-dialog",
+        "src/AGENTS.md gains notes on why the dialogs use no ids, why image-crop is created lazily, the distinct-class-per-button reason, and the overlay support caveat",
+        "npm test passes end to end"
+      ],
+      "priority": 8,
+      "passes": true,
+      "notes": "Do not write tests for documentation. The example rewrite onto preact, @preact/signals and htm is a separate piece of work with its own spec, and starts from the smaller example/index.ts this story leaves behind."
+    }
+  ]
+}

@@ -42,6 +42,18 @@
   `dataTransfer.items.add(file)`, assign `input.files =
   dataTransfer.files`, then `input.dispatchEvent(new Event('change',
   { bubbles: true }))`. See `test/index.ts` `selectFile()` helper.
+- `stylelint-config-standard`'s `no-descending-specificity` rule fires
+  across an entire file, not just within one nested block: a low-
+  specificity selector like `& .picker` declared *after* a higher-
+  specificity one that targets the same element (e.g. `&.has-image
+  .picker` nested inside `.box`, higher specificity via the extra
+  class) fails, even though they're in different top-level nested
+  rules. Fix by ordering base/low-specificity selectors (`.picker`,
+  `.prompt`) before any selector that adds a state class in front of
+  them (`.box.has-image .picker`), not just before other rules with
+  the same selector. `npm test` does NOT catch this -- only
+  `npm run preversion` / `stylelint src/*.css` does, since stylelint
+  isn't part of the `test` script.
 - No "dev-browser" skill is registered in this harness. Use the
   Playwright MCP tools directly against `npm run start` (vite dev
   server) for the "verify in browser" acceptance criteria, and kill
@@ -563,9 +575,637 @@
 - Tests: full `npm test` (lint + build + typecheck + tape-run) passes
   with 100 total assertions (up from 98).
 - **Learnings for future iterations:**
-  - When a story's acceptance criteria list test coverage areas,
+  - When a story's acceptance criteria list task areas,
     check whether prior stories (written test-first) already satisfy
     them before writing net-new tests -- grep each criterion against
     existing `test/*.ts` describe/test names first, same lesson as
     US-003.
+---
+
+## 2026-07-24 - DT-001
+
+- This branch (`rewrite`) is driven by a second, separate spec file,
+  `specs/drop-target.json` (story ids `DT-*`), not `specs/prd.json`
+  (whose `US-*` stories are all already `passes: true` from the prior
+  branch). `specs/drop-target.json`'s own `branchName` field matches
+  the checked-out branch, and its `description` points at
+  `docs/tasks/drop-target.md` for the full spec/rationale. Read that
+  doc's "Resolved decisions" and "Markup" sections before starting any
+  `DT-*` story -- it also documents verified facts about
+  `@substrate-system/drag-drop` (needed starting DT-003) pulled from
+  `node_modules` rather than its README.
+- Implemented DT-001 only (bordered-box markup, not yet the border/
+  drag/prompt CSS -- those are DT-003/DT-008/DT-010): `render()` in
+  `src/index.ts` now produces `<div class="box"><label
+  class="picker"><input ... /></label><div class="preview">...`
+  instead of `<div class="wrapper"><input ... /><div
+  class="preview">...`. The `.preview`/`.overlay`/`.alt-badge`/
+  `.edit`/`.remove` subtree is untouched (same closing `</div>` count,
+  only the outer wrapper tag and the new `<label class="picker">`
+  around the input changed).
+- `src/index.css`: renamed the `.wrapper` rule (`position: relative;
+  display: inline-block`) to `.box`, and added the visually-hidden
+  `input[type="file"]` rule from the task doc's task-6 CSS block
+  (clip-path based, not `display:none`/`visibility:hidden`/`hidden`
+  attribute, so the input stays focusable and can still report
+  `required` validity). Did not add box border/background/prompt
+  styling -- out of scope for DT-001, belongs to DT-008/DT-010.
+- Wrote 4 failing tests first in `test/index.ts` (confirmed 6 failing
+  assertions before the fix, since one test had multiple assertions):
+  `.wrapper` is gone and `.box`/`.picker` exist and nest correctly,
+  the input keeps `accept`/`name`/`required` and lives inside
+  `.picker`, the input has no `hidden` attribute or inline
+  `display:none`/`visibility:hidden`, and `.preview.has-image` still
+  toggles correctly inside the new markup. All pre-existing tests
+  (which select via `.preview`, `.overlay`, `.alt-badge`, `.edit`,
+  `.remove`, `input[type="file"]`) kept passing unchanged, since those
+  selectors don't depend on the removed `.wrapper` class.
+- Files changed: `src/index.ts`, `src/index.css`, `test/index.ts`,
+  `specs/drop-target.json` (DT-001 `passes: true`).
+- Tests: 4 new tests (6 new assertions). Full `npm test` (lint +
+  build + typecheck + tape-run) passes with 115 total assertions (109
+  pre-existing on this branch plus the 6 new ones; this branch already
+  carries an `alt-change` event and its tests not reflected in
+  `specs/prd.json`'s dated entries above, which explains the count
+  being higher than the 100 recorded at the end of the US-009 entry).
+- No "verify in browser" step was listed in DT-001's acceptance
+  criteria, so none was performed; DT-002 (click/keyboard opening the
+  picker) is the first story in this doc that calls for it.
+- **Learnings for future iterations:**
+  - Don't assume `specs/prd.json` is the only/current spec file --
+    check for a repo-specific spec name matching the branch (here
+    `specs/drop-target.json`) whenever `specs/prd.json`'s stories are
+    already all `passes: true` but the session's assigned task id
+    doesn't appear in it.
+  - The test harness (`test/index.html`) still doesn't load
+    `src/index.css` (see Codebase Patterns above), so DT-001's
+    "input hidden via clip-path, not display:none" requirement could
+    only be tested by asserting the *absence* of hiding via
+    `hidden`/inline styles, not by asserting the CSS class actually
+    clips it. Real hiding is verified by reading the stylesheet rule
+    directly plus (later, once relevant) manual browser verification.
+---
+
+## 2026-07-24 - DT-002
+
+- DT-001 already produced the `<label class="picker"><input/></label>`
+  markup, so the click/keyboard-opens-the-picker mechanics were already
+  correct for free (native label semantics -- no JS click forwarding,
+  no tabindex/role needed). The real gap was DT-002's other criterion:
+  "clicking the box while an image is showing reopens the picker and
+  replaces the image", which needs the picker to visually overlap the
+  preview image once one is loaded, per the task doc's "Layering"
+  section (also restated verbatim in DT-002's own `notes` field, which
+  is what pointed at the mechanism).
+- Implemented that layering, scoped tightly to what DT-002's
+  acceptance criteria require (not the fuller DT-007/DT-008 box-sizing
+  work, which is out of scope this session):
+  - `src/index.ts`: `#setFile` now also adds `has-image` to `.box`
+    (previously only `.preview` got it); `#clear` removes it from both.
+  - `src/index.css`: `.box.has-image .picker { position: absolute;
+    inset: 0 }` makes the label overlay the whole box once an image is
+    showing. `.preview` gained `pointer-events: none` so a click on the
+    `<img>` falls through to the label underneath (`.overlay > *`
+    already had `pointer-events: auto` from US-001, so the ALT/edit/
+    remove buttons -- which paint after the label in DOM order -- stay
+    clickable and do NOT reach the input). Also added `.box:has(input
+    :focus-visible)` with the existing `--image-input-focus-color`
+    variable for the visible focus ring criterion.
+  - Did NOT touch box sizing/prompt content (`.picker` in the *empty*
+    state still collapses to zero size, since it has no in-flow
+    content until DT-008 adds the icon/prompt-text markup and DT-007/
+    DT-010 add the in-flow-vs-absolute toggle for that state) -- this
+    matches DT-001's/DT-007's own notes and is explicitly deferred.
+- Wrote failing tests first in `test/index.ts` (confirmed 1 failing
+  assertion -- `#setFile adds has-image to .box` -- before the fix; the
+  other new tests around label-click and overlay-buttons-don't-open
+  already passed against the DT-001 markup, since those were pre-
+  existing native-semantics guarantees, not new behavior):
+  1. the picker has no `tabindex`/`role` attributes,
+  2. clicking the `.picker` label forwards a click to the input,
+  3. `#setFile`/`#clear` toggle `has-image` on `.box`,
+  4. clicking ALT/edit/remove does not fire a click on the input.
+- **Could not test the CSS-dependent click-passthrough
+  (`.box.has-image .picker` overlay) via `npm test`**, per the
+  existing Codebase Patterns note: `test/index.html` does not load
+  `src/index.css`. Verified it instead with the Playwright MCP tools
+  against `npm run start`: uploaded a 400x300 test PNG via a real file
+  chooser (triggered with `input.click()` + `browser_file_upload`,
+  since Playwright's ref-based click on the input itself fails --
+  the input's own hit-test area is clipped to nothing by `clip-path:
+  inset(50%)`, which is expected; real users click the label, not the
+  input), confirmed `document.elementFromPoint` over the image (away
+  from the overlay buttons) resolved to `LABEL.picker`, then did a real
+  mouse click at that point and confirmed the file chooser reopened.
+  Also confirmed clicking the "Add alt text" badge does NOT reopen the
+  chooser. Killed the vite dev server and removed the scratch PNGs and
+  `.playwright-mcp/` afterwards.
+- Files changed: `src/index.ts`, `src/index.css`, `test/index.ts`,
+  `specs/drop-target.json` (DT-002 `passes: true`).
+- Tests: 4 new tape tests (9 new assertions). Full `npm test` (lint +
+  build + typecheck + tape-run) passes with 124 total assertions.
+- **Learnings for future iterations:**
+  - The empty (no-image) box still collapses to zero size in a real
+    browser right now (no prompt content yet) -- don't try to
+    Playwright-click an empty box's picker/label directly; test that
+    path with structural assertions (label wraps input, no tabindex/
+    role) instead, and defer real click-position testing on the empty
+    box until DT-008 (prompt content) and DT-007/DT-010 (box sizing)
+    land.
+  - Playwright's ref-based `browser_click` on the file `<input>`
+    itself fails once it's hidden via `clip-path: inset(50%)` --
+    "element intercepts pointer events" -- because clip-path also
+    clips the hit-test region, not just painting. That's correct,
+    intended behavior (only the label should be clickable by a mouse
+    user), but it means manual verification of this pattern needs
+    `input.click()` via `browser_evaluate` (or a real click on the
+    label/box coordinates) rather than a direct ref-click on the input.
+---
+
+## 2026-07-24 - DT-003
+
+- Wired `@substrate-system/drag-drop`'s `dragDrop()` onto `.box` in
+  `setupEventListeners`, storing the returned cleanup function on a
+  new private field `#cleanupDrop` and calling it in
+  `disconnectedCallback` alongside the existing listener teardown. No
+  hand-written `dragenter`/`dragover`/`dragleave` handlers were added
+  -- the library itself adds/removes the `drag` class on `.box`
+  (verified by reading `node_modules/@substrate-system/drag-drop/dist/
+  util.js`: `addDragClass`/`removeDragClass` just toggle
+  `classList`).
+- `dragDrop(box, listeners)` requires a `Listener` function or
+  `ListenerObject`; passed a new `handleDrop = (_record:DropRecord) =>
+  {}` bound method as the `onDrop` shorthand. It's currently a no-op
+  stub -- actually selecting the dropped file, syncing `input.files`,
+  and emitting `image-input:change`/`:error` is DT-004/DT-005/DT-006's
+  scope, deliberately left out this session per the one-task-per-
+  session rule even though the task doc's own "Task 3" write-up
+  bundles all of that together. Confirmed via
+  `node_modules/@substrate-system/drag-drop/dist/index.js` that
+  `addDragClass`/`removeDragClass` on `dragenter`/`dragleave` do not
+  depend on what `onDrop` does, only on `isEventHandleable` finding a
+  file-kind item/type in `dataTransfer` and `listenerObject.onDrop`
+  being truthy (any non-null function satisfies that check) -- so the
+  no-op stub is sufficient for this story's border-swap behavior to
+  work for real, not just in the test.
+- CSS: added `.box` a real border (`--image-input-border-width`
+  `--image-input-border-style` `--image-input-border-color`,
+  previously `.box` had no border at all -- DT-001 explicitly deferred
+  it) and a `background` (`--image-input-box-bg`), plus a `.box.drag`
+  override swapping to `--image-input-border-color-drag`
+  (`--image-input-focus-color` reused as the value, not a new color)
+  `--image-input-border-style-drag` (solid) and
+  `--image-input-box-bg-drag`. Added all six as new variables in
+  `src/_vars.css`. Left `.box` un-sized (no width/height/padding) and
+  did not touch prompt-content styling -- those remain DT-008/DT-010's
+  scope.
+- Wrote a failing test first in `test/index.ts` (confirmed it failed
+  with `box` never gaining the `drag` class before `dragDrop()` was
+  wired up): dispatches a real `DragEvent('dragenter', ...)` with a
+  `DataTransfer` that has a `File` added via `dt.items.add(file)` (so
+  `isEventHandleable`'s file-kind check passes), asserts `.box` gains
+  `drag`, dispatches `DragEvent('dragleave', ...)`, asserts `.box`
+  loses `drag`.
+- Files changed: `src/index.ts`, `src/index.css`, `src/_vars.css`,
+  `test/index.ts`, `specs/drop-target.json` (DT-003 `passes: true`).
+- Tests: 1 new tape test (3 new assertions). Full `npm test` (lint +
+  build + typecheck + tape-run) passes with 127 total assertions.
+- No "verify in browser" step was listed in DT-003's acceptance
+  criteria, so none was performed.
+- **Learnings for future iterations:**
+  - `dragDrop()`'s dragenter/dragleave class toggling is entirely
+    independent of the `onDrop` callback's implementation -- a no-op
+    `onDrop` is enough to get the drag-class CSS working for real. Use
+    this to land the library wiring and CSS in one story (DT-003)
+    ahead of the actual drop-handling logic (DT-004+) without
+    faking/skipping anything.
+  - For synthetic `DragEvent` tests against this library, add a real
+    `File` to the test `DataTransfer` via `dt.items.add(file)` --
+    `isEventHandleable` in the library requires a file-kind item (or a
+    `"Files"` type) present, or it silently no-ops and the class never
+    gets added.
+---
+
+## 2026-07-24 - DT-004
+
+- Implemented `handleDrop` in `src/index.ts`: scans
+  `Object.values(record)` (the `DropRecord` from `dragDrop()`'s
+  `onDrop` callback) for the first file whose `type` starts with
+  `image/`, ignoring the rest. If found, calls the existing `#setFile`
+  and emits `image-input:change` with `{ file, alt }`, the same shape
+  used by the picker path (`handleFileSelect`). If no image file is
+  present, it's currently a silent no-op -- emitting
+  `image-input:error` for that case is DT-006's scope, not this
+  story's, so it was deliberately left out.
+- Did NOT add `#syncInputFiles`/`DataTransfer` wiring (writing the
+  dropped file into `input.files` for form submission) -- that's
+  DT-005's scope. `#setFile` today only updates the preview/`#file`
+  field, not `input.files`, for either the picker or drop path; DT-005
+  adds that for both.
+- Hit and fixed a real `tsc` typecheck failure not caught by
+  `esbuild`/tape-run: chaining `Object.values(record).find(f => ...)`
+  directly makes `tsc` infer `f` as `unknown` in this project's
+  tsconfig (see the new `src/AGENTS.md` note for the mechanism).
+  Fixed by assigning to an explicitly typed `const files:File[] =
+  Object.values(record)` first, then calling `.find` on that. Caught
+  this because `npm run build` (which runs
+  `tsc --emitDeclarationOnly`) is part of `npm test`'s pipeline, not
+  because `npx vitest`/tape-run failed -- worth remembering that a
+  green targeted test run does not guarantee a green typecheck.
+- Wrote 2 failing tests first in `test/index.ts` (confirmed 6 failing
+  assertions before the fix): dropping a single image file shows the
+  preview, marks `.box` `has-image`, and emits `image-input:change`
+  with the dropped `File` and current alt text; a drop containing a
+  non-image file plus an image file selects the image one and ignores
+  the other. Both dispatch a real `DragEvent('drop', { dataTransfer,
+  bubbles: true })` at `.box` and `await new Promise(resolve =>
+  setTimeout(resolve, 0))` afterward, since the library's `onDrop` is
+  async (per the task doc and the existing DT-003 test's pattern,
+  extended here from a bare `await Promise.resolve()` to a macrotask
+  wait since `handleItems`'s fallback-to-`files` path still crosses at
+  least one microtask boundary via its own `await`, and a `setTimeout`
+  wait is a safer margin than counting microtask hops by hand).
+- Files changed: `src/index.ts`, `test/index.ts`, `src/AGENTS.md`,
+  `specs/drop-target.json` (DT-004 `passes: true`).
+- Tests: 2 new tape tests (6 new assertions). Full `npm test` (lint +
+  build + typecheck + tape-run) passes with 133 total assertions.
+- No "verify in browser" step was listed in DT-004's acceptance
+  criteria, so none was performed.
+- **Learnings for future iterations:**
+  - `npm run build`'s typecheck step can fail in ways the targeted
+    tape-run tests never exercise (esbuild transpiles TS structurally
+    and doesn't do full type inference). Don't treat a passing
+    `npx vitest`/tape-run subset as proof the story is done -- always
+    run the full `npm test` (or at least `tsc --noEmit -p
+    tsconfig.json`) before marking a story passing, per the session's
+    own TEST-FIRST/TARGETED-TESTING rules.
+  - See the new `src/AGENTS.md` entry for the `Object.values(...).find`
+    -> `unknown` typecheck gotcha; it will likely recur anywhere else
+    in this codebase that chains `Object.values` straight into an
+    array method instead of assigning it to a typed variable first.
+---
+
+## 2026-07-24 - DT-005
+
+- Added `#syncInputFiles(file:File):void` to `src/index.ts`, exactly
+  as specified in the task doc: builds a `DataTransfer`, adds the
+  dropped file, and assigns `dt.files` to the native `<input>`'s
+  `.files`, wrapped in `try/catch` since `DataTransfer` isn't
+  constructible in every environment (the `image-input:change` event
+  still carries the file either way, since the emit doesn't depend on
+  `input.files`).
+- Wired it into `handleDrop` only (called before `#setFile`), not into
+  `handleFileSelect` -- the picker path already populates
+  `input.files` natively when the user chooses a file via the OS
+  dialog, so there's nothing to sync there. This matches the task
+  doc's Task 4, which only shows `#syncInputFiles` called from the
+  drop handler.
+- `#clear()` needed no change: it already sets `input.value = ''`,
+  which the spec (and a live browser) confirms also clears
+  `input.files` back to an empty `FileList`.
+- Wrote 3 failing tests first in `test/index.ts` (confirmed 4 failing
+  assertions before the fix): a drop populates `input.files` with
+  exactly one entry carrying the dropped file; a required input is
+  invalid before any drop and valid after one (via
+  `input.checkValidity()`, no picker interaction); and `#clear()` (via
+  clicking remove) empties `input.files` back to zero entries after a
+  prior drop had synced one.
+- Files changed: `src/index.ts`, `test/index.ts`,
+  `specs/drop-target.json` (DT-005 `passes: true`).
+- Tests: 3 new tape tests (5 new assertions). Full `npm test` (lint +
+  build + typecheck + tape-run) passes with 139 total assertions (up
+  from 133 recorded at the end of the DT-004 entry above).
+- No "verify in browser" step was listed in DT-005's acceptance
+  criteria, so none was performed; `input.checkValidity()` in a real
+  browser test harness (`tape-run`) is a faithful proxy for form
+  validation behavior without needing an actual `<form>` wrapper.
+- **Learnings for future iterations:**
+  - `input.checkValidity()` is a convenient, non-brittle way to assert
+    `required` behavior in tests without constructing a surrounding
+    `<form>` and calling `reportValidity()`/`requestSubmit()` on it.
+  - DT-009 (normalize every input path to a `File`) will later move
+    the `#syncInputFiles` call from `handleDrop` into `#setFile`
+    itself, per the task doc's Task 11 -- that's explicitly deferred,
+    not done this session, since only DT-005's own scope (drop ->
+    input.files sync) was in scope.
+---
+
+## 2026-07-24 - DT-006
+
+- `handleDrop` now emits `image-input:error` with
+  `{ reason: 'not-an-image' }` and returns early when no `image/*`
+  file is found in the dropped record (previously a silent no-op).
+  `handleFileSelect` gained the matching `else` branch so the picker
+  path (reachable when a user picks "All Files" in the native dialog,
+  defeating `accept`) behaves the same way instead of silently
+  dropping the file.
+- No CSS or markup changes -- this story is purely the two emit
+  points plus their tests, per its acceptance criteria (the component
+  shows no message of its own; that's the consumer's job).
+- Wrote 2 failing tests first in `test/index.ts` (confirmed the drop
+  test's "should bubble" assertion failed before the fix; the picker
+  test would have failed the same way): dropping a non-image file
+  emits `image-input:error` (bubbled, `{ reason: 'not-an-image' }`)
+  and leaves `.preview` without `has-image`; picking a non-image file
+  via `selectFile()` does the same.
+- Files changed: `src/index.ts`, `test/index.ts`,
+  `specs/drop-target.json` (DT-006 `passes: true`).
+- Tests: 2 new tape tests (6 new assertions). Full `npm test` (lint +
+  build + typecheck + tape-run) passes with 145 total assertions (up
+  from 139 recorded at the end of the DT-005 entry).
+- No "verify in browser" step was listed in DT-006's acceptance
+  criteria, so none was performed.
+- **Learnings for future iterations:**
+  - Both file-input paths (`handleFileSelect` and `handleDrop`) now
+    follow the same if-image/else-error shape; keep them symmetric if
+    either path gains new logic later.
+---
+
+## 2026-07-24 - DT-007
+
+- Added a `.prompt` element (a `.prompt-icon` inline SVG plus a
+  `.prompt-text` span, hardcoded to "Drop an image, or click to
+  choose one") inside `.picker` in `render()`. This is the in-flow
+  content that gives the empty box its height, per this story's own
+  `notes` field ("Without the in-flow-then-absolute switch, an empty
+  box collapses to zero height"). The text is hardcoded here on
+  purpose -- DT-008 owns making it overridable via a `label`
+  attribute and wiring `handleChange_label`; this story only needed
+  *some* in-flow content to exist so the box has intrinsic height
+  while empty.
+  Did not introduce any new CSS variables (box padding, prompt color,
+  icon size, gap) -- those are explicitly DT-010's scope
+  ("Box styling is variable-driven"). Kept the new CSS to the one
+  rule this story actually needs.
+- CSS: added `.box.has-image .prompt { display: none }` next to the
+  existing `.box.has-image .picker { position: absolute; inset: 0 }`
+  rule (that rule already existed from DT-002). No other CSS changed;
+  `.picker`'s own default (non-has-image) position is already static/
+  in-flow since no rule set it otherwise.
+- `#setFile`/`#clear` already toggled `has-image` on `.box` as well as
+  `.preview` (done in DT-002), so no change was needed there for this
+  story's fourth acceptance criterion.
+- Wrote a failing test first in `test/index.ts` (confirmed it failed
+  with `.prompt` being `null` before the markup change): the picker
+  contains a `.prompt` element that isn't pulled out of flow via
+  inline style, containing a `.prompt-icon` (`aria-hidden="true"`)
+  and a non-empty `.prompt-text` -- per the no-brittle-text rule, only
+  asserts `textContent` is truthy, not its exact string.
+- Files changed: `src/index.ts`, `src/index.css`, `test/index.ts`,
+  `specs/drop-target.json` (DT-007 `passes: true`).
+- Tests: 1 new tape test (4 new assertions). Full `npm test` (lint +
+  build + typecheck + tape-run) passes with 150 total assertions.
+- No "verify in browser" step was listed in DT-007's acceptance
+  criteria, so none was performed. The test harness (`test/index.html`)
+  still doesn't load `src/index.css`, so the actual `display: none`/
+  in-flow-vs-absolute layout behavior can only be confirmed by reading
+  the stylesheet source, not asserted via computed style in a test --
+  consistent with the existing Codebase Patterns note.
+- **Learnings for future iterations:**
+  - When a story's own `notes` field explains *why* a change is
+    needed (here, the zero-height-without-in-flow-content gotcha),
+    treat it as the actual acceptance test to satisfy, even if the
+    listed acceptanceCriteria strings alone would be ambiguous about
+    whether markup or CSS-only changes are required.
+  - Resist scope creep from the task doc's combined write-up: the
+    doc's "Task 2: Rewrite render()" and "Task 6: CSS" sections show
+    the *entire* final markup/CSS in one block (including DT-008's
+    `label`-driven text and DT-010's styling variables), but each
+    story only needed its own slice. Cross-check new CSS variables
+    against which later story's acceptanceCriteria actually claims
+    them before adding them early.
+---
+
+## 2026-07-24 - DT-008
+
+- Added a `label` reflected string attribute to `ImageInput`
+  (`static reflectedStringAttributes`, `declare label:string|null`),
+  with the default prompt text `'Drop an image, or click to choose
+  one'` lifted into a `static DEFAULT_LABEL` so `render()` and
+  `handleChange_label` share one source of truth instead of
+  duplicating the string.
+- `render()` now interpolates `this.label ?? ImageInput.DEFAULT_LABEL`
+  into both the input's `aria-label` attribute and the
+  `.prompt-text` span's content (previously `.prompt-text` had the
+  default text hardcoded from DT-007, and the input had no
+  `aria-label` at all).
+- Added `handleChange_label(_old, newValue)`, following the same
+  `this.qs(...)`-mutates-existing-DOM pattern as
+  `handleChange_alt`/`handleChange_accept` (per the Codebase Patterns
+  note that `render()` only runs once): it updates `.prompt-text`'s
+  `textContent` and the input's `aria-label` together, so they never
+  drift out of sync, satisfying the "accessible name" rationale in
+  the task doc (`.prompt` is `display:none`'d once an image loads, so
+  the input needs its own `aria-label` to stay named).
+- Did not add an `icon` override or any new CSS -- DT-008's
+  acceptanceCriteria only calls for the `label` attribute (text) plus
+  confirming the existing default icon is inline SVG with
+  `aria-hidden="true"` (already true since DT-007). CSS variables for
+  styling remain DT-010's scope.
+- Wrote 2 failing tests first in `test/index.ts` (confirmed 3 failing
+  assertions before the fix -- the input had no `aria-label` at all,
+  and setting `el.label` had no effect since the attribute/handler
+  didn't exist yet): the input has a non-empty default `aria-label`
+  on first render, and setting `el.label = 'Drag a photo here'`
+  updates both the input's `aria-label` and the `.prompt-text`
+  content to match.
+- Files changed: `src/index.ts`, `test/index.ts`,
+  `specs/drop-target.json` (DT-008 `passes: true`).
+- Tests: 2 new tape tests (3 new assertions). Full `npm test` (lint +
+  build + typecheck + tape-run) passes with 153 total assertions (up
+  from 150 recorded at the end of the DT-007 entry).
+- No "verify in browser" step was listed in DT-008's acceptance
+  criteria, so none was performed.
+- **Learnings for future iterations:**
+  - When a default string needs to be shared between `render()` (the
+    initial paint) and a `handleChange_*` DOM-mutation method (the
+    post-mount update path), hoist it to a `static` class field
+    (`ImageInput.DEFAULT_LABEL`) rather than repeating the literal in
+    both places -- keeps them from silently drifting apart later.
+---
+
+## 2026-07-24 - DT-009
+
+- `#setFile` now normalizes every input path (picker, drop,
+  `setImage()`) to a `File`: `#file`'s type narrowed from
+  `File|Blob|null` to `File|null`. A `Blob` (or a `File` passed with an
+  explicit `name` override) is promoted via `new File([file], name ??
+  this.#deriveName(file.type), { type: file.type })` before anything
+  else happens in `#setFile`. `#setFile` now also owns the
+  `#syncInputFiles` call for every path (previously only `handleDrop`
+  called it directly) and returns the resulting `File` so callers
+  (`setImage`) can emit the promoted file instead of the original
+  blob.
+- Added `#deriveName(type)`: builds `${base}.${ext}` from the
+  *previous* `this.#file`'s name (stripped of its own extension via
+  `/\.[^.]+$/`) falling back to `'image'` when nothing was picked yet,
+  and a new `static EXT` map (`image/jpeg -> jpg`, etc.) falling back
+  to `'jpg'` for an unrecognized MIME type. Read `this.#file` for the
+  base name *before* `#setFile` overwrites it with the new file --
+  ordering matters here (see `src/AGENTS.md`).
+- Widened `setImage(blob:Blob, name?:string)` -- the second parameter
+  is optional so existing single-argument call sites keep working.
+- Simplified `handleDrop`: removed its direct `#syncInputFiles(file)`
+  call since `#setFile` now does that itself for every path, per the
+  task doc's Task 11 note ("Task 3's drop handler no longer calls
+  `#syncInputFiles` itself").
+- Wrote 3 new failing tests first in `test/index.ts` (confirmed they
+  failed -- wrong extension, non-`File` change detail, and a crash
+  reading `.name` of an undefined `input.files[0]` -- before the fix):
+  `setImage` promotes a Blob to a File and syncs `input.files` (reusing
+  the prior file's base name with the new extension, and asserting
+  `image-input:change`'s `detail.file instanceof File`), `setImage`
+  falls back to `image.jpg` when nothing was picked first and the MIME
+  type is unrecognized, and `setImage` accepts and uses an explicit
+  filename.
+- The pre-existing test `setImage replaces the preview with the given
+  blob` asserted `detail?.file === blob` by reference, which can no
+  longer hold once every `Blob` is promoted to a new `File` instance.
+  Per the task doc's own note that this test "still passes" once
+  extended with file/extension assertions, updated its assertion to
+  check `detail.file instanceof File` and `detail.file.type ===
+  blob.type` instead of reference equality, and added the
+  `input.files` entry-count/filename assertions the task doc calls
+  for, rather than weakening or deleting the test.
+- Files changed: `src/index.ts`, `src/AGENTS.md`, `test/index.ts`,
+  `specs/drop-target.json` (DT-009 `passes: true`).
+- Tests: 3 new tape tests (9 new assertions) plus 4 new assertions
+  added to the existing `setImage replaces the preview...` test. Full
+  `npm test` (lint + build + typecheck + tape-run) passes with 162
+  total assertions (up from 153 recorded at the end of the DT-008
+  entry above -- 150 pre-existing plus 12 net new, minus one removed
+  reference-equality assertion this session replaced).
+- No "verify in browser" step was listed in DT-009's acceptance
+  criteria, so none was performed.
+- **Learnings for future iterations:**
+  - When a task doc says an existing test "still passes" after a
+    behavior-narrowing change (here: `Blob` identity no longer
+    survives `setImage`), read that as "the test's *intent* still
+    holds," not "the exact assertion is literally unchanged" --
+    update the assertion to match the new (documented) contract
+    instead of treating the note as license to leave a now-incorrect
+    assertion in place.
+  - See the new `src/AGENTS.md` entry for the `#setFile`
+    normalize-to-File pattern and the ordering requirement between
+    `#deriveName` (reads the *old* `this.#file`) and the reassignment
+    of `this.#file` to the new value.
+---
+
+## 2026-07-24 - DT-010
+
+- Filled in the CSS gaps DT-010 called out: `.picker` and `.prompt`
+  had no layout rules at all before this session (only the
+  `.box.has-image .picker`/`.prompt` state overrides existed, added
+  incidentally in DT-002/DT-007). Added base rules for both, plus
+  `padding: 0` on the existing `.box.has-image .picker` override (the
+  task doc's spec for that rule, previously missing).
+- `src/_vars.css`: added `--image-input-box-padding` (2rem),
+  `--image-input-prompt-color` (`rgb(0 0 0 / 55%)`, a new value --
+  none of the existing colors fit a body-text-like prompt color: pill
+  colors are for filled badges, border-color at 25% is too faint for
+  text), `--image-input-prompt-icon-size` (2rem, bigger than the
+  overlay's 1.125rem icon since it's the box's main visual element),
+  `--image-input-prompt-gap` (0.75rem). Reused
+  `--image-input-border-width/style/color(-drag)` and
+  `--image-input-box-bg(-drag)` unchanged -- those already existed
+  from DT-003. `--image-input-radius` and `--image-input-focus-color`
+  were already reused by `.box`'s existing rules (DT-002/DT-003), no
+  change needed there.
+- `.box` itself still sets no `width`/`height`/`min-height`/
+  `aspect-ratio` -- confirmed by re-reading the existing rule; nothing
+  needed changing there, it already matched this story's requirement.
+- `image-crop`/`#alt-dialog` blocks untouched, as required.
+- No test-first step for this story: it's pure CSS variable/layout
+  work, and the existing Codebase Patterns note that `test/index.html`
+  doesn't load `src/index.css` means no tape test can observe real
+  computed layout here. Verification is `stylelint src/*.css` (this
+  story's own explicit acceptance criterion, via `npm run preversion`)
+  plus a full `npm test` run to confirm no regressions from the markup
+  ordering change in `src/index.css`.
+- Hit and fixed a `stylelint` `no-descending-specificity` failure: the
+  new `& .picker`/`& .prompt` rules were originally placed *after* the
+  `.box` block (which nests `&.has-image .picker`/`&.has-image
+  .prompt`, higher specificity). Moved both new rules to before `.box`
+  in `src/index.css` to fix the ordering. See Codebase Patterns above.
+- Also fixed a pre-existing (unrelated to this story, but blocking its
+  own "stylelint passes" acceptance criterion) `custom-property-empty-
+  line-before` violation in `src/_vars.css`: a blank line separated the
+  `image-input` and `image-crop` variable groups inside one `:root`
+  block, which stylelint flags. Removed the blank line.
+- Files changed: `src/_vars.css`, `src/index.css`,
+  `specs/drop-target.json` (DT-010 `passes: true`).
+- Tests: no new tests (CSS-only story, see above). Full `npm test`
+  (lint + build + typecheck + tape-run) passes with all 162 assertions
+  unchanged. `npm run preversion` (lint + stylelint) passes clean.
+- No "verify in browser" step was listed in DT-010's acceptance
+  criteria, so none was performed.
+- **Learnings for future iterations:**
+  - See Codebase Patterns above for the `no-descending-specificity`
+    ordering gotcha -- relevant for DT-011 and any future CSS work in
+    this file, since `npm test` won't catch it.
+---
+
+## 2026-07-25 - DT-011
+
+- Documentation-only story (plus one example CSS tweak); no test-first
+  step was applicable since none of the acceptance criteria describe
+  testable component behavior -- they describe README content, an
+  example stylesheet, and an AGENTS.md file. Verification here is
+  `npm run lint`, `npm test`, and `npm run preversion` staying green,
+  plus manually re-reading the rendered README sections.
+- `README.md`: added a "Drop target" paragraph under `## Example`
+  describing that click and drop are equivalent (same preview, same
+  `image-input:change`, same `input.files` entry); added the new
+  `label` attribute to the Attributes list; added `image-input:error`
+  to the Events list; added a new "CSS variables" subsection under
+  `## CSS` listing all `--image-input-*` box/prompt/drag variables and
+  stating the box has no default width/height/min-height/aspect-ratio
+  (the consumer must size it), with a short example rule. Updated the
+  three `File|Blob` references in the Events list (`change`, `edit`,
+  `alt`) to `File`, per DT-009's normalize-to-File change -- grepped
+  the whole file for `File|Blob` first and found exactly 3 literal
+  occurrences, not the 4 DT-009's `notes` field mentioned; fixed what
+  actually exists rather than inventing a fourth.
+  Ran `npm run toc` (the project's existing `markdown-toc` script)
+  afterward to regenerate the `<!-- toc -->` block for the new/moved
+  headings (`CSS variables`, `Drop target`) -- this also happened to
+  pick up `## Example` (the actual heading) where the stale TOC had
+  said `Use`, a pre-existing drift not caused by this session.
+- `example/index.css`: added a `.box` rule (nested under the existing
+  `image-input` block) giving the box `width: 100%; max-width: 480px;
+  min-height: 200px` so the demo shows a real, visibly-sized drop
+  target -- previously only `.preview` was sized, and `.box` itself
+  (per DT-010, deliberately) ships with no intrinsic size. Left the
+  crop dialog and alt dialog wiring in `example/index.ts` untouched,
+  as required.
+- `src/AGENTS.md`: the div-not-label constraint and the clipped-not-
+  hidden input rationale were already documented (from DT-001/DT-002
+  sessions). Added the two genuinely missing notes this story asked
+  for: the `#syncInputFiles`/`DataTransfer` trick (build a
+  `DataTransfer`, `items.add(file)`, assign `input.files = dt.files`,
+  wrapped in try/catch), and the `@substrate-system/drag-drop` library
+  facts (cleanup function removes all four listeners; the library adds/
+  removes its own `drag` class so no hand-written dragenter/dragleave
+  handlers are needed; `onDrop` is async so tests must await a tick;
+  `record` covers directory contents while `dataTransfer.files` does
+  not).
+- Files changed: `README.md`, `example/index.css`, `src/AGENTS.md`,
+  `specs/drop-target.json` (DT-011 `passes: true`).
+- Tests: no new tests (docs/config story, see above). Full `npm test`
+  (lint + build + typecheck + tape-run) passes unchanged at 162 total
+  assertions. `npm run preversion` (lint + stylelint on `src/*.css`)
+  passes clean; `example/index.css` isn't in stylelint's glob, but its
+  syntax was hand-verified against the existing nested-selector style
+  in that file.
+- All eleven stories in `specs/drop-target.json` now have
+  `passes: true` -- this branch's spec is complete.
+- **Learnings for future iterations:**
+  - `npm run toc` (via `markdown-toc`) is safe to run after any README
+    heading change on this project; it regenerates the whole
+    `<!-- toc -->`/`<!-- tocstop -->` block in place and also repairs
+    pre-existing drift between actual headings and a stale TOC.
+  - When a prior story's `notes` field cites a specific count (e.g.
+    "File|Blob in four places"), verify it with a fresh grep before
+    trusting it -- the actual count here was three, and the fix should
+    match reality, not the cited number.
 ---

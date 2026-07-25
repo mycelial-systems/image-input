@@ -1,0 +1,76 @@
+{
+  "project": "image-input",
+  "branchName": "rewrite",
+  "description": "Rewrite the example app on preact, @preact/signals and htm. The example is 15 lines of imperative DOM left over from when it had to build the alt and crop modals itself; the component owns those now. Replace it with a preact app that renders the component and a live state panel driven by signals. Detailed spec and rationale live in specs/tasks/example-preact.md; read it before starting, especially the five preact-and-custom-element contract rules. Scope is example/ only -- no change to src/, the build scripts, or package.json. preact, @preact/signals and htm are already installed at compatible versions.",
+  "userStories": [
+    {
+      "id": "EP-001",
+      "title": "Preact renders the example, component included",
+      "description": "As a developer reading the demo, I want the example written the way a real preact consumer would write it, so it shows me how to embed the component in a preact app.",
+      "acceptanceCriteria": [
+        "example/index.html gains a <div id=\"app\"></div> alongside the existing module script tag",
+        "example/index.ts defines an App component using html from htm/preact and mounts it with preact's render into #app",
+        "App renders the <image-input> element itself, with static attributes only and no dynamic props",
+        "The <image-input> vnode has a stable position in the tree and carries no key attribute",
+        "import '../src/index.js' stays above the render() call, so preact only ever sees an upgraded element",
+        "The imperative document.body.innerHTML += markup string is gone",
+        "npm run build-example succeeds and npx eslint example/*.ts passes with no config change",
+        "npm test still passes end to end"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "No dynamic props is a correctness rule, not style: the component owns alt as a reflected attribute written from inside by handleChange_alt, so a preact-driven alt prop would put two writers on one attribute. Preact 10 sets a property when `name in domElement` and an attribute otherwise, which is why the import must stay above render() -- an un-upgraded element silently takes the attribute path. Recreating the <image-input> DOM node would destroy its file, object URL, preview and both dialogs, which is why no key."
+    },
+    {
+      "id": "EP-002",
+      "title": "Signals hold the demo state and a panel displays it",
+      "description": "As a developer reading the demo, I want to see the component's state rendered on the page, so I can tell what the component exposes without opening devtools.",
+      "acceptanceCriteria": [
+        "New file example/state.ts exports five signals: altText, fileName, fileSize, lastEvent, errorReason",
+        "New file example/panel.ts exports a Panel component that displays all five",
+        "App renders Panel as a sibling of the <image-input>",
+        "Signals are read only inside Panel, never inside App",
+        "Text-only signals are passed straight into text position so @preact/signals binds a text node rather than re-rendering",
+        "npm run build-example succeeds and npx eslint example/*.ts passes with no config change",
+        "npm test still passes end to end"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "A signal read inside App would subscribe App, so every event would re-render the tree containing the <image-input> vnode. That is harmless given EP-001's static-props rule, but reading signals as deep as possible keeps it harmless by construction instead of by accident. At this point the panel shows initial empty values; EP-003 makes it live."
+    },
+    {
+      "id": "EP-003",
+      "title": "Listeners keep the panel current",
+      "description": "As a developer trying the demo, I want the panel to update as I pick, crop, describe and remove an image, so I can watch the component's events as they fire.",
+      "acceptanceCriteria": [
+        "App takes a ref to the <image-input> and attaches its listeners in a useEffect",
+        "The effect returns a cleanup that removes every listener it added",
+        "Listeners are attached with addEventListener via the ref, NOT with preact on* props",
+        "image-input:change sets fileName, fileSize and lastEvent and clears errorReason; image-input:alt-change sets altText and lastEvent; image-input:remove clears fileName and fileSize and sets lastEvent; image-input:error sets errorReason and lastEvent",
+        "The remove handler does NOT clear altText, because the component's #clear() ends with `this.alt = null` (src/index.ts:318), which emits image-input:alt-change with an empty string and so clears it through the alt-change handler already",
+        "image-input:edit and image-input:alt each set lastEvent, so the panel shows they still fire even though the component opens its own dialogs",
+        "Every handler that sets more than one signal wraps them in batch from @preact/signals",
+        "npm run build-example succeeds and npx eslint example/*.ts passes with no config change",
+        "npm test still passes end to end"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "Preact lowercases event prop names and a colon cannot survive as a prop name, so there is no onImage-input:change to write -- the ref plus useEffect is the only workable route, not a stylistic preference. The batch requirement comes from the repo's frontend state rule in CLAUDE.md."
+    },
+    {
+      "id": "EP-004",
+      "title": "The example's AGENTS.md records the preact contract",
+      "description": "As the next agent to touch the example, I want the preact and custom-element rules written down, so I do not undo them by accident.",
+      "acceptanceCriteria": [
+        "example/AGENTS.md documents all five contract rules: no dynamic props on the component, import before render, listeners via ref and useEffect rather than on* props, stable position and no key, and signals read in Panel rather than App",
+        "Each rule records WHY, not just what, so a reader can tell which are correctness rules and which are convention",
+        "The note about example/index.css being demo-only styling is preserved",
+        "No em dashes and no arrow characters anywhere in the file",
+        "npm test still passes end to end"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "Do not write tests for documentation. example/AGENTS.md was already rewritten once when the component took over the dialogs -- it previously claimed the components were headless with respect to dialogs, which had become false. Check its current contents before editing rather than assuming."
+    }
+  ]
+}

@@ -46,7 +46,8 @@
     }
   },
   "dependencies": {
-    "@substrate-system/web-component": "^0.0.56"
+    "@substrate-system/drag-drop": "^0.4.12",
+    "microtags": "^0.0.12"
   },
   "devDependencies": {
     "@preact/signals": "^2.10.0",
