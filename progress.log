@@ -1209,3 +1209,65 @@
     trusting it -- the actual count here was three, and the fix should
     match reality, not the cited number.
 ---
+
+## 2026-07-25 - EP-001
+
+- Verified rather than authored: `example/index.html` and
+  `example/index.ts` already carried an uncommitted rewrite (from an
+  interrupted prior session) that satisfies every EP-001 acceptance
+  criterion -- `<div id="app">` added to the HTML; `index.ts` defines
+  an `App` preact component via `html` from `htm/preact`, renders it
+  into `#app`, and renders `<${ImageInput.TAG} accept="image/*" />`
+  with only static attributes, no `key`, at a stable tree position;
+  `import '../src/index.js'` sits above the `render()` call; the old
+  `document.body.innerHTML += ...` string-markup and its by-id
+  `alt-change` listener are gone. This session's work was to check
+  that state against the spec, run the verification obligations listed
+  in `specs/tasks/example-preact.md`, and flip `passes: true` -- no
+  code changes were needed in `example/`.
+- No test-first step: `specs/tasks/example-preact.md`'s own
+  "Verification" section says explicitly "No new tests" for this
+  spec (`test/` covers the component, not the example, and the
+  project rule forbids testing docs/demo pages). EP-001's acceptance
+  criteria list no test obligation either -- only `npm run
+  build-example`, `npx eslint example/*.ts`, and `npm test` passing
+  end to end. Ran all three: `npm run build-example` succeeds (vite
+  build, 23 modules), `npx eslint example/*.ts` is clean, `npm test`
+  (lint + build + build-tests + tape-run) passes at 253 assertions.
+- Found unrelated, already-uncommitted working-tree changes to
+  `src/index.ts`, `test/index.ts`, and `ralph_claude.sh` predating
+  this session -- `src/index.ts`'s `connectedCallback` calls a
+  reintroduced `setupEventListeners()` instead of constructing the
+  `ImageInputClient` from `src/client.ts` (which still exists but is
+  now unused), and `test/index.ts` has one test removed (`ImageInput
+  .setImage sets the image on the given instance`). `ralph_claude.sh`
+  now points `PRD_FILE` at `specs/example-preact.json`. None of this
+  is explained by EP-001, which scopes to `example/` only per
+  `specs/example-preact.json`'s top-level `description`. `npm test`
+  passes with these changes in place, so they aren't blocking, but
+  they are NOT part of this commit -- left in the working tree
+  uncommitted, untouched, for whoever owns that work to finish or
+  revert deliberately. Do not assume they are safe to discard.
+- Files changed (this commit): `specs/example-preact.json` (EP-001
+  `passes: true`), `progress.log`. `example/index.html` and
+  `example/index.ts` were already modified in the working tree before
+  this session started; this commit includes them since they are the
+  actual EP-001 deliverable, verified against the spec above.
+- Tests: no new tests (see above). Full `npm test` passes unchanged at
+  253 assertions.
+- **Learnings for future iterations:**
+  - Before assuming a story's code needs writing, check whether the
+    working tree already has uncommitted changes satisfying it --
+    `git diff` against HEAD first. A prior session may have done the
+    work and stopped short of verifying/committing.
+  - When the working tree has dirty files outside the current story's
+    stated scope, do not fold them into the commit and do not revert
+    them speculatively -- stage only the files the current story
+    actually owns, and leave the rest for the session that has
+    context on them.
+  - `specs/tasks/example-preact.md` is the authoritative design doc
+    for EP-001 through EP-004; it has a "No new tests" verification
+    section that overrides the general test-first rule for this whole
+    spec, and documents five preact/custom-element contract rules that
+    EP-004 will transcribe into `example/AGENTS.md`.
+---

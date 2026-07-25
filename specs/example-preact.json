@@ -18,7 +18,7 @@
         "npm test still passes end to end"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "No dynamic props is a correctness rule, not style: the component owns alt as a reflected attribute written from inside by handleChange_alt, so a preact-driven alt prop would put two writers on one attribute. Preact 10 sets a property when `name in domElement` and an attribute otherwise, which is why the import must stay above render() -- an un-upgraded element silently takes the attribute path. Recreating the <image-input> DOM node would destroy its file, object URL, preview and both dialogs, which is why no key."
     },
     {
