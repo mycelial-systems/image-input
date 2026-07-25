@@ -1,16 +1,16 @@
 # AGENTS.md - example/
 
-- `example/index.ts` builds all page markup itself via
-  `document.body.innerHTML += \`...\``. Keep `example/index.html`'s
-  `<body>` to just the module `<script>` tag -- any component tags
-  added statically to `index.html` will end up duplicated (a second,
-  unwired copy) alongside whatever `index.ts` renders.
-- `example/index.css` is styling for the example app only (dialogs,
-  menus, layout around the demo). It is not part of the shipped
-  package -- component-library CSS belongs in `src/index.css`/
-  `src/_vars.css` instead.
-- `image-input`/`image-crop` are headless with respect to dialogs: they
-  only emit `edit`/`alt`/`change` events. Opening/closing a `<dialog>`
-  in response is entirely the example app's (or any consumer's)
-  responsibility -- don't add dialog-opening logic to the components
-  themselves.
+- `example/index.css` is styling for the example app only (layout
+  around the demo). It is not part of the shipped package --
+  component-library CSS belongs in `src/index.css`/`src/_vars.css`
+  instead.
+- `image-input` owns its own alt-text and crop dialogs. It renders
+  two `<dialog>` elements itself and opens them from the ALT badge and
+  the edit button, so the example does NOT need to build modals. See
+  `src/AGENTS.md` and the README for the details.
+- `image-input:edit` and `image-input:alt` still fire before the
+  built-in dialog opens, and both are cancelable. A consumer that
+  wants its own crop or alt UI calls `preventDefault()` on the event
+  and then drives the component through `setImage(blob)` and the `alt`
+  property. If the example demonstrates that path, it is showing the
+  opt-out, not the default.
