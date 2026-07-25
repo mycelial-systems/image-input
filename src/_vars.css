@@ -9,6 +9,13 @@
     --image-input-button-size: 2rem;
     --image-input-icon-size: 1.125rem;
     --image-input-focus-color: #1d9bf0;
+    --image-input-border-width: 2px;
+    --image-input-border-style: dashed;
+    --image-input-border-color: rgb(0 0 0 / 25%);
+    --image-input-border-color-drag: var(--image-input-focus-color);
+    --image-input-border-style-drag: solid;
+    --image-input-box-bg: transparent;
+    --image-input-box-bg-drag: rgb(29 155 240 / 8%);
 
     --image-crop-dim-color: rgb(0 0 0 / 55%);
     --image-crop-rect-border-color: #fff;

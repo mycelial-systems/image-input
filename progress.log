@@ -709,3 +709,67 @@
     `input.click()` via `browser_evaluate` (or a real click on the
     label/box coordinates) rather than a direct ref-click on the input.
 ---
+
+## 2026-07-24 - DT-003
+
+- Wired `@substrate-system/drag-drop`'s `dragDrop()` onto `.box` in
+  `setupEventListeners`, storing the returned cleanup function on a
+  new private field `#cleanupDrop` and calling it in
+  `disconnectedCallback` alongside the existing listener teardown. No
+  hand-written `dragenter`/`dragover`/`dragleave` handlers were added
+  -- the library itself adds/removes the `drag` class on `.box`
+  (verified by reading `node_modules/@substrate-system/drag-drop/dist/
+  util.js`: `addDragClass`/`removeDragClass` just toggle
+  `classList`).
+- `dragDrop(box, listeners)` requires a `Listener` function or
+  `ListenerObject`; passed a new `handleDrop = (_record:DropRecord) =>
+  {}` bound method as the `onDrop` shorthand. It's currently a no-op
+  stub -- actually selecting the dropped file, syncing `input.files`,
+  and emitting `image-input:change`/`:error` is DT-004/DT-005/DT-006's
+  scope, deliberately left out this session per the one-task-per-
+  session rule even though the task doc's own "Task 3" write-up
+  bundles all of that together. Confirmed via
+  `node_modules/@substrate-system/drag-drop/dist/index.js` that
+  `addDragClass`/`removeDragClass` on `dragenter`/`dragleave` do not
+  depend on what `onDrop` does, only on `isEventHandleable` finding a
+  file-kind item/type in `dataTransfer` and `listenerObject.onDrop`
+  being truthy (any non-null function satisfies that check) -- so the
+  no-op stub is sufficient for this story's border-swap behavior to
+  work for real, not just in the test.
+- CSS: added `.box` a real border (`--image-input-border-width`
+  `--image-input-border-style` `--image-input-border-color`,
+  previously `.box` had no border at all -- DT-001 explicitly deferred
+  it) and a `background` (`--image-input-box-bg`), plus a `.box.drag`
+  override swapping to `--image-input-border-color-drag`
+  (`--image-input-focus-color` reused as the value, not a new color)
+  `--image-input-border-style-drag` (solid) and
+  `--image-input-box-bg-drag`. Added all six as new variables in
+  `src/_vars.css`. Left `.box` un-sized (no width/height/padding) and
+  did not touch prompt-content styling -- those remain DT-008/DT-010's
+  scope.
+- Wrote a failing test first in `test/index.ts` (confirmed it failed
+  with `box` never gaining the `drag` class before `dragDrop()` was
+  wired up): dispatches a real `DragEvent('dragenter', ...)` with a
+  `DataTransfer` that has a `File` added via `dt.items.add(file)` (so
+  `isEventHandleable`'s file-kind check passes), asserts `.box` gains
+  `drag`, dispatches `DragEvent('dragleave', ...)`, asserts `.box`
+  loses `drag`.
+- Files changed: `src/index.ts`, `src/index.css`, `src/_vars.css`,
+  `test/index.ts`, `specs/drop-target.json` (DT-003 `passes: true`).
+- Tests: 1 new tape test (3 new assertions). Full `npm test` (lint +
+  build + typecheck + tape-run) passes with 127 total assertions.
+- No "verify in browser" step was listed in DT-003's acceptance
+  criteria, so none was performed.
+- **Learnings for future iterations:**
+  - `dragDrop()`'s dragenter/dragleave class toggling is entirely
+    independent of the `onDrop` callback's implementation -- a no-op
+    `onDrop` is enough to get the drag-class CSS working for real. Use
+    this to land the library wiring and CSS in one story (DT-003)
+    ahead of the actual drop-handling logic (DT-004+) without
+    faking/skipping anything.
+  - For synthetic `DragEvent` tests against this library, add a real
+    `File` to the test `DataTransfer` via `dt.items.add(file)` --
+    `isEventHandleable` in the library requires a file-kind item (or a
+    `"Files"` type) present, or it silently no-ops and the class never
+    gets added.
+---

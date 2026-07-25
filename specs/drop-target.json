@@ -49,7 +49,7 @@
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "Verified in node_modules: the library adds class 'drag' on dragenter and removes it on dragleave and drop."
     },
     {

@@ -151,6 +151,38 @@ test('#setFile adds has-image to .box, #clear removes it', async t => {
         'the box should lose has-image after remove')
 })
 
+test('dragenter on the box adds the drag class, dragleave removes it',
+    async t => {
+        document.body.innerHTML += `
+            <image-input class="drag-class-test"></image-input>
+        `
+        const el = await waitFor('image-input.drag-class-test') as ImageInput
+        const box = el.querySelector('.box') as HTMLElement
+        const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+
+        const dt = new DataTransfer()
+        dt.items.add(file)
+
+        t.equal(box.classList.contains('drag'), false,
+            'the box should not have the drag class before dragenter')
+
+        box.dispatchEvent(new DragEvent('dragenter', {
+            dataTransfer: dt,
+            bubbles: true,
+            cancelable: true
+        }))
+        t.ok(box.classList.contains('drag'),
+            'dragenter should add the drag class')
+
+        box.dispatchEvent(new DragEvent('dragleave', {
+            dataTransfer: dt,
+            bubbles: true,
+            cancelable: true
+        }))
+        t.equal(box.classList.contains('drag'), false,
+            'dragleave should remove the drag class')
+    })
+
 test('clicking the ALT, edit or remove buttons does not open the ' +
     'file picker', async t => {
     document.body.innerHTML += `

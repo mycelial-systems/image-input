@@ -1,5 +1,6 @@
 import { WebComponent } from '@substrate-system/web-component'
 import { createDebug } from '@substrate-system/debug'
+import { dragDrop, type DropRecord } from '@substrate-system/drag-drop'
 const debug = createDebug('image-input')
 
 // for document.querySelector
@@ -21,6 +22,7 @@ export class ImageInput extends WebComponent {
 
     #file:File|Blob|null = null
     #previewUrl:string|null = null
+    #cleanupDrop:(() => void)|null = null
 
     connectedCallback () {
         debug('connected')
@@ -34,6 +36,7 @@ export class ImageInput extends WebComponent {
         this.qs('.remove')?.removeEventListener('click', this.handleRemove)
         this.qs('.edit')?.removeEventListener('click', this.handleEdit)
         this.qs('.alt-badge')?.removeEventListener('click', this.handleAlt)
+        this.#cleanupDrop?.()
         this.#revokePreviewUrl()
     }
 
@@ -42,6 +45,9 @@ export class ImageInput extends WebComponent {
         this.qs('.remove')?.addEventListener('click', this.handleRemove)
         this.qs('.edit')?.addEventListener('click', this.handleEdit)
         this.qs('.alt-badge')?.addEventListener('click', this.handleAlt)
+
+        const box = this.qs<HTMLElement>('.box')
+        if (box) this.#cleanupDrop = dragDrop(box, this.handleDrop)
     }
 
     handleChange_accept (_old:string|null, newValue:string|null) {
@@ -105,6 +111,11 @@ export class ImageInput extends WebComponent {
         if (!this.#file) return
         this.emit('alt', { detail: { file: this.#file, alt: this.alt ?? '' } })
     }
+
+    // Selecting the dropped file is implemented in DT-004; the
+    // drag-drop library manages the `.drag` class itself, regardless
+    // of what this listener does.
+    handleDrop = (_record:DropRecord):void => {}
 
     /**
      * Replace the preview with a Blob (e.g. a cropped image), and use it

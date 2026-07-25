@@ -20,6 +20,9 @@ image-input {
     & .box {
         position: relative;
         display: inline-block;
+        border: var(--image-input-border-width)
+            var(--image-input-border-style) var(--image-input-border-color);
+        background: var(--image-input-box-bg);
 
         &:has(input:focus-visible) {
             outline: 2px solid var(--image-input-focus-color);
@@ -29,6 +32,12 @@ image-input {
         &.has-image .picker {
             position: absolute;
             inset: 0;
+        }
+
+        &.drag {
+            border-color: var(--image-input-border-color-drag);
+            border-style: var(--image-input-border-style-drag);
+            background: var(--image-input-box-bg-drag);
         }
     }
 
