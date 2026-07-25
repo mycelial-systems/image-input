@@ -69,7 +69,7 @@
         "npm test still passes end to end"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "Do not write tests for documentation. example/AGENTS.md was already rewritten once when the component took over the dialogs -- it previously claimed the components were headless with respect to dialogs, which had become false. Check its current contents before editing rather than assuming."
     }
   ]

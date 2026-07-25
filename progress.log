@@ -1375,3 +1375,44 @@
     and is the documented, required mechanism for EP-003's listener
     wiring.
 ---
+
+## 2026-07-25 - EP-004
+
+- Rewrote `example/AGENTS.md`'s stale "How the example renders today"
+  section (which described the pre-EP-001 imperative
+  `document.body.innerHTML += ...` markup and said it was "scheduled to
+  change") with a new "The preact and custom-element contract" section
+  transcribing all five rules from `specs/tasks/example-preact.md`: no
+  dynamic props on `<image-input>`, import before render, listeners via
+  `ref`/`useEffect` not `on*` props, stable position with no `key`, and
+  signals read only in `Panel`. Each rule keeps its WHY (the specific
+  failure mode it prevents), not just a restatement of what it says,
+  per this story's own acceptance criteria.
+- Preserved the existing "The component owns its dialogs" and "CSS"
+  sections unchanged (still accurate; this story's notes explicitly
+  call out checking current contents rather than assuming a full
+  rewrite is needed).
+- No test-first step: per this story's own `notes` field and
+  `specs/tasks/example-preact.md`'s "Verification" section, docs are
+  not tested in this repo. Ran the spec's own obligations instead:
+  grepped the file for em dash (`—`) and arrow (`→`)
+  characters (none found), `npx eslint example/*.ts` clean, `npm run
+  build-example` succeeds (vite build, 28 modules), full `npm test`
+  (lint + build + typecheck + tape-run) passes unchanged at 253
+  assertions.
+- Files changed: `example/AGENTS.md`, `specs/example-preact.json`
+  (EP-004 `passes: true`), `progress.log`. This is the last story in
+  `specs/example-preact.json` -- all four (EP-001 through EP-004) now
+  `passes: true`.
+- Left untouched, per the EP-001/EP-002/EP-003 sessions' note:
+  pre-existing uncommitted changes to `src/index.ts`, `test/index.ts`,
+  and `ralph_claude.sh` that predate this branch's `example/`-scoped
+  work and are out of this story's scope. Verified again this session
+  that they are still present and still not part of this commit.
+- **Learnings for future iterations:**
+  - When a story's acceptance criteria are entirely about documentation
+    content (not code), the useful verification is grep for the
+    forbidden characters/patterns plus the existing lint/build/test
+    gates -- there is nothing else to test-first here, and the story's
+    own `notes` field said so explicitly.
+---
