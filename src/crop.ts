@@ -182,6 +182,31 @@ export class ImageCrop extends WebComponent {
     }
 
     /**
+     * The height budget for the displayed image, read from this
+     * element's own `max-height`.
+     *
+     * Deliberately *not* `clientHeight`. `image-crop` is an auto-height
+     * block, so its height comes from the frame that `#layout` just
+     * sized -- measuring it would feed the previous layout back into
+     * the next one, and the image could then only ever shrink. Widen
+     * the window and it would stay stuck at whatever height it first
+     * landed on. `max-height` is authored in CSS and never depends on
+     * the content, so it is a stable ceiling.
+     *
+     * Returns 0, meaning unconstrained, for `none` and for anything
+     * that does not resolve to pixels. A percentage against an
+     * auto-height parent resolves to a percentage string rather than a
+     * length, and parsing that as pixels would silently collapse the
+     * image.
+     */
+    #maxDisplayHeight ():number {
+        const raw = getComputedStyle(this).maxHeight
+        if (!raw.endsWith('px')) return 0
+        const px = parseFloat(raw)
+        return (Number.isFinite(px) && px > 0) ? px : 0
+    }
+
+    /**
      * The displayed image size, fitted to the element's available width
      * *and* height so a tall image never overflows its container.
      */
@@ -190,7 +215,7 @@ export class ImageCrop extends WebComponent {
             this.#naturalWidth,
             this.#naturalHeight,
             this.clientWidth,
-            this.clientHeight
+            this.#maxDisplayHeight()
         )
     }
 

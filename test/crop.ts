@@ -422,3 +422,61 @@ test('keyboard interactions emit image-crop:change in natural pixels', async t =
 
     t.ok(detail, 'should have emitted image-crop:change from a keydown')
 })
+
+test('constrains the displayed height by the element\'s max-height, ' +
+    'preserving aspect ratio', async t => {
+    document.body.innerHTML += `
+        <image-crop class="max-height-test"
+            style="display:block;width:400px;max-height:100px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.max-height-test') as ImageCrop
+    // 1:2, so fitting 400px wide would be 800px tall -- far over the cap
+    el.setFile(await makeImageFile(400, 800))
+    await waitForImageLoad(el)
+
+    const frame = el.querySelector('.image-crop-frame') as HTMLElement
+    const width = parseFloat(frame.style.width)
+    const height = parseFloat(frame.style.height)
+
+    t.equal(height, 100, 'should cap the frame height at max-height')
+    t.equal(width, 50,
+        'should narrow the frame to keep the 1:2 aspect ratio at the ' +
+        'capped height')
+})
+
+/**
+ * Regression test. `#fitted` used to take its height budget from
+ * `clientHeight`, which is the height of the frame it had itself just
+ * sized. That fed each layout back into the next one, so the displayed
+ * image could only ever shrink -- widening the container again left it
+ * stuck at whatever size it first landed on.
+ */
+test('re-lays out to fill the container again after it grows back',
+    async t => {
+        document.body.innerHTML += `
+        <image-crop class="regrow-test"
+            style="display:block;width:200px;"></image-crop>
+    `
+        const el = await waitFor('image-crop.regrow-test') as ImageCrop
+        el.setFile(await makeImageFile(400, 200))
+        await waitForImageLoad(el)
+
+        const frame = el.querySelector('.image-crop-frame') as HTMLElement
+        const startWidth = parseFloat(frame.style.width)
+        const startHeight = parseFloat(frame.style.height)
+        t.equal(startWidth, 200,
+            'sanity check: should start out filling the container')
+
+        el.style.width = '100px'
+        window.dispatchEvent(new Event('resize'))
+        t.equal(parseFloat(frame.style.width), 100,
+            'should shrink the frame when the container narrows')
+
+        el.style.width = '200px'
+        window.dispatchEvent(new Event('resize'))
+
+        t.equal(parseFloat(frame.style.width), startWidth,
+            'should widen the frame back when the container widens')
+        t.equal(parseFloat(frame.style.height), startHeight,
+            'should restore the frame height along with the width')
+    })

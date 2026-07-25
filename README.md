@@ -111,7 +111,13 @@ overridable from your own stylesheet:
   `--image-input-dialog-textarea-padding` -- the space between the alt
   dialog's label and its textarea, and the textarea's own padding.
 * `--image-input-dialog-crop-max-width` -- the widest the
-  `<image-crop>` inside the crop dialog will render.
+  `<image-crop>` inside the crop dialog will render. `100%` by
+  default, so it fills the dialog's content box.
+* `--image-crop-max-height` -- the tallest an `<image-crop>` will
+  render, `65vh` by default. This is what keeps a tall portrait image
+  from pushing the Cancel and Save buttons off screen. It must be a
+  value that resolves to a length, because `ImageCrop` reads it back
+  to size the crop frame; a percentage is treated as no cap at all.
 * `--image-input-dialog-duration`, `--image-input-dialog-scale-from`
   -- the duration of the dialogs' open/close fade-and-scale, and the
   scale they animate in from.

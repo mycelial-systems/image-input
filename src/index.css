@@ -16,7 +16,6 @@ image-input {
         flex-direction: column;
         align-items: center;
         gap: var(--image-input-prompt-gap);
-        color: var(--image-input-prompt-color);
         font-size: 1rem;
 
         & .prompt-icon {
@@ -164,6 +163,7 @@ image-input {
         border: none;
         border-radius: var(--image-input-dialog-radius);
         padding: var(--image-input-dialog-padding);
+        width: 600px;
 
         /**
          * The author-facing max width, clamped so it can never be
@@ -171,10 +171,7 @@ image-input {
          * `max-width: calc(100% - 6px - 2em)` with a fixed length
          * alone would overflow a narrow screen.
          */
-        max-width: min(
-            var(--image-input-dialog-max-width),
-            var(--image-input-dialog-max-width-viewport)
-        );
+        max-width: var(--image-input-dialog-max-width);
         opacity: 0;
         transform: scale(var(--image-input-dialog-scale-from));
         transition-property: opacity, transform, display, overlay;
@@ -218,6 +215,10 @@ image-input {
          * Clamp the slot rather than the `<image-crop>` inside it. The
          * crop element is block-level, so it fills the slot, and
          * `ImageCrop` lays its frame out from `clientWidth`.
+         *
+         * The default is `100%`, so the crop image spans the dialog's
+         * whole content box. Height is capped separately, by
+         * `--image-crop-max-height` on `image-crop` itself.
          */
         & .crop-slot {
             max-width: var(--image-input-dialog-crop-max-width);
@@ -278,9 +279,26 @@ image-input:not(:defined) {
 image-crop {
     display: block;
 
+    /**
+     * The height ceiling for the crop image. `ImageCrop.#fitted` reads
+     * this back with `getComputedStyle` to size the frame, so it must
+     * resolve to a length -- a percentage against an auto-height
+     * parent does not, and is treated as unconstrained. Keeping the
+     * cap here rather than in the frame's own layout is what stops the
+     * measure/write feedback loop described in src/crop.ts.
+     */
+    max-height: var(--image-crop-max-height);
+
     & .image-crop-frame {
         position: relative;
         width: 100%;
+
+        /**
+         * A tall image is capped by height, so the frame ends up
+         * narrower than the slot. Center it rather than leaving it
+         * flush to the inline start.
+         */
+        margin-inline: auto;
 
         & img {
             display: block;
