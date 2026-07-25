@@ -1,5 +1,24 @@
 # PRD: Image Input with Crop and Alt Text (Bluesky-style)
 
+> **Status: partly superseded.** This document records what was
+> specified before implementation, and is kept for that history. Two
+> of its premises no longer hold:
+>
+> 1. The "headless with regard to chrome" rule in the Introduction,
+>    and the matching goal "Keep all UI chrome (modals, buttons
+>    layout) in the consumer's hands", were reversed by CD-001
+>    through CD-008. `image-input` now renders and opens its own alt
+>    and crop dialogs. They stay optional: `image-input:edit` and
+>    `image-input:alt` are cancelable, and `preventDefault()` on
+>    either suppresses the built-in dialog so a consumer can
+>    substitute their own UI.
+> 2. US-003's "Alt text is a plain textarea owned by the consumer"
+>    describes the old design. The component ships an alt-text
+>    dialog.
+>
+> Current behavior lives in the README's "Built-in dialogs" section
+> and in [ADR-001](../docs/adr/ADR-001-use-platform-primitives.md).
+
 ## Introduction
 
 Extend the `image-input` web component package so it supports the full
