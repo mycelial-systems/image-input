@@ -832,3 +832,48 @@
     in this codebase that chains `Object.values` straight into an
     array method instead of assigning it to a typed variable first.
 ---
+
+## 2026-07-24 - DT-005
+
+- Added `#syncInputFiles(file:File):void` to `src/index.ts`, exactly
+  as specified in the task doc: builds a `DataTransfer`, adds the
+  dropped file, and assigns `dt.files` to the native `<input>`'s
+  `.files`, wrapped in `try/catch` since `DataTransfer` isn't
+  constructible in every environment (the `image-input:change` event
+  still carries the file either way, since the emit doesn't depend on
+  `input.files`).
+- Wired it into `handleDrop` only (called before `#setFile`), not into
+  `handleFileSelect` -- the picker path already populates
+  `input.files` natively when the user chooses a file via the OS
+  dialog, so there's nothing to sync there. This matches the task
+  doc's Task 4, which only shows `#syncInputFiles` called from the
+  drop handler.
+- `#clear()` needed no change: it already sets `input.value = ''`,
+  which the spec (and a live browser) confirms also clears
+  `input.files` back to an empty `FileList`.
+- Wrote 3 failing tests first in `test/index.ts` (confirmed 4 failing
+  assertions before the fix): a drop populates `input.files` with
+  exactly one entry carrying the dropped file; a required input is
+  invalid before any drop and valid after one (via
+  `input.checkValidity()`, no picker interaction); and `#clear()` (via
+  clicking remove) empties `input.files` back to zero entries after a
+  prior drop had synced one.
+- Files changed: `src/index.ts`, `test/index.ts`,
+  `specs/drop-target.json` (DT-005 `passes: true`).
+- Tests: 3 new tape tests (5 new assertions). Full `npm test` (lint +
+  build + typecheck + tape-run) passes with 139 total assertions (up
+  from 133 recorded at the end of the DT-004 entry above).
+- No "verify in browser" step was listed in DT-005's acceptance
+  criteria, so none was performed; `input.checkValidity()` in a real
+  browser test harness (`tape-run`) is a faithful proxy for form
+  validation behavior without needing an actual `<form>` wrapper.
+- **Learnings for future iterations:**
+  - `input.checkValidity()` is a convenient, non-brittle way to assert
+    `required` behavior in tests without constructing a surrounding
+    `<form>` and calling `reportValidity()`/`requestSubmit()` on it.
+  - DT-009 (normalize every input path to a `File`) will later move
+    the `#syncInputFiles` call from `handleDrop` into `#setFile`
+    itself, per the task doc's Task 11 -- that's explicitly deferred,
+    not done this session, since only DT-005's own scope (drop ->
+    input.files sync) was in scope.
+---

@@ -118,6 +118,7 @@ export class ImageInput extends WebComponent {
         if (!file) return
 
         debug('Image file dropped:', file.name)
+        this.#syncInputFiles(file)
         this.#setFile(file)
         this.emit('change', { detail: { file, alt: this.alt ?? '' } })
     }
@@ -154,6 +155,20 @@ export class ImageInput extends WebComponent {
         this.qs('.box')?.classList.remove('has-image')
 
         this.alt = null
+    }
+
+    #syncInputFiles (file:File):void {
+        const input = this.qs<HTMLInputElement>('input')
+        if (!input) return
+
+        try {
+            const dt = new DataTransfer()
+            dt.items.add(file)
+            input.files = dt.files
+        } catch (_err) {
+            // DataTransfer is not constructible everywhere; the change
+            // event still carries the file.
+        }
     }
 
     #revokePreviewUrl ():void {

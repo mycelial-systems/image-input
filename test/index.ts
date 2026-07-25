@@ -218,6 +218,98 @@ test('dropping an image renders the preview and emits change', async t => {
         'the change detail should carry the current alt text')
 })
 
+test('dropping an image populates input.files with one file', async t => {
+    document.body.innerHTML += `
+        <image-input class="drop-sync-files-test"></image-input>
+    `
+    const el = await waitFor(
+        'image-input.drop-sync-files-test'
+    ) as ImageInput
+    const box = el.querySelector('.box') as HTMLElement
+    const input = el.querySelector(
+        'input[type="file"]'
+    ) as HTMLInputElement
+    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+
+    const dt = new DataTransfer()
+    dt.items.add(file)
+
+    box.dispatchEvent(new DragEvent('drop', {
+        dataTransfer: dt,
+        bubbles: true,
+        cancelable: true
+    }))
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    t.equal(input.files?.length, 1,
+        'input.files should have exactly one entry after a drop')
+    t.equal(input.files?.[0], file,
+        'input.files should carry the dropped file')
+})
+
+test('a dropped file satisfies required with no picker interaction',
+    async t => {
+        document.body.innerHTML += `
+            <image-input class="drop-required-test" required></image-input>
+        `
+        const el = await waitFor(
+            'image-input.drop-required-test'
+        ) as ImageInput
+        const box = el.querySelector('.box') as HTMLElement
+        const input = el.querySelector(
+            'input[type="file"]'
+        ) as HTMLInputElement
+        const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+
+        t.equal(input.checkValidity(), false,
+            'the required input should be invalid before any file')
+
+        const dt = new DataTransfer()
+        dt.items.add(file)
+
+        box.dispatchEvent(new DragEvent('drop', {
+            dataTransfer: dt,
+            bubbles: true,
+            cancelable: true
+        }))
+        await new Promise(resolve => setTimeout(resolve, 0))
+
+        t.ok(input.checkValidity(),
+            'a dropped file should satisfy required validation')
+    })
+
+test('#clear resets input.files as well as input.value', async t => {
+    document.body.innerHTML += `
+        <image-input class="drop-clear-files-test"></image-input>
+    `
+    const el = await waitFor(
+        'image-input.drop-clear-files-test'
+    ) as ImageInput
+    const box = el.querySelector('.box') as HTMLElement
+    const input = el.querySelector(
+        'input[type="file"]'
+    ) as HTMLInputElement
+    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+
+    const dt = new DataTransfer()
+    dt.items.add(file)
+
+    box.dispatchEvent(new DragEvent('drop', {
+        dataTransfer: dt,
+        bubbles: true,
+        cancelable: true
+    }))
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    t.equal(input.files?.length, 1, 'sanity check: file was synced')
+
+    const removeBtn = el.querySelector('.remove') as HTMLButtonElement
+    removeBtn.click()
+
+    t.equal(input.files?.length, 0,
+        'input.files should be cleared after remove')
+})
+
 test('a drop with several files uses the first image/* one', async t => {
     document.body.innerHTML += `
         <image-input class="drop-multi-test"></image-input>
