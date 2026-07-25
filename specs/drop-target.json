@@ -148,7 +148,7 @@
         "Typecheck passes"
       ],
       "priority": 9,
-      "passes": false,
+      "passes": true,
       "notes": "This makes #file always a File, so detail.file on change/edit/alt narrows from File|Blob to File. Backward compatible, since File extends Blob, but the README says File|Blob in four places."
     },
     {

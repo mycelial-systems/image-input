@@ -721,7 +721,7 @@ test('setImage replaces the preview with the given blob', async t => {
 
     const blob = new Blob(['cropped'], { type: 'image/jpeg' })
 
-    let detail:{ file:Blob, alt:string }|undefined
+    let detail:{ file:File, alt:string }|undefined
     el.addEventListener('image-input:change', (ev:Event) => {
         detail = (ev as CustomEvent).detail
     })
@@ -737,8 +737,16 @@ test('setImage replaces the preview with the given blob', async t => {
     t.notEqual(imgAfter.getAttribute('src'), srcBefore,
         'should replace the previous preview src')
 
-    t.equal(detail?.file, blob,
-        'should emit image-input:change with the new blob as the file')
+    t.ok(detail?.file instanceof File,
+        'should emit image-input:change with a File promoted from the blob')
+    t.equal(detail?.file.type, blob.type,
+        'the promoted File should keep the blob\'s type')
+
+    const input = el.querySelector('input[type="file"]') as HTMLInputElement
+    t.equal(input.files?.length, 1,
+        'input.files should have one entry after setImage')
+    t.equal(input.files?.[0]?.name, 'photo.jpg',
+        'the synced file name should carry an extension matching the blob type')
 })
 
 test('setImage revokes the previous preview object URL', async t => {
@@ -766,6 +774,67 @@ test('setImage revokes the previous preview object URL', async t => {
 
     t.ok(revoked.includes(srcBefore),
         'should revoke the previous preview object URL')
+})
+
+test('setImage promotes a Blob to a File and syncs input.files', async t => {
+    document.body.innerHTML += `
+        <image-input class="set-image-file-test"></image-input>
+    `
+    const el = await waitFor('image-input.set-image-file-test') as ImageInput
+    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    selectFile(el, file)
+
+    const blob = new Blob(['cropped'], { type: 'image/jpeg' })
+    el.setImage(blob)
+
+    const input = el.querySelector('input[type="file"]') as HTMLInputElement
+    t.equal(input.files?.length, 1,
+        'should populate input.files with exactly one entry')
+
+    const synced = input.files?.[0] as File
+    t.ok(synced instanceof File, 'the synced entry should be a File')
+    t.equal(synced.name, 'photo.jpg',
+        'the filename should reuse the prior base name with the new extension')
+
+    let detail:{ file:File, alt:string }|undefined
+    el.addEventListener('image-input:change', (ev:Event) => {
+        detail = (ev as CustomEvent).detail
+    })
+
+    const secondBlob = new Blob(['cropped again'], { type: 'image/jpeg' })
+    el.setImage(secondBlob)
+    t.ok(detail?.file instanceof File,
+        'image-input:change detail.file should be a File after setImage')
+})
+
+test('setImage falls back to a default name and extension', async t => {
+    document.body.innerHTML += `
+        <image-input class="set-image-fallback-test"></image-input>
+    `
+    const el = await waitFor(
+        'image-input.set-image-fallback-test'
+    ) as ImageInput
+
+    const blob = new Blob(['bytes'], { type: 'image/unknown' })
+    el.setImage(blob)
+
+    const input = el.querySelector('input[type="file"]') as HTMLInputElement
+    const synced = input.files?.[0] as File
+    t.equal(synced.name, 'image.jpg',
+        'should fall back to "image" base name and "jpg" extension')
+})
+
+test('setImage accepts an explicit filename', async t => {
+    document.body.innerHTML += `
+        <image-input class="set-image-name-test"></image-input>
+    `
+    const el = await waitFor('image-input.set-image-name-test') as ImageInput
+    const blob = new Blob(['bytes'], { type: 'image/jpeg' })
+    el.setImage(blob, 'cover.jpg')
+
+    const input = el.querySelector('input[type="file"]') as HTMLInputElement
+    t.equal(input.files?.[0]?.name, 'cover.jpg',
+        'should use the caller-supplied filename')
 })
 
 test('edit and alt buttons do not open a dialog or navigate', async t => {

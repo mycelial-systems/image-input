@@ -60,3 +60,14 @@
   variable first -- `const files:File[] = Object.values(record)` --
   then call `.find`/etc. on that. This class of bug won't show up in
   `esbuild`/tape-run, only in the `tsc` build step.
+- `#setFile(file:File|Blob, name?:string)` is the single place that
+  normalizes every input path (pick, drop, `setImage()`) to a `File`
+  and calls `#syncInputFiles`. A plain `Blob` (or a `File` passed with
+  an explicit `name` override) gets wrapped with `new File([file],
+  name ?? this.#deriveName(file.type), { type: file.type })` before
+  anything else happens -- `#deriveName` must read `this.#file` (the
+  *previous* file, for its base name) before `#setFile` overwrites
+  `this.#file` with the new one. Because of this, `#file` is always a
+  `File`, never a bare `Blob`, so callers/tests can assume
+  `detail.file instanceof File` on every `image-input:change`/`:edit`/
+  `:alt` event, even after a `setImage(croppedBlob)` call.

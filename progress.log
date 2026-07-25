@@ -1011,3 +1011,70 @@
     (`ImageInput.DEFAULT_LABEL`) rather than repeating the literal in
     both places -- keeps them from silently drifting apart later.
 ---
+
+## 2026-07-24 - DT-009
+
+- `#setFile` now normalizes every input path (picker, drop,
+  `setImage()`) to a `File`: `#file`'s type narrowed from
+  `File|Blob|null` to `File|null`. A `Blob` (or a `File` passed with an
+  explicit `name` override) is promoted via `new File([file], name ??
+  this.#deriveName(file.type), { type: file.type })` before anything
+  else happens in `#setFile`. `#setFile` now also owns the
+  `#syncInputFiles` call for every path (previously only `handleDrop`
+  called it directly) and returns the resulting `File` so callers
+  (`setImage`) can emit the promoted file instead of the original
+  blob.
+- Added `#deriveName(type)`: builds `${base}.${ext}` from the
+  *previous* `this.#file`'s name (stripped of its own extension via
+  `/\.[^.]+$/`) falling back to `'image'` when nothing was picked yet,
+  and a new `static EXT` map (`image/jpeg -> jpg`, etc.) falling back
+  to `'jpg'` for an unrecognized MIME type. Read `this.#file` for the
+  base name *before* `#setFile` overwrites it with the new file --
+  ordering matters here (see `src/AGENTS.md`).
+- Widened `setImage(blob:Blob, name?:string)` -- the second parameter
+  is optional so existing single-argument call sites keep working.
+- Simplified `handleDrop`: removed its direct `#syncInputFiles(file)`
+  call since `#setFile` now does that itself for every path, per the
+  task doc's Task 11 note ("Task 3's drop handler no longer calls
+  `#syncInputFiles` itself").
+- Wrote 3 new failing tests first in `test/index.ts` (confirmed they
+  failed -- wrong extension, non-`File` change detail, and a crash
+  reading `.name` of an undefined `input.files[0]` -- before the fix):
+  `setImage` promotes a Blob to a File and syncs `input.files` (reusing
+  the prior file's base name with the new extension, and asserting
+  `image-input:change`'s `detail.file instanceof File`), `setImage`
+  falls back to `image.jpg` when nothing was picked first and the MIME
+  type is unrecognized, and `setImage` accepts and uses an explicit
+  filename.
+- The pre-existing test `setImage replaces the preview with the given
+  blob` asserted `detail?.file === blob` by reference, which can no
+  longer hold once every `Blob` is promoted to a new `File` instance.
+  Per the task doc's own note that this test "still passes" once
+  extended with file/extension assertions, updated its assertion to
+  check `detail.file instanceof File` and `detail.file.type ===
+  blob.type` instead of reference equality, and added the
+  `input.files` entry-count/filename assertions the task doc calls
+  for, rather than weakening or deleting the test.
+- Files changed: `src/index.ts`, `src/AGENTS.md`, `test/index.ts`,
+  `specs/drop-target.json` (DT-009 `passes: true`).
+- Tests: 3 new tape tests (9 new assertions) plus 4 new assertions
+  added to the existing `setImage replaces the preview...` test. Full
+  `npm test` (lint + build + typecheck + tape-run) passes with 162
+  total assertions (up from 153 recorded at the end of the DT-008
+  entry above -- 150 pre-existing plus 12 net new, minus one removed
+  reference-equality assertion this session replaced).
+- No "verify in browser" step was listed in DT-009's acceptance
+  criteria, so none was performed.
+- **Learnings for future iterations:**
+  - When a task doc says an existing test "still passes" after a
+    behavior-narrowing change (here: `Blob` identity no longer
+    survives `setImage`), read that as "the test's *intent* still
+    holds," not "the exact assertion is literally unchanged" --
+    update the assertion to match the new (documented) contract
+    instead of treating the note as license to leave a now-incorrect
+    assertion in place.
+  - See the new `src/AGENTS.md` entry for the `#setFile`
+    normalize-to-File pattern and the ordering requirement between
+    `#deriveName` (reads the *old* `this.#file`) and the reassignment
+    of `this.#file` to the new value.
+---

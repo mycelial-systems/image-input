@@ -23,7 +23,15 @@ export class ImageInput extends WebComponent {
 
     static DEFAULT_LABEL = 'Drop an image, or click to choose one'
 
-    #file:File|Blob|null = null
+    static EXT:Record<string, string> = {
+        'image/jpeg': 'jpg',
+        'image/png': 'png',
+        'image/webp': 'webp',
+        'image/gif': 'gif',
+        'image/avif': 'avif'
+    }
+
+    #file:File|null = null
     #previewUrl:string|null = null
     #cleanupDrop:(() => void)|null = null
 
@@ -137,7 +145,6 @@ export class ImageInput extends WebComponent {
         }
 
         debug('Image file dropped:', file.name)
-        this.#syncInputFiles(file)
         this.#setFile(file)
         this.emit('change', { detail: { file, alt: this.alt ?? '' } })
     }
@@ -146,20 +153,38 @@ export class ImageInput extends WebComponent {
      * Replace the preview with a Blob (e.g. a cropped image), and use it
      * as the file emitted in the resulting `image-input:change` event.
      */
-    setImage (blob:Blob):void {
-        this.#setFile(blob)
-        this.emit('change', { detail: { file: blob, alt: this.alt ?? '' } })
+    setImage (blob:Blob, name?:string):void {
+        const file = this.#setFile(blob, name)
+        this.emit('change', { detail: { file, alt: this.alt ?? '' } })
     }
 
-    #setFile (file:File|Blob):void {
+    #deriveName (type:string):string {
+        const prevName = this.#file?.name
+        const base = prevName ?
+            prevName.replace(/\.[^.]+$/, '') :
+            'image'
+        const ext = ImageInput.EXT[type] ?? 'jpg'
+        return `${base}.${ext}`
+    }
+
+    #setFile (file:File|Blob, name?:string):File {
+        const asFile = (file instanceof File && !name) ?
+            file :
+            new File([file], name ?? this.#deriveName(file.type), {
+                type: file.type
+            })
+
+        this.#syncInputFiles(asFile)
         this.#revokePreviewUrl()
-        this.#file = file
-        this.#previewUrl = URL.createObjectURL(file)
+        this.#file = asFile
+        this.#previewUrl = URL.createObjectURL(asFile)
 
         const img = this.qs('img')
         if (img) img.src = this.#previewUrl
         this.qs('.preview')?.classList.add('has-image')
         this.qs('.box')?.classList.add('has-image')
+
+        return asFile
     }
 
     #clear ():void {
