@@ -152,11 +152,13 @@ export class ImageInput extends WebComponent {
         const alt = this.alt ?? ''
         const hasAlt = !!this.alt
 
-        this.innerHTML = `<div class="wrapper">
-            <input
-                type="file"
-                accept="${accept}"${name}${required}
-            />
+        this.innerHTML = `<div class="box">
+            <label class="picker">
+                <input
+                    type="file"
+                    accept="${accept}"${name}${required}
+                />
+            </label>
             <div class="preview">
                 <img alt="${alt}" />
                 <div class="overlay">

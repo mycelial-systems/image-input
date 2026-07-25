@@ -563,9 +563,73 @@
 - Tests: full `npm test` (lint + build + typecheck + tape-run) passes
   with 100 total assertions (up from 98).
 - **Learnings for future iterations:**
-  - When a story's acceptance criteria list test coverage areas,
+  - When a story's acceptance criteria list task areas,
     check whether prior stories (written test-first) already satisfy
     them before writing net-new tests -- grep each criterion against
     existing `test/*.ts` describe/test names first, same lesson as
     US-003.
+---
+
+## 2026-07-24 - DT-001
+
+- This branch (`rewrite`) is driven by a second, separate spec file,
+  `specs/drop-target.json` (story ids `DT-*`), not `specs/prd.json`
+  (whose `US-*` stories are all already `passes: true` from the prior
+  branch). `specs/drop-target.json`'s own `branchName` field matches
+  the checked-out branch, and its `description` points at
+  `docs/tasks/drop-target.md` for the full spec/rationale. Read that
+  doc's "Resolved decisions" and "Markup" sections before starting any
+  `DT-*` story -- it also documents verified facts about
+  `@substrate-system/drag-drop` (needed starting DT-003) pulled from
+  `node_modules` rather than its README.
+- Implemented DT-001 only (bordered-box markup, not yet the border/
+  drag/prompt CSS -- those are DT-003/DT-008/DT-010): `render()` in
+  `src/index.ts` now produces `<div class="box"><label
+  class="picker"><input ... /></label><div class="preview">...`
+  instead of `<div class="wrapper"><input ... /><div
+  class="preview">...`. The `.preview`/`.overlay`/`.alt-badge`/
+  `.edit`/`.remove` subtree is untouched (same closing `</div>` count,
+  only the outer wrapper tag and the new `<label class="picker">`
+  around the input changed).
+- `src/index.css`: renamed the `.wrapper` rule (`position: relative;
+  display: inline-block`) to `.box`, and added the visually-hidden
+  `input[type="file"]` rule from the task doc's task-6 CSS block
+  (clip-path based, not `display:none`/`visibility:hidden`/`hidden`
+  attribute, so the input stays focusable and can still report
+  `required` validity). Did not add box border/background/prompt
+  styling -- out of scope for DT-001, belongs to DT-008/DT-010.
+- Wrote 4 failing tests first in `test/index.ts` (confirmed 6 failing
+  assertions before the fix, since one test had multiple assertions):
+  `.wrapper` is gone and `.box`/`.picker` exist and nest correctly,
+  the input keeps `accept`/`name`/`required` and lives inside
+  `.picker`, the input has no `hidden` attribute or inline
+  `display:none`/`visibility:hidden`, and `.preview.has-image` still
+  toggles correctly inside the new markup. All pre-existing tests
+  (which select via `.preview`, `.overlay`, `.alt-badge`, `.edit`,
+  `.remove`, `input[type="file"]`) kept passing unchanged, since those
+  selectors don't depend on the removed `.wrapper` class.
+- Files changed: `src/index.ts`, `src/index.css`, `test/index.ts`,
+  `specs/drop-target.json` (DT-001 `passes: true`).
+- Tests: 4 new tests (6 new assertions). Full `npm test` (lint +
+  build + typecheck + tape-run) passes with 115 total assertions (109
+  pre-existing on this branch plus the 6 new ones; this branch already
+  carries an `alt-change` event and its tests not reflected in
+  `specs/prd.json`'s dated entries above, which explains the count
+  being higher than the 100 recorded at the end of the US-009 entry).
+- No "verify in browser" step was listed in DT-001's acceptance
+  criteria, so none was performed; DT-002 (click/keyboard opening the
+  picker) is the first story in this doc that calls for it.
+- **Learnings for future iterations:**
+  - Don't assume `specs/prd.json` is the only/current spec file --
+    check for a repo-specific spec name matching the branch (here
+    `specs/drop-target.json`) whenever `specs/prd.json`'s stories are
+    already all `passes: true` but the session's assigned task id
+    doesn't appear in it.
+  - The test harness (`test/index.html`) still doesn't load
+    `src/index.css` (see Codebase Patterns above), so DT-001's
+    "input hidden via clip-path, not display:none" requirement could
+    only be tested by asserting the *absence* of hiding via
+    `hidden`/inline styles, not by asserting the CSS class actually
+    clips it. Real hiding is verified by reading the stylesheet rule
+    directly plus (later, once relevant) manual browser verification.
 ---

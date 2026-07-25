@@ -20,3 +20,16 @@
   `PointerEvent`s dispatched in tests don't correspond to a real active
   pointer session, and some environments throw when capture is
   requested for a pointer id with no active pointer.
+- `image-input`'s drop-target box (`.box`) is a `<div>`, not the
+  `<label>` -- `<button>` is labelable content, and a `<label>` may
+  not contain labelable descendants other than its own control, so
+  wrapping the whole box in a label would be invalid HTML once the
+  overlay's edit/remove buttons are inside it. The `<label
+  class="picker">` wraps only the `<input type="file">`, as a sibling
+  layer inside `.box`, not the whole box. See
+  `docs/tasks/drop-target.md` for the full rationale and remaining
+  drag/drop/keyboard/CSS work built on top of this markup.
+- The file input is hidden with a clip-path/absolute-position CSS
+  trick (`src/index.css`), never `display:none`, `visibility:hidden`
+  or the `hidden` attribute -- those three make the control
+  unfocusable and stop the browser from reporting `required` on it.

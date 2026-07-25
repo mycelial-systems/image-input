@@ -5,6 +5,89 @@ import type { ImageInput } from '../src/index.js'
 import './crop.js'
 import './crop-math.js'
 
+test('renders a .box div instead of .wrapper', async t => {
+    document.body.innerHTML += `
+        <image-input class="box-test" accept="image/png" name="photo"
+            required></image-input>
+    `
+    const el = await waitFor('image-input.box-test') as ImageInput
+
+    t.equal(el.querySelector('.wrapper'), null,
+        'the .wrapper div should be gone')
+
+    const box = el.querySelector('.box')
+    t.ok(box, 'should render a .box div')
+
+    const picker = el.querySelector('.picker')
+    t.ok(picker, 'should render a .picker element inside the box')
+    t.ok(box?.contains(picker as Node),
+        'the .picker should be inside the .box')
+
+    const preview = el.querySelector('.preview')
+    t.ok(box?.contains(preview as Node),
+        'the .preview subtree should still be inside the .box')
+})
+
+test('the native input keeps its attributes and stays in the picker',
+    async t => {
+        document.body.innerHTML += `
+            <image-input class="input-attrs-test" accept="image/png"
+                name="photo" required></image-input>
+        `
+        const el = await waitFor('image-input.input-attrs-test') as ImageInput
+
+        const picker = el.querySelector('.picker')
+        const input = el.querySelector(
+            'input[type="file"]'
+        ) as HTMLInputElement
+
+        t.ok(picker?.contains(input),
+            'the input should still exist and be inside .picker')
+        t.equal(input.getAttribute('accept'), 'image/png',
+            'should keep the accept attribute')
+        t.equal(input.getAttribute('name'), 'photo',
+            'should keep the name attribute')
+        t.equal(input.hasAttribute('required'), true,
+            'should keep the required attribute')
+    })
+
+test('the input is not hidden with display:none or the hidden attribute',
+    async t => {
+        document.body.innerHTML += `
+            <image-input class="input-visible-test"></image-input>
+        `
+        const el = await waitFor(
+            'image-input.input-visible-test'
+        ) as ImageInput
+        const input = el.querySelector(
+            'input[type="file"]'
+        ) as HTMLInputElement
+
+        t.equal(input.hasAttribute('hidden'), false,
+            'should not use the hidden attribute')
+        t.notEqual(input.style.display, 'none',
+            'should not set inline display:none')
+        t.notEqual(input.style.visibility, 'hidden',
+            'should not set inline visibility:hidden')
+    })
+
+test('.preview.has-image still drives preview visibility inside .box',
+    async t => {
+        document.body.innerHTML += `
+            <image-input class="box-preview-test"></image-input>
+        `
+        const el = await waitFor(
+            'image-input.box-preview-test'
+        ) as ImageInput
+        const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+
+        selectFile(el, file)
+
+        const preview = el.querySelector('.preview')
+        t.ok(preview?.classList.contains('has-image'),
+            'the preview should gain has-image inside the new .box markup')
+    })
+
 test('example test', async t => {
     document.body.innerHTML += `
         <image-input class="test">

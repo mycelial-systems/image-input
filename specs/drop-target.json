@@ -16,7 +16,7 @@
         "Typecheck passes"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "The box must be a div, not a label. button is labelable content and a label may not contain labelable descendants other than its own control."
     },
     {
