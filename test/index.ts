@@ -788,3 +788,38 @@ test('edit and alt buttons do not open a dialog or navigate', async t => {
     t.equal(el.querySelector('dialog'), null,
         'should not open a dialog after clicking edit or alt buttons')
 })
+
+test('the input has a default aria-label matching the default prompt',
+    async t => {
+        document.body.innerHTML += `
+            <image-input class="label-default-test"></image-input>
+        `
+        const el = await waitFor(
+            'image-input.label-default-test'
+        ) as ImageInput
+        const input = el.querySelector(
+            'input[type="file"]'
+        ) as HTMLInputElement
+
+        t.ok(input.getAttribute('aria-label'),
+            'the input should have a non-empty default aria-label')
+    })
+
+test('setting the label attribute updates the prompt text and the ' +
+    'input aria-label', async t => {
+    document.body.innerHTML += `
+        <image-input class="label-set-test"></image-input>
+    `
+    const el = await waitFor('image-input.label-set-test') as ImageInput
+    const input = el.querySelector(
+        'input[type="file"]'
+    ) as HTMLInputElement
+    const promptText = el.querySelector('.prompt-text') as HTMLElement
+
+    el.label = 'Drag a photo here'
+
+    t.equal(input.getAttribute('aria-label'), 'Drag a photo here',
+        'the input aria-label should match the label attribute')
+    t.equal(promptText.textContent, 'Drag a photo here',
+        'the prompt text should match the label attribute')
+})

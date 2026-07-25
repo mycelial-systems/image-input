@@ -13,12 +13,15 @@ declare global {
 export class ImageInput extends WebComponent {
     static TAG = 'image-input'
     TAG = ImageInput.TAG
-    static reflectedStringAttributes = ['accept', 'name', 'alt']
+    static reflectedStringAttributes = ['accept', 'name', 'alt', 'label']
     static reflectedBooleanAttributes = ['required']
     declare accept:string|null
     declare name:string|null
     declare alt:string|null
+    declare label:string|null
     declare required:boolean
+
+    static DEFAULT_LABEL = 'Drop an image, or click to choose one'
 
     #file:File|Blob|null = null
     #previewUrl:string|null = null
@@ -66,6 +69,15 @@ export class ImageInput extends WebComponent {
 
     handleChange_required (_old:string|null, newValue:string|null) {
         this.qs('input')?.toggleAttribute('required', newValue !== null)
+    }
+
+    handleChange_label (_old:string|null, newValue:string|null) {
+        const text = newValue ?? ImageInput.DEFAULT_LABEL
+
+        const promptText = this.qs('.prompt-text')
+        if (promptText) promptText.textContent = text
+
+        this.qs('input')?.setAttribute('aria-label', text)
     }
 
     handleChange_alt (_old:string|null, newValue:string|null) {
@@ -191,12 +203,14 @@ export class ImageInput extends WebComponent {
         const required = this.required ? ' required' : ''
         const alt = this.alt ?? ''
         const hasAlt = !!this.alt
+        const label = this.label ?? ImageInput.DEFAULT_LABEL
 
         this.innerHTML = `<div class="box">
             <label class="picker">
                 <input
                     type="file"
                     accept="${accept}"${name}${required}
+                    aria-label="${label}"
                 />
                 <span class="prompt">
                     <svg class="prompt-icon" aria-hidden="true"
@@ -206,8 +220,7 @@ export class ImageInput extends WebComponent {
                         <path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0
                             0 1-1v-3" />
                     </svg>
-                    <span class="prompt-text">Drop an image, or click
-                        to choose one</span>
+                    <span class="prompt-text">${label}</span>
                 </span>
             </label>
             <div class="preview">

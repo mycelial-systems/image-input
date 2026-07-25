@@ -963,3 +963,51 @@
     against which later story's acceptanceCriteria actually claims
     them before adding them early.
 ---
+
+## 2026-07-24 - DT-008
+
+- Added a `label` reflected string attribute to `ImageInput`
+  (`static reflectedStringAttributes`, `declare label:string|null`),
+  with the default prompt text `'Drop an image, or click to choose
+  one'` lifted into a `static DEFAULT_LABEL` so `render()` and
+  `handleChange_label` share one source of truth instead of
+  duplicating the string.
+- `render()` now interpolates `this.label ?? ImageInput.DEFAULT_LABEL`
+  into both the input's `aria-label` attribute and the
+  `.prompt-text` span's content (previously `.prompt-text` had the
+  default text hardcoded from DT-007, and the input had no
+  `aria-label` at all).
+- Added `handleChange_label(_old, newValue)`, following the same
+  `this.qs(...)`-mutates-existing-DOM pattern as
+  `handleChange_alt`/`handleChange_accept` (per the Codebase Patterns
+  note that `render()` only runs once): it updates `.prompt-text`'s
+  `textContent` and the input's `aria-label` together, so they never
+  drift out of sync, satisfying the "accessible name" rationale in
+  the task doc (`.prompt` is `display:none`'d once an image loads, so
+  the input needs its own `aria-label` to stay named).
+- Did not add an `icon` override or any new CSS -- DT-008's
+  acceptanceCriteria only calls for the `label` attribute (text) plus
+  confirming the existing default icon is inline SVG with
+  `aria-hidden="true"` (already true since DT-007). CSS variables for
+  styling remain DT-010's scope.
+- Wrote 2 failing tests first in `test/index.ts` (confirmed 3 failing
+  assertions before the fix -- the input had no `aria-label` at all,
+  and setting `el.label` had no effect since the attribute/handler
+  didn't exist yet): the input has a non-empty default `aria-label`
+  on first render, and setting `el.label = 'Drag a photo here'`
+  updates both the input's `aria-label` and the `.prompt-text`
+  content to match.
+- Files changed: `src/index.ts`, `test/index.ts`,
+  `specs/drop-target.json` (DT-008 `passes: true`).
+- Tests: 2 new tape tests (3 new assertions). Full `npm test` (lint +
+  build + typecheck + tape-run) passes with 153 total assertions (up
+  from 150 recorded at the end of the DT-007 entry).
+- No "verify in browser" step was listed in DT-008's acceptance
+  criteria, so none was performed.
+- **Learnings for future iterations:**
+  - When a default string needs to be shared between `render()` (the
+    initial paint) and a `handleChange_*` DOM-mutation method (the
+    post-mount update path), hoist it to a `static` class field
+    (`ImageInput.DEFAULT_LABEL`) rather than repeating the literal in
+    both places -- keeps them from silently drifting apart later.
+---
