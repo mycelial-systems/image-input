@@ -67,6 +67,10 @@ export class ImageInput extends WebComponent {
             ?.removeEventListener('click', this.handleAltSave)
         this.qs('.alt-cancel')
             ?.removeEventListener('click', this.handleAltCancel)
+        this.qs('.crop-save')
+            ?.removeEventListener('click', this.handleCropSave)
+        this.qs('.crop-cancel')
+            ?.removeEventListener('click', this.handleCropCancel)
         this.#cleanupDrop?.()
         this.#revokePreviewUrl()
     }
@@ -79,6 +83,10 @@ export class ImageInput extends WebComponent {
         this.qs('.alt-save')?.addEventListener('click', this.handleAltSave)
         this.qs('.alt-cancel')
             ?.addEventListener('click', this.handleAltCancel)
+        this.qs('.crop-save')
+            ?.addEventListener('click', this.handleCropSave)
+        this.qs('.crop-cancel')
+            ?.addEventListener('click', this.handleCropCancel)
 
         const box = this.qs<HTMLElement>('.box')
         if (box) this.#cleanupDrop = dragDrop(box, this.handleDrop)
@@ -186,6 +194,23 @@ export class ImageInput extends WebComponent {
     handleAltCancel = (event:Event) => {
         event.preventDefault()
         const dialog = this.qs<HTMLDialogElement>('.alt-dialog')
+        if (dialog) closeDialog(dialog)
+    }
+
+    handleCropSave = async (event:Event):Promise<void> => {
+        event.preventDefault()
+        const dialog = this.qs<HTMLDialogElement>('.crop-dialog')
+        const cropEl = dialog?.querySelector<ImageCrop>(ImageCrop.TAG)
+        if (!cropEl) return
+
+        const blob = await cropEl.getBlob()
+        this.setImage(blob)
+        if (dialog) closeDialog(dialog)
+    }
+
+    handleCropCancel = (event:Event) => {
+        event.preventDefault()
+        const dialog = this.qs<HTMLDialogElement>('.crop-dialog')
         if (dialog) closeDialog(dialog)
     }
 

@@ -2,6 +2,8 @@ import { test } from '@substrate-system/tapzero'
 import { waitFor } from '@substrate-system/dom'
 import '../src/index.js'
 import type { ImageInput } from '../src/index.js'
+import type { ImageCrop } from '../src/crop.js'
+import { makeImageFile, waitForImageLoad } from './helpers.js'
 import './crop.js'
 import './crop-math.js'
 
@@ -900,6 +902,90 @@ test('reopening the crop dialog reuses the existing image-crop, ' +
         'reopening should not append a second image-crop')
     t.equal(el.querySelector('image-crop'), firstCropEl,
         'reopening should reuse the same image-crop element')
+})
+
+test('clicking .crop-save calls getBlob, applies the crop via ' +
+    'setImage, and closes the dialog', async t => {
+    document.body.innerHTML += `
+        <image-input class="crop-save-test"></image-input>
+    `
+    const el = await waitFor('image-input.crop-save-test') as ImageInput
+    const file = await makeImageFile(200, 100)
+    selectFile(el, file)
+
+    const editBtn = el.querySelector('.edit') as HTMLButtonElement
+    const cropDialog = el.querySelector('.crop-dialog') as HTMLDialogElement
+    editBtn.click()
+
+    const cropEl = el.querySelector('image-crop') as ImageCrop
+    await waitForImageLoad(cropEl)
+
+    const saveBtn = cropDialog.querySelector(
+        '.crop-save'
+    ) as HTMLButtonElement
+
+    const imgBefore = el.querySelector('img') as HTMLImageElement
+    const srcBefore = imgBefore.getAttribute('src')
+
+    const changed = new Promise<{ file:File, alt:string }>(resolve => {
+        el.addEventListener('image-input:change', ((ev:CustomEvent) => {
+            resolve(ev.detail)
+        }) as EventListener, { once: true })
+    })
+
+    saveBtn.click()
+    const detail = await changed
+
+    t.equal(cropDialog.open, false, 'saving should close the crop dialog')
+    t.ok(detail.file instanceof File,
+        'should emit image-input:change with a File built from the ' +
+        'crop blob')
+
+    const imgAfter = el.querySelector('img') as HTMLImageElement
+    t.ok(imgAfter.getAttribute('src'), 'should set a new preview src')
+    t.notEqual(imgAfter.getAttribute('src'), srcBefore,
+        'should replace the preview with the cropped image')
+
+    const input = el.querySelector('input[type="file"]') as HTMLInputElement
+    t.equal(input.files?.[0], detail.file,
+        'should sync input.files with the cropped file')
+})
+
+test('clicking .crop-cancel closes the dialog and leaves the current ' +
+    'image and file unchanged', async t => {
+    document.body.innerHTML += `
+        <image-input class="crop-cancel-test"></image-input>
+    `
+    const el = await waitFor('image-input.crop-cancel-test') as ImageInput
+    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    selectFile(el, file)
+
+    const editBtn = el.querySelector('.edit') as HTMLButtonElement
+    const cropDialog = el.querySelector('.crop-dialog') as HTMLDialogElement
+    editBtn.click()
+
+    t.equal(cropDialog.open, true, 'sanity check: crop dialog is open')
+
+    const img = el.querySelector('img') as HTMLImageElement
+    const srcBefore = img.getAttribute('src')
+
+    let changeFired = false
+    el.addEventListener('image-input:change', () => { changeFired = true })
+
+    const cancelBtn = cropDialog.querySelector(
+        '.crop-cancel'
+    ) as HTMLButtonElement
+    cancelBtn.click()
+
+    t.equal(cropDialog.open, false, 'canceling should close the crop dialog')
+    t.equal(img.getAttribute('src'), srcBefore,
+        'canceling should leave the preview image unchanged')
+    t.equal(changeFired, false,
+        'canceling should not emit image-input:change')
+
+    const input = el.querySelector('input[type="file"]') as HTMLInputElement
+    t.equal(input.files?.[0], file,
+        'canceling should leave input.files unchanged')
 })
 
 test('clicking the ALT badge opens the alt dialog, seeded with the ' +

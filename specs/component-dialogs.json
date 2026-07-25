@@ -86,7 +86,7 @@
         "Typecheck passes"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "getBlob() returns a Promise, so the save handler is async and the dialog closes only after the blob resolves. Tests must await it."
     },
     {
