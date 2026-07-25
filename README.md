@@ -9,7 +9,7 @@
 [![Common Changelog](https://nichoth.github.io/badge/common-changelog.svg)](./CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-Big_Time-blue?style=flat-square)](LICENSE)
 
-Web component for inputting images. Includes client-side visibility, a crop
+Web component for inputting images. Includes client-side preview, a crop
 tool, and `alt` text input.
 
 [See a live demo](https://substrate-system.github.io/image-input/)
