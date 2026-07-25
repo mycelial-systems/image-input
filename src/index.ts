@@ -5,6 +5,7 @@ import {
     altDialogMarkup,
     cropDialogMarkup,
     openDialog,
+    closeDialog,
     type DialogText
 } from './dialogs.js'
 const debug = createDebug('image-input')
@@ -61,6 +62,10 @@ export class ImageInput extends WebComponent {
         this.qs('.remove')?.removeEventListener('click', this.handleRemove)
         this.qs('.edit')?.removeEventListener('click', this.handleEdit)
         this.qs('.alt-badge')?.removeEventListener('click', this.handleAlt)
+        this.qs('.alt-save')
+            ?.removeEventListener('click', this.handleAltSave)
+        this.qs('.alt-cancel')
+            ?.removeEventListener('click', this.handleAltCancel)
         this.#cleanupDrop?.()
         this.#revokePreviewUrl()
     }
@@ -70,6 +75,9 @@ export class ImageInput extends WebComponent {
         this.qs('.remove')?.addEventListener('click', this.handleRemove)
         this.qs('.edit')?.addEventListener('click', this.handleEdit)
         this.qs('.alt-badge')?.addEventListener('click', this.handleAlt)
+        this.qs('.alt-save')?.addEventListener('click', this.handleAltSave)
+        this.qs('.alt-cancel')
+            ?.addEventListener('click', this.handleAltCancel)
 
         const box = this.qs<HTMLElement>('.box')
         if (box) this.#cleanupDrop = dragDrop(box, this.handleDrop)
@@ -156,6 +164,20 @@ export class ImageInput extends WebComponent {
         const textarea = dialog?.querySelector('textarea')
         if (textarea) textarea.value = this.alt ?? ''
         if (dialog) openDialog(dialog)
+    }
+
+    handleAltSave = (event:Event) => {
+        event.preventDefault()
+        const dialog = this.qs<HTMLDialogElement>('.alt-dialog')
+        const textarea = dialog?.querySelector('textarea')
+        this.alt = textarea?.value ?? ''
+        if (dialog) closeDialog(dialog)
+    }
+
+    handleAltCancel = (event:Event) => {
+        event.preventDefault()
+        const dialog = this.qs<HTMLDialogElement>('.alt-dialog')
+        if (dialog) closeDialog(dialog)
     }
 
     handleDrop = (record:DropRecord):void => {

@@ -887,6 +887,89 @@ test('clicking the ALT badge opens the alt dialog, seeded with the ' +
         'the textarea should be seeded with the current alt text')
 })
 
+test('clicking .alt-save applies the textarea value and closes the ' +
+    'dialog', async t => {
+    document.body.innerHTML += `
+        <image-input class="alt-save-test"></image-input>
+    `
+    const el = await waitFor('image-input.alt-save-test') as ImageInput
+    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    selectFile(el, file)
+
+    const altBadge = el.querySelector('.alt-badge') as HTMLButtonElement
+    const altDialog = el.querySelector('.alt-dialog') as HTMLDialogElement
+    const textarea = altDialog.querySelector(
+        'textarea'
+    ) as HTMLTextAreaElement
+    const saveBtn = altDialog.querySelector(
+        '.alt-save'
+    ) as HTMLButtonElement
+
+    altBadge.click()
+    textarea.value = 'a new description'
+
+    let detail:{ alt:string }|undefined
+    el.addEventListener('image-input:alt-change', (ev:Event) => {
+        detail = (ev as CustomEvent).detail
+    })
+
+    saveBtn.click()
+
+    t.equal(altDialog.open, false, 'saving should close the dialog')
+    t.equal(el.alt, 'a new description',
+        'saving should assign the textarea value to alt')
+    t.deepEqual(detail, { alt: 'a new description' },
+        'saving should emit image-input:alt-change with the new value')
+
+    const img = el.querySelector('img')
+    t.equal(img?.getAttribute('alt'), 'a new description',
+        'saving should update the img alt attribute')
+
+    const altBadgeAfter = el.querySelector('.alt-badge')
+    t.ok(altBadgeAfter?.classList.contains('has-alt'),
+        'saving should update the badge has-alt state')
+})
+
+test('clicking .alt-cancel closes the dialog and leaves alt unchanged',
+    async t => {
+        document.body.innerHTML += `
+            <image-input class="alt-cancel-test"></image-input>
+        `
+        const el = await waitFor(
+            'image-input.alt-cancel-test'
+        ) as ImageInput
+        const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+        selectFile(el, file)
+        el.alt = 'original description'
+
+        const altBadge = el.querySelector('.alt-badge') as HTMLButtonElement
+        const altDialog = el.querySelector(
+            '.alt-dialog'
+        ) as HTMLDialogElement
+        const textarea = altDialog.querySelector(
+            'textarea'
+        ) as HTMLTextAreaElement
+        const cancelBtn = altDialog.querySelector(
+            '.alt-cancel'
+        ) as HTMLButtonElement
+
+        altBadge.click()
+        textarea.value = 'a discarded edit'
+
+        let changeFired = false
+        el.addEventListener('image-input:alt-change', () => {
+            changeFired = true
+        })
+
+        cancelBtn.click()
+
+        t.equal(altDialog.open, false, 'canceling should close the dialog')
+        t.equal(el.alt, 'original description',
+            'canceling should leave alt unchanged')
+        t.equal(changeFired, false,
+            'canceling should not emit image-input:alt-change')
+    })
+
 test('render() emits the alt and crop dialogs as siblings of .box, ' +
     'closed by default', async t => {
     document.body.innerHTML += `

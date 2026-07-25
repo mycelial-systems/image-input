@@ -53,7 +53,7 @@
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "Tests must assert behavior, not rendered text: check dialog.open and the alt property, never the button or heading strings."
     },
     {
