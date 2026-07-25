@@ -126,6 +126,30 @@ test('clicking the picker label opens the input, with no JS ' +
         'clicking the label should forward the click to the input')
 })
 
+test('the empty picker has in-flow prompt content that gives the ' +
+    'box its height', async t => {
+    document.body.innerHTML += `
+        <image-input class="prompt-content-test"></image-input>
+    `
+    const el = await waitFor(
+        'image-input.prompt-content-test'
+    ) as ImageInput
+    const picker = el.querySelector('.picker') as HTMLElement
+    const prompt = picker.querySelector('.prompt') as HTMLElement
+
+    t.ok(prompt, 'the picker should contain a .prompt element')
+    t.equal(prompt.style.position, '',
+        'the prompt should not be pulled out of flow inline')
+
+    const icon = prompt.querySelector('.prompt-icon')
+    t.ok(icon, 'the prompt should contain an icon')
+    t.equal(icon?.getAttribute('aria-hidden'), 'true',
+        'the icon should be hidden from assistive tech')
+
+    const text = prompt.querySelector('.prompt-text')
+    t.ok(text?.textContent, 'the prompt should contain non-empty text')
+})
+
 test('#setFile adds has-image to .box, #clear removes it', async t => {
     document.body.innerHTML += `
         <image-input class="box-has-image-test"></image-input>

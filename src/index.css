@@ -34,6 +34,10 @@ image-input {
             inset: 0;
         }
 
+        &.has-image .prompt {
+            display: none;
+        }
+
         &.drag {
             border-color: var(--image-input-border-color-drag);
             border-style: var(--image-input-border-style-drag);

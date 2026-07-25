@@ -198,6 +198,17 @@ export class ImageInput extends WebComponent {
                     type="file"
                     accept="${accept}"${name}${required}
                 />
+                <span class="prompt">
+                    <svg class="prompt-icon" aria-hidden="true"
+                        viewBox="0 0 24 24"
+                    >
+                        <path d="M12 16V4M12 4l-5 5M12 4l5 5" />
+                        <path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0
+                            0 1-1v-3" />
+                    </svg>
+                    <span class="prompt-text">Drop an image, or click
+                        to choose one</span>
+                </span>
             </label>
             <div class="preview">
                 <img alt="${alt}" />

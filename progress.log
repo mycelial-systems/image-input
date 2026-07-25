@@ -908,3 +908,58 @@
     follow the same if-image/else-error shape; keep them symmetric if
     either path gains new logic later.
 ---
+
+## 2026-07-24 - DT-007
+
+- Added a `.prompt` element (a `.prompt-icon` inline SVG plus a
+  `.prompt-text` span, hardcoded to "Drop an image, or click to
+  choose one") inside `.picker` in `render()`. This is the in-flow
+  content that gives the empty box its height, per this story's own
+  `notes` field ("Without the in-flow-then-absolute switch, an empty
+  box collapses to zero height"). The text is hardcoded here on
+  purpose -- DT-008 owns making it overridable via a `label`
+  attribute and wiring `handleChange_label`; this story only needed
+  *some* in-flow content to exist so the box has intrinsic height
+  while empty.
+  Did not introduce any new CSS variables (box padding, prompt color,
+  icon size, gap) -- those are explicitly DT-010's scope
+  ("Box styling is variable-driven"). Kept the new CSS to the one
+  rule this story actually needs.
+- CSS: added `.box.has-image .prompt { display: none }` next to the
+  existing `.box.has-image .picker { position: absolute; inset: 0 }`
+  rule (that rule already existed from DT-002). No other CSS changed;
+  `.picker`'s own default (non-has-image) position is already static/
+  in-flow since no rule set it otherwise.
+- `#setFile`/`#clear` already toggled `has-image` on `.box` as well as
+  `.preview` (done in DT-002), so no change was needed there for this
+  story's fourth acceptance criterion.
+- Wrote a failing test first in `test/index.ts` (confirmed it failed
+  with `.prompt` being `null` before the markup change): the picker
+  contains a `.prompt` element that isn't pulled out of flow via
+  inline style, containing a `.prompt-icon` (`aria-hidden="true"`)
+  and a non-empty `.prompt-text` -- per the no-brittle-text rule, only
+  asserts `textContent` is truthy, not its exact string.
+- Files changed: `src/index.ts`, `src/index.css`, `test/index.ts`,
+  `specs/drop-target.json` (DT-007 `passes: true`).
+- Tests: 1 new tape test (4 new assertions). Full `npm test` (lint +
+  build + typecheck + tape-run) passes with 150 total assertions.
+- No "verify in browser" step was listed in DT-007's acceptance
+  criteria, so none was performed. The test harness (`test/index.html`)
+  still doesn't load `src/index.css`, so the actual `display: none`/
+  in-flow-vs-absolute layout behavior can only be confirmed by reading
+  the stylesheet source, not asserted via computed style in a test --
+  consistent with the existing Codebase Patterns note.
+- **Learnings for future iterations:**
+  - When a story's own `notes` field explains *why* a change is
+    needed (here, the zero-height-without-in-flow-content gotcha),
+    treat it as the actual acceptance test to satisfy, even if the
+    listed acceptanceCriteria strings alone would be ambiguous about
+    whether markup or CSS-only changes are required.
+  - Resist scope creep from the task doc's combined write-up: the
+    doc's "Task 2: Rewrite render()" and "Task 6: CSS" sections show
+    the *entire* final markup/CSS in one block (including DT-008's
+    `label`-driven text and DT-010's styling variables), but each
+    story only needed its own slice. Cross-check new CSS variables
+    against which later story's acceptanceCriteria actually claims
+    them before adding them early.
+---

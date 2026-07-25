@@ -114,7 +114,7 @@
         "Typecheck passes"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": "Without the in-flow-then-absolute switch, an empty box collapses to zero height, since the component sets no intrinsic size."
     },
     {
