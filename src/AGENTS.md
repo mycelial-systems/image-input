@@ -69,6 +69,35 @@
   let the emitted `image-input:change` carry the file regardless of
   whether the sync succeeded, since consumers should not depend on
   `input.files` alone.
+- Neither `<dialog>` markup in `dialogs.ts` carries an `id`. `image-input`
+  is a light-DOM component, so any `id` its markup used would leak into
+  the page's global id space -- ten `<image-input>` elements on one page
+  would produce ten duplicate `#alt-dialog`/`#crop-dialog` ids. Each
+  dialog is labeled with `aria-label` instead of `aria-labelledby`, and
+  the alt `<textarea>` relies on implicit labelling (it is its wrapping
+  `<label>`'s own control), so no `for`/`id` pair is needed there either.
+- `#getOrCreateCropEl()` in `index.ts` creates the `<image-crop>` element
+  lazily, on the first `edit` click, rather than including it in the
+  initial `render()` output. `ImageCrop.connectedCallback` sets up window
+  listeners for its pointer-drag handles; creating one eagerly per
+  `image-input` would mean idle listeners on every page that never opens
+  the crop dialog. Once created, the element is left in `.crop-slot` and
+  reused on subsequent opens rather than being torn down on close.
+- The dialog buttons use one class per button per dialog
+  (`.alt-cancel`/`.alt-save`, `.crop-cancel`/`.crop-save`) instead of a
+  shared `.cancel`/`.save` pair. `this.qs()` only returns the first
+  match (see the trap above) and both dialogs render into the same
+  light-DOM subtree, so a shared class name would mean `this.qs('.save')`
+  silently binds only the first dialog's button, leaving the other
+  dialog's Save permanently unwired.
+- The dialog open/close animation (`src/index.css`) uses
+  `@starting-style` and `transition-behavior: allow-discrete`, both
+  Baseline since 2024-08-06, so the entry fade/scale works in every
+  current browser. The `overlay` value in `transition-property`, which
+  keeps a closing dialog painted for the duration of its exit
+  transition, is Chromium-only. Firefox and Safari therefore animate the
+  open but close instantly -- that gap is a documented limitation of
+  only specifying an entry animation, not a bug to fix here.
 - `@substrate-system/drag-drop`'s `dragDrop(elem, listeners)` (used for
   the box's drop target) returns a cleanup function that removes all
   four of its listeners (`dragenter`/`dragover`/`dragleave`/`drop`) --

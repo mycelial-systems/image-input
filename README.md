@@ -26,6 +26,7 @@ tool, and `alt` text input.
   * [Drop target](#drop-target)
   * [Attributes](#attributes)
   * [Events](#events)
+  * [Built-in dialogs](#built-in-dialogs)
   * [`image-crop`](#image-crop)
 - [API](#api)
 - [API](#api-1)
@@ -94,6 +95,14 @@ overridable from your own stylesheet:
   preview image.
 * `--image-input-focus-color` -- the keyboard focus ring, shared with
   the overlay buttons.
+* `--image-input-dialog-bg`, `--image-input-dialog-radius`,
+  `--image-input-dialog-padding`, `--image-input-dialog-max-width`,
+  `--image-input-dialog-backdrop-color` -- the built-in alt-text and
+  crop dialogs' background, corner radius (defaults to
+  `--image-input-radius`), padding, max width, and backdrop color.
+* `--image-input-dialog-duration`, `--image-input-dialog-scale-from`
+  -- the duration of the dialogs' open/close fade-and-scale, and the
+  scale they animate in from.
 
 ## Example
 
@@ -109,8 +118,13 @@ input.addEventListener('image-input:change', ev => {
 })
 
 input.addEventListener('image-input:edit', ev => {
+    // image-input opens its own crop dialog after this event fires --
+    // you don't need this listener at all to get that behavior. Call
+    // preventDefault() only if you want to replace it with your own
+    // crop UI:
+    ev.preventDefault()
     const { file } = ev.detail
-    // open a crop dialog, then:
+    // open your own crop dialog, then:
     // input.setImage(croppedBlob)
 })
 ```
@@ -163,22 +177,89 @@ They bubble, so you can listen on the element or an ancestor.
 * `image-input:remove` -- The remove button was clicked. The preview
   and file have already been cleared. No `detail`.
 * `image-input:edit` -- The edit button was clicked. `detail` is
-  `{ file:File }`. Use this to open a crop/edit UI, then call
-  `setImage(blob)` with the result.
+  `{ file:File }`. Cancelable: by default, the built-in crop dialog
+  (see [Built-in dialogs](#built-in-dialogs) below) opens right after
+  this event fires. Call `preventDefault()` on it to suppress that
+  dialog and open your own crop UI instead, then call `setImage(blob)`
+  with the result.
 * `image-input:alt` -- The ALT badge was clicked. `detail` is
-  `{ file:File, alt:string }`. Use this to open an alt text
-  editor, then set the `alt` property with the result.
+  `{ file:File, alt:string }`. Cancelable: by default, the built-in
+  alt-text dialog opens right after this event fires. Call
+  `preventDefault()` on it to suppress that dialog and open your own
+  alt text editor instead, then set the `alt` property with the
+  result.
 * `image-input:alt-change` -- The `alt` attribute or property changed.
   `detail` is `{ alt:string }`.
 * `image-input:error` -- A picked or dropped file was not an image.
   `detail` is `{ reason:'not-an-image' }`. The component shows no
   message of its own; use this event to report the error yourself.
 
+### Built-in dialogs
+
+`image-input` renders two `<dialog>` elements as siblings of `.box`,
+inside the element itself: `.alt-dialog` and `.crop-dialog`. The ALT
+badge opens `.alt-dialog`; the edit button opens `.crop-dialog`. Both
+fade and scale in when opened. You get this for free -- no markup or
+wiring of your own is required.
+
+* `.alt-dialog` contains a `<textarea>`, an `.alt-cancel` button and
+  an `.alt-save` button. Saving assigns the textarea's value to
+  `input.alt`, which emits `image-input:alt-change`.
+* `.crop-dialog` contains a `.crop-slot` div, a `.crop-cancel` button
+  and a `.crop-save` button. The `<image-crop>` element is created
+  the first time the crop dialog is opened, and reused after that --
+  it is not present in the initial markup. Saving calls
+  `cropEl.getBlob()` and passes the result to `input.setImage(blob)`,
+  which emits `image-input:change`.
+
+No new event types exist for this. Both dialogs sit on top of the
+events already documented above: `image-input:edit` and
+`image-input:alt` open them (unless canceled), and saving fires the
+existing `image-input:change` / `image-input:alt-change`.
+
+Neither dialog's markup has an `id` -- `image-input` is a light-DOM
+component, so an `id` in its own markup would collide with every
+other `image-input` on the page. Each dialog is labeled with
+`aria-label` instead.
+
+#### Changing the dialog copy
+
+`ImageInput.TEXT` is a static object with keys `altHeading`,
+`altLabel`, `cropHeading`, `save` and `cancel`. It is read once, at
+render time, so it must be reassigned before the first `image-input`
+element upgrades to have an effect, and it changes the copy for
+every `image-input` on the page, not one element at a time:
+
+```js
+import { ImageInput } from '@substrate-system/image-input'
+
+ImageInput.TEXT = {
+    ...ImageInput.TEXT,
+    cropHeading: 'Crop your photo'
+}
+```
+
+`TEXT` only controls the dialogs' headings and button labels. The
+alt text *value* is still set per element, through the existing
+`alt` attribute/property.
+
+#### Browser support for the open/close animation
+
+The fade-and-scale transition uses `@starting-style` and
+`transition-behavior: allow-discrete`, both Baseline since
+2024-08-06. The `overlay` value, which keeps a closing dialog
+painted for the length of its exit transition, is Chromium-only.
+Firefox and Safari animate the dialog opening, then close it
+instantly -- a known limitation of specifying only an entry
+animation, not a bug.
+
 ### `image-crop`
 
 The package also exports an `image-crop` component, a cropping UI
-with draggable handles. See [the example](./example/index.ts) for how
-to wire it up to `image-input`.
+with draggable handles. `image-input` uses it internally for the
+built-in crop dialog, described above. You can also use it directly
+if you build your own crop UI, as in the reframed
+`image-input:edit` example above.
 
 ```js
 import { ImageCrop } from '@substrate-system/image-input/crop'

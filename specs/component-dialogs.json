@@ -139,7 +139,7 @@
         "npm test passes end to end"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "notes": "Do not write tests for documentation. The example rewrite onto preact, @preact/signals and htm is a separate piece of work with its own spec, and starts from the smaller example/index.ts this story leaves behind."
     }
   ]
