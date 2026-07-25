@@ -123,6 +123,7 @@ export class ImageInput extends WebComponent {
         const img = this.qs('img')
         if (img) img.src = this.#previewUrl
         this.qs('.preview')?.classList.add('has-image')
+        this.qs('.box')?.classList.add('has-image')
     }
 
     #clear ():void {
@@ -134,6 +135,7 @@ export class ImageInput extends WebComponent {
 
         this.qs('img')?.removeAttribute('src')
         this.qs('.preview')?.classList.remove('has-image')
+        this.qs('.box')?.classList.remove('has-image')
 
         this.alt = null
     }

@@ -33,7 +33,7 @@
         "Typecheck passes"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "Clicks reach the label through the image because .preview gets pointer-events: none while .overlay > * keeps pointer-events: auto."
     },
     {

@@ -88,6 +88,102 @@ test('.preview.has-image still drives preview visibility inside .box',
             'the preview should gain has-image inside the new .box markup')
     })
 
+test('the picker has no tabindex or role, relying on native label ' +
+    'and input semantics', async t => {
+    document.body.innerHTML += `
+            <image-input class="picker-semantics-test"></image-input>
+        `
+    const el = await waitFor(
+        'image-input.picker-semantics-test'
+    ) as ImageInput
+    const picker = el.querySelector('.picker') as HTMLElement
+
+    t.equal(picker.hasAttribute('tabindex'), false,
+        'the picker should not have a tabindex attribute')
+    t.equal(picker.hasAttribute('role'), false,
+        'the picker should not have a role attribute')
+})
+
+test('clicking the picker label opens the input, with no JS ' +
+    'click-forwarding needed', async t => {
+    document.body.innerHTML += `
+            <image-input class="picker-click-test"></image-input>
+        `
+    const el = await waitFor(
+        'image-input.picker-click-test'
+    ) as ImageInput
+    const picker = el.querySelector('.picker') as HTMLLabelElement
+    const input = el.querySelector(
+        'input[type="file"]'
+    ) as HTMLInputElement
+
+    let inputClicked = false
+    input.addEventListener('click', () => { inputClicked = true })
+
+    picker.click()
+
+    t.ok(inputClicked,
+        'clicking the label should forward the click to the input')
+})
+
+test('#setFile adds has-image to .box, #clear removes it', async t => {
+    document.body.innerHTML += `
+        <image-input class="box-has-image-test"></image-input>
+    `
+    const el = await waitFor(
+        'image-input.box-has-image-test'
+    ) as ImageInput
+    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+
+    const box = el.querySelector('.box') as HTMLElement
+    t.equal(box.classList.contains('has-image'), false,
+        'the box should not have has-image before a file is selected')
+
+    selectFile(el, file)
+
+    t.ok(box.classList.contains('has-image'),
+        'the box should gain has-image once a file is selected')
+
+    const removeBtn = el.querySelector('.remove') as HTMLButtonElement
+    removeBtn.click()
+
+    t.equal(box.classList.contains('has-image'), false,
+        'the box should lose has-image after remove')
+})
+
+test('clicking the ALT, edit or remove buttons does not open the ' +
+    'file picker', async t => {
+    document.body.innerHTML += `
+            <image-input class="overlay-no-open-test"></image-input>
+        `
+    const el = await waitFor(
+        'image-input.overlay-no-open-test'
+    ) as ImageInput
+    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    selectFile(el, file)
+
+    const input = el.querySelector(
+        'input[type="file"]'
+    ) as HTMLInputElement
+    let inputClicked = false
+    input.addEventListener('click', () => { inputClicked = true })
+
+    const altBadge = el.querySelector('.alt-badge') as HTMLButtonElement
+    altBadge.click()
+    t.equal(inputClicked, false,
+        'clicking the ALT badge should not open the file picker')
+
+    const editBtn = el.querySelector('.edit') as HTMLButtonElement
+    editBtn.click()
+    t.equal(inputClicked, false,
+        'clicking the edit button should not open the file picker')
+
+    const removeBtn = el.querySelector('.remove') as HTMLButtonElement
+    removeBtn.click()
+    t.equal(inputClicked, false,
+        'clicking the remove button should not open the file picker')
+})
+
 test('example test', async t => {
     document.body.innerHTML += `
         <image-input class="test">

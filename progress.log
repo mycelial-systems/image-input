@@ -633,3 +633,79 @@
     clips it. Real hiding is verified by reading the stylesheet rule
     directly plus (later, once relevant) manual browser verification.
 ---
+
+## 2026-07-24 - DT-002
+
+- DT-001 already produced the `<label class="picker"><input/></label>`
+  markup, so the click/keyboard-opens-the-picker mechanics were already
+  correct for free (native label semantics -- no JS click forwarding,
+  no tabindex/role needed). The real gap was DT-002's other criterion:
+  "clicking the box while an image is showing reopens the picker and
+  replaces the image", which needs the picker to visually overlap the
+  preview image once one is loaded, per the task doc's "Layering"
+  section (also restated verbatim in DT-002's own `notes` field, which
+  is what pointed at the mechanism).
+- Implemented that layering, scoped tightly to what DT-002's
+  acceptance criteria require (not the fuller DT-007/DT-008 box-sizing
+  work, which is out of scope this session):
+  - `src/index.ts`: `#setFile` now also adds `has-image` to `.box`
+    (previously only `.preview` got it); `#clear` removes it from both.
+  - `src/index.css`: `.box.has-image .picker { position: absolute;
+    inset: 0 }` makes the label overlay the whole box once an image is
+    showing. `.preview` gained `pointer-events: none` so a click on the
+    `<img>` falls through to the label underneath (`.overlay > *`
+    already had `pointer-events: auto` from US-001, so the ALT/edit/
+    remove buttons -- which paint after the label in DOM order -- stay
+    clickable and do NOT reach the input). Also added `.box:has(input
+    :focus-visible)` with the existing `--image-input-focus-color`
+    variable for the visible focus ring criterion.
+  - Did NOT touch box sizing/prompt content (`.picker` in the *empty*
+    state still collapses to zero size, since it has no in-flow
+    content until DT-008 adds the icon/prompt-text markup and DT-007/
+    DT-010 add the in-flow-vs-absolute toggle for that state) -- this
+    matches DT-001's/DT-007's own notes and is explicitly deferred.
+- Wrote failing tests first in `test/index.ts` (confirmed 1 failing
+  assertion -- `#setFile adds has-image to .box` -- before the fix; the
+  other new tests around label-click and overlay-buttons-don't-open
+  already passed against the DT-001 markup, since those were pre-
+  existing native-semantics guarantees, not new behavior):
+  1. the picker has no `tabindex`/`role` attributes,
+  2. clicking the `.picker` label forwards a click to the input,
+  3. `#setFile`/`#clear` toggle `has-image` on `.box`,
+  4. clicking ALT/edit/remove does not fire a click on the input.
+- **Could not test the CSS-dependent click-passthrough
+  (`.box.has-image .picker` overlay) via `npm test`**, per the
+  existing Codebase Patterns note: `test/index.html` does not load
+  `src/index.css`. Verified it instead with the Playwright MCP tools
+  against `npm run start`: uploaded a 400x300 test PNG via a real file
+  chooser (triggered with `input.click()` + `browser_file_upload`,
+  since Playwright's ref-based click on the input itself fails --
+  the input's own hit-test area is clipped to nothing by `clip-path:
+  inset(50%)`, which is expected; real users click the label, not the
+  input), confirmed `document.elementFromPoint` over the image (away
+  from the overlay buttons) resolved to `LABEL.picker`, then did a real
+  mouse click at that point and confirmed the file chooser reopened.
+  Also confirmed clicking the "Add alt text" badge does NOT reopen the
+  chooser. Killed the vite dev server and removed the scratch PNGs and
+  `.playwright-mcp/` afterwards.
+- Files changed: `src/index.ts`, `src/index.css`, `test/index.ts`,
+  `specs/drop-target.json` (DT-002 `passes: true`).
+- Tests: 4 new tape tests (9 new assertions). Full `npm test` (lint +
+  build + typecheck + tape-run) passes with 124 total assertions.
+- **Learnings for future iterations:**
+  - The empty (no-image) box still collapses to zero size in a real
+    browser right now (no prompt content yet) -- don't try to
+    Playwright-click an empty box's picker/label directly; test that
+    path with structural assertions (label wraps input, no tabindex/
+    role) instead, and defer real click-position testing on the empty
+    box until DT-008 (prompt content) and DT-007/DT-010 (box sizing)
+    land.
+  - Playwright's ref-based `browser_click` on the file `<input>`
+    itself fails once it's hidden via `clip-path: inset(50%)` --
+    "element intercepts pointer events" -- because clip-path also
+    clips the hit-test region, not just painting. That's correct,
+    intended behavior (only the label should be clickable by a mouse
+    user), but it means manual verification of this pattern needs
+    `input.click()` via `browser_evaluate` (or a real click on the
+    label/box coordinates) rather than a direct ref-click on the input.
+---

@@ -33,3 +33,19 @@
   trick (`src/index.css`), never `display:none`, `visibility:hidden`
   or the `hidden` attribute -- those three make the control
   unfocusable and stop the browser from reporting `required` on it.
+- `clip-path: inset(50%)` also clips the element's hit-test region, not
+  just its paint -- Playwright's ref-based `browser_click` on the raw
+  `<input>` fails with "element intercepts pointer events" once this
+  style applies. That's correct: only the wrapping `<label>` should be
+  clickable by a mouse user. When verifying manually, open the picker
+  with `input.click()` via `browser_evaluate` (or click the label/box
+  at real coordinates), not a ref-click on the input itself.
+- `.box.has-image .picker` is `position: absolute; inset: 0`, and
+  `.preview` has `pointer-events: none` so a click on the `<img>` falls
+  through to the label underneath it. `.overlay > *` already has
+  `pointer-events: auto` (from the US-001 overlay work), and the
+  overlay buttons paint after the label in DOM order, so ALT/edit/
+  remove stay clickable without any `z-index`. The *empty* box has no
+  in-flow content yet (no prompt/icon markup), so it still collapses to
+  zero size and isn't meaningfully click-testable until that markup
+  (and its in-flow-vs-absolute toggle) lands.

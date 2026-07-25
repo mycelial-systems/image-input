@@ -20,6 +20,16 @@ image-input {
     & .box {
         position: relative;
         display: inline-block;
+
+        &:has(input:focus-visible) {
+            outline: 2px solid var(--image-input-focus-color);
+            outline-offset: 2px;
+        }
+
+        &.has-image .picker {
+            position: absolute;
+            inset: 0;
+        }
     }
 
     & input[type="file"] {
@@ -37,6 +47,7 @@ image-input {
     & .preview {
         display: none;
         position: relative;
+        pointer-events: none;
 
         &.has-image {
             display: block;
