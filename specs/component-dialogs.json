@@ -19,7 +19,7 @@
         "Typecheck passes"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "No ids is a hard requirement, not a style preference: ten image-input elements on a page would otherwise emit ten duplicate ids. Implicit labelling is valid here because a textarea is the label's own control -- see the existing note in src/AGENTS.md about labelable descendants. src/index.ts is 282 lines before this work; the dialogs.ts split exists to keep it from passing 400. esbuild src/*.ts is not bundled and the exports map has a ./* catch-all, so a new source file needs no build change."
     },
     {

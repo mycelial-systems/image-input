@@ -837,7 +837,8 @@ test('setImage accepts an explicit filename', async t => {
         'should use the caller-supplied filename')
 })
 
-test('edit and alt buttons do not open a dialog or navigate', async t => {
+test('edit and alt buttons do not open a dialog until later stories ' +
+    'wire them up', async t => {
     document.body.innerHTML += `
         <image-input class="no-dialog-test"></image-input>
     `
@@ -847,15 +848,178 @@ test('edit and alt buttons do not open a dialog or navigate', async t => {
 
     const editBtn = el.querySelector('.edit') as HTMLButtonElement
     const altBadge = el.querySelector('.alt-badge') as HTMLButtonElement
+    const altDialog = el.querySelector('.alt-dialog') as HTMLDialogElement
+    const cropDialog = el.querySelector('.crop-dialog') as HTMLDialogElement
 
-    t.equal(el.querySelector('dialog'), null,
-        'should not have a dialog element before clicking')
+    t.equal(altDialog.open, false,
+        'the alt dialog should be closed before clicking')
+    t.equal(cropDialog.open, false,
+        'the crop dialog should be closed before clicking')
 
     editBtn.click()
     altBadge.click()
 
-    t.equal(el.querySelector('dialog'), null,
-        'should not open a dialog after clicking edit or alt buttons')
+    t.equal(altDialog.open, false,
+        'clicking the alt badge should not open the alt dialog yet')
+    t.equal(cropDialog.open, false,
+        'clicking edit should not open the crop dialog yet')
+})
+
+test('render() emits the alt and crop dialogs as siblings of .box, ' +
+    'closed by default', async t => {
+    document.body.innerHTML += `
+        <image-input class="dialogs-render-test"></image-input>
+    `
+    const el = await waitFor(
+        'image-input.dialogs-render-test'
+    ) as ImageInput
+
+    const box = el.querySelector('.box') as HTMLElement
+    const altDialog = el.querySelector('.alt-dialog') as HTMLDialogElement
+    const cropDialog = el.querySelector('.crop-dialog') as HTMLDialogElement
+
+    t.ok(altDialog, 'should render an .alt-dialog')
+    t.ok(cropDialog, 'should render a .crop-dialog')
+    t.equal(altDialog.tagName, 'DIALOG',
+        'the alt dialog should be a <dialog> element')
+    t.equal(cropDialog.tagName, 'DIALOG',
+        'the crop dialog should be a <dialog> element')
+
+    t.equal(box.contains(altDialog), false,
+        'the alt dialog should not be nested inside .box')
+    t.equal(box.contains(cropDialog), false,
+        'the crop dialog should not be nested inside .box')
+
+    t.equal(altDialog.parentElement, el,
+        'the alt dialog should be a direct child of image-input')
+    t.equal(cropDialog.parentElement, el,
+        'the crop dialog should be a direct child of image-input')
+
+    t.equal(altDialog.open, false,
+        'the alt dialog should be closed by default')
+    t.equal(cropDialog.open, false,
+        'the crop dialog should be closed by default')
+})
+
+test('the alt dialog contains a heading, a label-wrapped textarea, ' +
+    'and a menu with save/cancel buttons', async t => {
+    document.body.innerHTML += `
+        <image-input class="alt-dialog-structure-test"></image-input>
+    `
+    const el = await waitFor(
+        'image-input.alt-dialog-structure-test'
+    ) as ImageInput
+    const altDialog = el.querySelector('.alt-dialog') as HTMLDialogElement
+
+    const heading = altDialog.querySelector('h1, h2, h3, h4, h5, h6')
+    t.ok(heading, 'the alt dialog should contain a heading element')
+
+    const label = altDialog.querySelector('label')
+    const textarea = label?.querySelector('textarea')
+    t.ok(label, 'the alt dialog should contain a label')
+    t.ok(textarea, 'the label should wrap a textarea')
+    t.ok(label?.contains(textarea as Node),
+        'the textarea should be inside the label')
+    t.equal(textarea?.getAttribute('rows'), '4',
+        'the textarea should have rows="4"')
+
+    const menu = altDialog.querySelector('menu')
+    t.ok(menu, 'the alt dialog should contain a menu')
+    t.ok(menu?.querySelector('.alt-cancel'),
+        'the menu should contain an .alt-cancel button')
+    t.ok(menu?.querySelector('.alt-save'),
+        'the menu should contain an .alt-save button')
+})
+
+test('the crop dialog contains a heading, an empty .crop-slot, and a ' +
+    'menu with save/cancel buttons', async t => {
+    document.body.innerHTML += `
+        <image-input class="crop-dialog-structure-test"></image-input>
+    `
+    const el = await waitFor(
+        'image-input.crop-dialog-structure-test'
+    ) as ImageInput
+    const cropDialog = el.querySelector('.crop-dialog') as HTMLDialogElement
+
+    const heading = cropDialog.querySelector('h1, h2, h3, h4, h5, h6')
+    t.ok(heading, 'the crop dialog should contain a heading element')
+
+    const slot = cropDialog.querySelector('.crop-slot')
+    t.ok(slot, 'the crop dialog should contain a .crop-slot')
+    t.equal(slot?.childElementCount, 0, 'the .crop-slot should be empty')
+
+    const menu = cropDialog.querySelector('menu')
+    t.ok(menu, 'the crop dialog should contain a menu')
+    t.ok(menu?.querySelector('.crop-cancel'),
+        'the menu should contain a .crop-cancel button')
+    t.ok(menu?.querySelector('.crop-save'),
+        'the menu should contain a .crop-save button')
+})
+
+test('dialog markup has no ids, no for attributes, no ' +
+    'aria-labelledby, and every button stays type="button"', async t => {
+    document.body.innerHTML += `
+        <image-input class="dialog-a11y-test"></image-input>
+    `
+    const el = await waitFor('image-input.dialog-a11y-test') as ImageInput
+    const altDialog = el.querySelector('.alt-dialog') as HTMLDialogElement
+    const cropDialog = el.querySelector('.crop-dialog') as HTMLDialogElement
+
+    for (const dialog of [altDialog, cropDialog]) {
+        t.equal(dialog.hasAttribute('id'), false,
+            'the dialog itself should not have an id attribute')
+        t.equal(dialog.querySelector('[id]'), null,
+            'no descendant should have an id attribute')
+        t.equal(dialog.querySelector('[for]'), null,
+            'no descendant should have a for attribute')
+        t.equal(dialog.hasAttribute('aria-labelledby'), false,
+            'the dialog should not use aria-labelledby')
+        t.ok(dialog.getAttribute('aria-label'),
+            'the dialog should carry an aria-label instead')
+    }
+
+    const textarea = altDialog.querySelector('textarea')
+    t.equal(textarea?.hasAttribute('name'), false,
+        'the textarea should have no name attribute')
+
+    const buttons = Array.from(
+        el.querySelectorAll('.alt-dialog button, .crop-dialog button')
+    )
+    t.ok(buttons.length > 0, 'sanity check: dialogs contain buttons')
+    for (const button of buttons) {
+        t.equal(button.getAttribute('type'), 'button',
+            'every dialog button should be type="button"')
+    }
+})
+
+test('two image-input elements each render their own dialogs with no ' +
+    'duplicate ids', async t => {
+    document.body.innerHTML += `
+        <image-input class="dupe-a"></image-input>
+        <image-input class="dupe-b"></image-input>
+    `
+    const a = await waitFor('image-input.dupe-a') as ImageInput
+    const b = await waitFor('image-input.dupe-b') as ImageInput
+
+    t.equal(a.querySelectorAll('.alt-dialog').length, 1,
+        'each image-input should render exactly one alt dialog')
+    t.equal(a.querySelectorAll('.crop-dialog').length, 1,
+        'each image-input should render exactly one crop dialog')
+    t.equal(b.querySelectorAll('.alt-dialog').length, 1,
+        'each image-input should render exactly one alt dialog')
+    t.equal(b.querySelectorAll('.crop-dialog').length, 1,
+        'each image-input should render exactly one crop dialog')
+
+    t.notEqual(a.querySelector('.alt-dialog'), b.querySelector('.alt-dialog'),
+        'the two elements should have distinct alt dialog instances')
+    t.notEqual(a.querySelector('.crop-dialog'), b.querySelector('.crop-dialog'),
+        'the two elements should have distinct crop dialog instances')
+
+    const ids = Array.from(document.querySelectorAll('[id]'))
+        .map(elem => elem.id)
+    const uniqueIds = new Set(ids)
+    t.equal(ids.length, uniqueIds.size,
+        'no id on the page should be duplicated')
 })
 
 test('the input has a default aria-label matching the default prompt',

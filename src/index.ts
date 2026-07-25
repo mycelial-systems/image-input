@@ -1,6 +1,11 @@
 import { WebComponent } from '@substrate-system/web-component'
 import { createDebug } from '@substrate-system/debug'
 import { dragDrop, type DropRecord } from '@substrate-system/drag-drop'
+import {
+    altDialogMarkup,
+    cropDialogMarkup,
+    type DialogText
+} from './dialogs.js'
 const debug = createDebug('image-input')
 
 // for document.querySelector
@@ -22,6 +27,14 @@ export class ImageInput extends WebComponent {
     declare required:boolean
 
     static DEFAULT_LABEL = 'Drop an image, or click to choose one'
+
+    static TEXT:DialogText = {
+        altHeading: 'Alt text',
+        altLabel: 'Description',
+        cropHeading: 'Crop image',
+        save: 'Save',
+        cancel: 'Cancel'
+    }
 
     static EXT:Record<string, string> = {
         'image/jpeg': 'jpg',
@@ -275,7 +288,9 @@ export class ImageInput extends WebComponent {
                     </div>
                 </div>
             </div>
-        </div>`
+        </div>
+        ${altDialogMarkup(ImageInput.TEXT)}
+        ${cropDialogMarkup(ImageInput.TEXT)}`
     }
 }
 
