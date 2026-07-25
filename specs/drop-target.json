@@ -65,7 +65,7 @@
         "Typecheck passes"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "record is Record<string, File>; every value is a real File. accept is deliberately NOT enforced on drop."
     },
     {

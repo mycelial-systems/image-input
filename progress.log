@@ -773,3 +773,62 @@
     `"Files"` type) present, or it silently no-ops and the class never
     gets added.
 ---
+
+## 2026-07-24 - DT-004
+
+- Implemented `handleDrop` in `src/index.ts`: scans
+  `Object.values(record)` (the `DropRecord` from `dragDrop()`'s
+  `onDrop` callback) for the first file whose `type` starts with
+  `image/`, ignoring the rest. If found, calls the existing `#setFile`
+  and emits `image-input:change` with `{ file, alt }`, the same shape
+  used by the picker path (`handleFileSelect`). If no image file is
+  present, it's currently a silent no-op -- emitting
+  `image-input:error` for that case is DT-006's scope, not this
+  story's, so it was deliberately left out.
+- Did NOT add `#syncInputFiles`/`DataTransfer` wiring (writing the
+  dropped file into `input.files` for form submission) -- that's
+  DT-005's scope. `#setFile` today only updates the preview/`#file`
+  field, not `input.files`, for either the picker or drop path; DT-005
+  adds that for both.
+- Hit and fixed a real `tsc` typecheck failure not caught by
+  `esbuild`/tape-run: chaining `Object.values(record).find(f => ...)`
+  directly makes `tsc` infer `f` as `unknown` in this project's
+  tsconfig (see the new `src/AGENTS.md` note for the mechanism).
+  Fixed by assigning to an explicitly typed `const files:File[] =
+  Object.values(record)` first, then calling `.find` on that. Caught
+  this because `npm run build` (which runs
+  `tsc --emitDeclarationOnly`) is part of `npm test`'s pipeline, not
+  because `npx vitest`/tape-run failed -- worth remembering that a
+  green targeted test run does not guarantee a green typecheck.
+- Wrote 2 failing tests first in `test/index.ts` (confirmed 6 failing
+  assertions before the fix): dropping a single image file shows the
+  preview, marks `.box` `has-image`, and emits `image-input:change`
+  with the dropped `File` and current alt text; a drop containing a
+  non-image file plus an image file selects the image one and ignores
+  the other. Both dispatch a real `DragEvent('drop', { dataTransfer,
+  bubbles: true })` at `.box` and `await new Promise(resolve =>
+  setTimeout(resolve, 0))` afterward, since the library's `onDrop` is
+  async (per the task doc and the existing DT-003 test's pattern,
+  extended here from a bare `await Promise.resolve()` to a macrotask
+  wait since `handleItems`'s fallback-to-`files` path still crosses at
+  least one microtask boundary via its own `await`, and a `setTimeout`
+  wait is a safer margin than counting microtask hops by hand).
+- Files changed: `src/index.ts`, `test/index.ts`, `src/AGENTS.md`,
+  `specs/drop-target.json` (DT-004 `passes: true`).
+- Tests: 2 new tape tests (6 new assertions). Full `npm test` (lint +
+  build + typecheck + tape-run) passes with 133 total assertions.
+- No "verify in browser" step was listed in DT-004's acceptance
+  criteria, so none was performed.
+- **Learnings for future iterations:**
+  - `npm run build`'s typecheck step can fail in ways the targeted
+    tape-run tests never exercise (esbuild transpiles TS structurally
+    and doesn't do full type inference). Don't treat a passing
+    `npx vitest`/tape-run subset as proof the story is done -- always
+    run the full `npm test` (or at least `tsc --noEmit -p
+    tsconfig.json`) before marking a story passing, per the session's
+    own TEST-FIRST/TARGETED-TESTING rules.
+  - See the new `src/AGENTS.md` entry for the `Object.values(...).find`
+    -> `unknown` typecheck gotcha; it will likely recur anywhere else
+    in this codebase that chains `Object.values` straight into an
+    array method instead of assigning it to a typed variable first.
+---

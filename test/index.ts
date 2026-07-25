@@ -183,6 +183,74 @@ test('dragenter on the box adds the drag class, dragleave removes it',
             'dragleave should remove the drag class')
     })
 
+test('dropping an image renders the preview and emits change', async t => {
+    document.body.innerHTML += `
+        <image-input class="drop-select-test"></image-input>
+    `
+    const el = await waitFor('image-input.drop-select-test') as ImageInput
+    const box = el.querySelector('.box') as HTMLElement
+    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+
+    let changeDetail:{ file:File|Blob, alt:string }|null = null
+    el.addEventListener('image-input:change', ((ev:CustomEvent) => {
+        changeDetail = ev.detail
+    }) as EventListener)
+
+    const dt = new DataTransfer()
+    dt.items.add(file)
+
+    box.dispatchEvent(new DragEvent('drop', {
+        dataTransfer: dt,
+        bubbles: true,
+        cancelable: true
+    }))
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    const preview = el.querySelector('.preview')
+    t.ok(preview?.classList.contains('has-image'),
+        'dropping an image should show the preview')
+    t.ok(box.classList.contains('has-image'),
+        'dropping an image should mark the box has-image')
+    t.ok(changeDetail, 'should emit image-input:change')
+    t.equal((changeDetail as any)?.file, file,
+        'the change detail should carry the dropped file')
+    t.equal((changeDetail as any)?.alt, '',
+        'the change detail should carry the current alt text')
+})
+
+test('a drop with several files uses the first image/* one', async t => {
+    document.body.innerHTML += `
+        <image-input class="drop-multi-test"></image-input>
+    `
+    const el = await waitFor('image-input.drop-multi-test') as ImageInput
+    const box = el.querySelector('.box') as HTMLElement
+    const textFile = new File(['abc'], 'readme.txt', {
+        type: 'text/plain'
+    })
+    const imageFile = new File(['abc'], 'photo.png', {
+        type: 'image/png'
+    })
+
+    let changeDetail:{ file:File|Blob, alt:string }|null = null
+    el.addEventListener('image-input:change', ((ev:CustomEvent) => {
+        changeDetail = ev.detail
+    }) as EventListener)
+
+    const dt = new DataTransfer()
+    dt.items.add(textFile)
+    dt.items.add(imageFile)
+
+    box.dispatchEvent(new DragEvent('drop', {
+        dataTransfer: dt,
+        bubbles: true,
+        cancelable: true
+    }))
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    t.equal((changeDetail as any)?.file, imageFile,
+        'should select the first image/* file and ignore the rest')
+})
+
 test('clicking the ALT, edit or remove buttons does not open the ' +
     'file picker', async t => {
     document.body.innerHTML += `

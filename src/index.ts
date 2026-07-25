@@ -112,10 +112,15 @@ export class ImageInput extends WebComponent {
         this.emit('alt', { detail: { file: this.#file, alt: this.alt ?? '' } })
     }
 
-    // Selecting the dropped file is implemented in DT-004; the
-    // drag-drop library manages the `.drag` class itself, regardless
-    // of what this listener does.
-    handleDrop = (_record:DropRecord):void => {}
+    handleDrop = (record:DropRecord):void => {
+        const files:File[] = Object.values(record)
+        const file = files.find(f => f.type.startsWith('image/'))
+        if (!file) return
+
+        debug('Image file dropped:', file.name)
+        this.#setFile(file)
+        this.emit('change', { detail: { file, alt: this.alt ?? '' } })
+    }
 
     /**
      * Replace the preview with a Blob (e.g. a cropped image), and use it

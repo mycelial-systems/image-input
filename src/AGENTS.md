@@ -49,3 +49,14 @@
   in-flow content yet (no prompt/icon markup), so it still collapses to
   zero size and isn't meaningfully click-testable until that markup
   (and its in-flow-vs-absolute toggle) lands.
+- `Object.values(record).find(f => ...)` (where `record` is
+  `DropRecord`/`Record<string, File>` from `@substrate-system/
+  drag-drop`) fails `tsc --emitDeclarationOnly` with `'f' is of type
+  'unknown'` when chained directly, in this project's tsconfig
+  (`strict: true` + `noImplicitAny: false` + the DOM/WebWorker lib
+  combo). `Object.values`'s generic overload doesn't get matched, so it
+  silently degrades to an `unknown[]`-returning overload instead of
+  erroring outright. Fix: assign to an explicitly typed intermediate
+  variable first -- `const files:File[] = Object.values(record)` --
+  then call `.find`/etc. on that. This class of bug won't show up in
+  `esbuild`/tape-run, only in the `tsc` build step.
