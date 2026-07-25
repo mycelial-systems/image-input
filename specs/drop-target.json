@@ -165,7 +165,7 @@
         "stylelint passes via npm run preversion"
       ],
       "priority": 10,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {

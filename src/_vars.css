@@ -16,7 +16,10 @@
     --image-input-border-style-drag: solid;
     --image-input-box-bg: transparent;
     --image-input-box-bg-drag: rgb(29 155 240 / 8%);
-
+    --image-input-box-padding: 2rem;
+    --image-input-prompt-color: rgb(0 0 0 / 55%);
+    --image-input-prompt-icon-size: 2rem;
+    --image-input-prompt-gap: 0.75rem;
     --image-crop-dim-color: rgb(0 0 0 / 55%);
     --image-crop-rect-border-color: #fff;
     --image-crop-rect-border-width: 2px;

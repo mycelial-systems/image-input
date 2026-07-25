@@ -42,6 +42,18 @@
   `dataTransfer.items.add(file)`, assign `input.files =
   dataTransfer.files`, then `input.dispatchEvent(new Event('change',
   { bubbles: true }))`. See `test/index.ts` `selectFile()` helper.
+- `stylelint-config-standard`'s `no-descending-specificity` rule fires
+  across an entire file, not just within one nested block: a low-
+  specificity selector like `& .picker` declared *after* a higher-
+  specificity one that targets the same element (e.g. `&.has-image
+  .picker` nested inside `.box`, higher specificity via the extra
+  class) fails, even though they're in different top-level nested
+  rules. Fix by ordering base/low-specificity selectors (`.picker`,
+  `.prompt`) before any selector that adds a state class in front of
+  them (`.box.has-image .picker`), not just before other rules with
+  the same selector. `npm test` does NOT catch this -- only
+  `npm run preversion` / `stylelint src/*.css` does, since stylelint
+  isn't part of the `test` script.
 - No "dev-browser" skill is registered in this harness. Use the
   Playwright MCP tools directly against `npm run start` (vite dev
   server) for the "verify in browser" acceptance criteria, and kill
@@ -1077,4 +1089,58 @@
     normalize-to-File pattern and the ordering requirement between
     `#deriveName` (reads the *old* `this.#file`) and the reassignment
     of `this.#file` to the new value.
+---
+
+## 2026-07-24 - DT-010
+
+- Filled in the CSS gaps DT-010 called out: `.picker` and `.prompt`
+  had no layout rules at all before this session (only the
+  `.box.has-image .picker`/`.prompt` state overrides existed, added
+  incidentally in DT-002/DT-007). Added base rules for both, plus
+  `padding: 0` on the existing `.box.has-image .picker` override (the
+  task doc's spec for that rule, previously missing).
+- `src/_vars.css`: added `--image-input-box-padding` (2rem),
+  `--image-input-prompt-color` (`rgb(0 0 0 / 55%)`, a new value --
+  none of the existing colors fit a body-text-like prompt color: pill
+  colors are for filled badges, border-color at 25% is too faint for
+  text), `--image-input-prompt-icon-size` (2rem, bigger than the
+  overlay's 1.125rem icon since it's the box's main visual element),
+  `--image-input-prompt-gap` (0.75rem). Reused
+  `--image-input-border-width/style/color(-drag)` and
+  `--image-input-box-bg(-drag)` unchanged -- those already existed
+  from DT-003. `--image-input-radius` and `--image-input-focus-color`
+  were already reused by `.box`'s existing rules (DT-002/DT-003), no
+  change needed there.
+- `.box` itself still sets no `width`/`height`/`min-height`/
+  `aspect-ratio` -- confirmed by re-reading the existing rule; nothing
+  needed changing there, it already matched this story's requirement.
+- `image-crop`/`#alt-dialog` blocks untouched, as required.
+- No test-first step for this story: it's pure CSS variable/layout
+  work, and the existing Codebase Patterns note that `test/index.html`
+  doesn't load `src/index.css` means no tape test can observe real
+  computed layout here. Verification is `stylelint src/*.css` (this
+  story's own explicit acceptance criterion, via `npm run preversion`)
+  plus a full `npm test` run to confirm no regressions from the markup
+  ordering change in `src/index.css`.
+- Hit and fixed a `stylelint` `no-descending-specificity` failure: the
+  new `& .picker`/`& .prompt` rules were originally placed *after* the
+  `.box` block (which nests `&.has-image .picker`/`&.has-image
+  .prompt`, higher specificity). Moved both new rules to before `.box`
+  in `src/index.css` to fix the ordering. See Codebase Patterns above.
+- Also fixed a pre-existing (unrelated to this story, but blocking its
+  own "stylelint passes" acceptance criterion) `custom-property-empty-
+  line-before` violation in `src/_vars.css`: a blank line separated the
+  `image-input` and `image-crop` variable groups inside one `:root`
+  block, which stylelint flags. Removed the blank line.
+- Files changed: `src/_vars.css`, `src/index.css`,
+  `specs/drop-target.json` (DT-010 `passes: true`).
+- Tests: no new tests (CSS-only story, see above). Full `npm test`
+  (lint + build + typecheck + tape-run) passes with all 162 assertions
+  unchanged. `npm run preversion` (lint + stylelint) passes clean.
+- No "verify in browser" step was listed in DT-010's acceptance
+  criteria, so none was performed.
+- **Learnings for future iterations:**
+  - See Codebase Patterns above for the `no-descending-specificity`
+    ordering gotcha -- relevant for DT-011 and any future CSS work in
+    this file, since `npm test` won't catch it.
 ---

@@ -17,6 +17,28 @@
 image-input {
     display: block;
 
+    & .picker {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: var(--image-input-box-padding);
+        cursor: pointer;
+    }
+
+    & .prompt {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--image-input-prompt-gap);
+        color: var(--image-input-prompt-color);
+        font-size: 1rem;
+
+        & .prompt-icon {
+            width: var(--image-input-prompt-icon-size);
+            height: var(--image-input-prompt-icon-size);
+        }
+    }
+
     & .box {
         position: relative;
         display: inline-block;
@@ -32,6 +54,7 @@ image-input {
         &.has-image .picker {
             position: absolute;
             inset: 0;
+            padding: 0;
         }
 
         &.has-image .prompt {
