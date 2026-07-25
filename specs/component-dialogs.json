@@ -70,7 +70,7 @@
         "Typecheck passes"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "ImageCrop.connectedCallback attaches four window listeners (resize, pointermove, pointerup, pointercancel). Rendering an image-crop eagerly inside every image-input would mean forty idle window listeners on a page with ten inputs. The lazily created element is left in place after close so reopening is cheap, and it unregisters naturally when the host image-input disconnects and takes the subtree with it."
     },
     {

@@ -8,6 +8,7 @@ import {
     closeDialog,
     type DialogText
 } from './dialogs.js'
+import { ImageCrop } from './crop.js'
 const debug = createDebug('image-input')
 
 // for document.querySelector
@@ -149,7 +150,15 @@ export class ImageInput extends WebComponent {
     handleEdit = (event:Event) => {
         event.preventDefault()
         if (!this.#file) return
-        this.emit('edit', { detail: { file: this.#file } })
+        const notCanceled = this.emit('edit', {
+            detail: { file: this.#file }
+        })
+        if (!notCanceled) return
+
+        const dialog = this.qs<HTMLDialogElement>('.crop-dialog')
+        const cropEl = this.#getOrCreateCropEl()
+        cropEl?.setFile(this.#file)
+        if (dialog) openDialog(dialog)
     }
 
     handleAlt = (event:Event) => {
@@ -200,6 +209,24 @@ export class ImageInput extends WebComponent {
     setImage (blob:Blob, name?:string):void {
         const file = this.#setFile(blob, name)
         this.emit('change', { detail: { file, alt: this.alt ?? '' } })
+    }
+
+    /**
+     * Reuse the `.crop-slot`'s `<image-crop>` if one has already been
+     * created, otherwise create it lazily. Rendering it eagerly for
+     * every `image-input` would mean idle window listeners (see
+     * `ImageCrop.connectedCallback`) on pages where nobody crops.
+     */
+    #getOrCreateCropEl ():ImageCrop|null {
+        const slot = this.qs<HTMLElement>('.crop-slot')
+        if (!slot) return null
+
+        let cropEl = slot.querySelector<ImageCrop>(ImageCrop.TAG)
+        if (!cropEl) {
+            cropEl = document.createElement(ImageCrop.TAG) as ImageCrop
+            slot.appendChild(cropEl)
+        }
+        return cropEl
     }
 
     #deriveName (type:string):string {

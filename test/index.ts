@@ -837,12 +837,14 @@ test('setImage accepts an explicit filename', async t => {
         'should use the caller-supplied filename')
 })
 
-test('the edit button does not open a dialog until a later story ' +
-    'wires it up', async t => {
+test('clicking the edit button lazily creates an image-crop and ' +
+    'opens the crop dialog', async t => {
     document.body.innerHTML += `
-        <image-input class="no-dialog-test"></image-input>
+        <image-input class="crop-dialog-open-test"></image-input>
     `
-    const el = await waitFor('image-input.no-dialog-test') as ImageInput
+    const el = await waitFor(
+        'image-input.crop-dialog-open-test'
+    ) as ImageInput
     const file = new File(['abc'], 'photo.png', { type: 'image/png' })
     selectFile(el, file)
 
@@ -851,11 +853,53 @@ test('the edit button does not open a dialog until a later story ' +
 
     t.equal(cropDialog.open, false,
         'the crop dialog should be closed before clicking')
+    t.equal(el.querySelector('image-crop'), null,
+        'no image-crop should exist before the first edit click')
 
     editBtn.click()
 
-    t.equal(cropDialog.open, false,
-        'clicking edit should not open the crop dialog yet')
+    t.equal(cropDialog.open, true,
+        'clicking edit should open the crop dialog')
+
+    const cropEls = el.querySelectorAll('image-crop')
+    t.equal(cropEls.length, 1,
+        'exactly one image-crop should exist after the first edit click')
+
+    const cropSlot = el.querySelector('.crop-slot')
+    t.ok(cropSlot?.contains(cropEls[0]),
+        'the image-crop should be appended to .crop-slot')
+
+    const src = cropEls[0].getAttribute('src') ?? ''
+    t.ok(src.startsWith('blob:'),
+        'setFile should be called with the current file')
+})
+
+test('reopening the crop dialog reuses the existing image-crop, ' +
+    'without appending a duplicate', async t => {
+    document.body.innerHTML += `
+        <image-input class="crop-dialog-reuse-test"></image-input>
+    `
+    const el = await waitFor(
+        'image-input.crop-dialog-reuse-test'
+    ) as ImageInput
+    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    selectFile(el, file)
+
+    const editBtn = el.querySelector('.edit') as HTMLButtonElement
+    const cropDialog = el.querySelector('.crop-dialog') as HTMLDialogElement
+
+    editBtn.click()
+    const firstCropEl = el.querySelector('image-crop')
+    cropDialog.close()
+
+    editBtn.click()
+
+    t.equal(cropDialog.open, true,
+        'clicking edit again should reopen the crop dialog')
+    t.equal(el.querySelectorAll('image-crop').length, 1,
+        'reopening should not append a second image-crop')
+    t.equal(el.querySelector('image-crop'), firstCropEl,
+        'reopening should reuse the same image-crop element')
 })
 
 test('clicking the ALT badge opens the alt dialog, seeded with the ' +
