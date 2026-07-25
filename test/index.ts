@@ -3,6 +3,7 @@ import { waitFor } from '@substrate-system/dom'
 import '../src/index.js'
 import type { ImageInput } from '../src/index.js'
 import type { ImageCrop } from '../src/crop.js'
+import { html } from '../src/html.js'
 import {
     makeImageFile,
     waitForCropRect,
@@ -1429,4 +1430,33 @@ test('setting the label attribute updates the prompt text and the ' +
         'the input aria-label should match the label attribute')
     t.equal(promptText.textContent, 'Drag a photo here',
         'the prompt text should match the label attribute')
+})
+
+test('render() and html() produce the same box markup', async t => {
+    document.body.innerHTML += `
+        <image-input class="parity-test" accept="image/png"
+            name="photo" required></image-input>
+    `
+    const el = await waitFor('image-input.parity-test') as ImageInput
+
+    const fromHtml = document.createElement('div')
+    fromHtml.innerHTML = html({
+        accept: 'image/png',
+        name: 'photo',
+        required: true
+    })
+
+    t.ok(el.querySelector('.box'), 'the element should render a box')
+    t.ok(el.querySelector('.alt-dialog'),
+        'the element should still render the alt dialog')
+    t.ok(el.querySelector('.crop-dialog'),
+        'the element should still render the crop dialog')
+
+    // Compare the whole rendered subtree, not just the box. Both
+    // sides are browser-serialized from the same parse path, so this
+    // is an exact comparison -- which is the point. A drift anywhere,
+    // including in the whitespace between the two dialogs, fails
+    // here. That is the lock this task installs.
+    t.equal(el.innerHTML, fromHtml.innerHTML,
+        'the element and html() should emit identical markup')
 })

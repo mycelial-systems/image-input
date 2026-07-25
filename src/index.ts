@@ -2,12 +2,12 @@ import { WebComponent } from '@substrate-system/web-component'
 import { createDebug } from '@substrate-system/debug'
 import { dragDrop, type DropRecord } from '@substrate-system/drag-drop'
 import {
-    altDialogMarkup,
-    cropDialogMarkup,
     openDialog,
     closeDialog,
+    DEFAULT_TEXT,
     type DialogText
 } from './dialogs.js'
+import { html, DEFAULT_LABEL as LABEL } from './html.js'
 import { ImageCrop } from './crop.js'
 const debug = createDebug('image-input')
 
@@ -29,15 +29,9 @@ export class ImageInput extends WebComponent {
     declare label:string|null
     declare required:boolean
 
-    static DEFAULT_LABEL = 'Drop an image, or click to choose one'
+    static DEFAULT_LABEL = LABEL
 
-    static TEXT:DialogText = {
-        altHeading: 'Alt text',
-        altLabel: 'Describe this image',
-        cropHeading: 'Crop image',
-        save: 'Save',
-        cancel: 'Cancel'
-    }
+    static TEXT:DialogText = { ...DEFAULT_TEXT }
 
     static EXT:Record<string, string> = {
         'image/jpeg': 'jpg',
@@ -340,61 +334,14 @@ export class ImageInput extends WebComponent {
     }
 
     render () {
-        const accept = this.accept ?? 'image/*'
-        const name = this.name ? ` name="${this.name}"` : ''
-        const required = this.required ? ' required' : ''
-        const alt = this.alt ?? ''
-        const hasAlt = !!this.alt
-        const label = this.label ?? ImageInput.DEFAULT_LABEL
-
-        this.innerHTML = `<div class="box">
-            <label class="picker">
-                <input
-                    type="file"
-                    accept="${accept}"${name}${required}
-                    aria-label="${label}"
-                />
-                <span class="prompt">
-                    <svg class="prompt-icon" aria-hidden="true"
-                        viewBox="0 0 24 24"
-                    >
-                        <path d="M12 16V4M12 4l-5 5M12 4l5 5" />
-                        <path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0
-                            0 1-1v-3" />
-                    </svg>
-                    <span class="prompt-text">${label}</span>
-                </span>
-            </label>
-            <div class="preview">
-                <img alt="${alt}" />
-                <div class="overlay">
-                    <button
-                        type="button"
-                        class="alt-badge${hasAlt ? ' has-alt' : ''}"
-                        aria-label="${hasAlt ? 'Edit alt text' : 'Add alt text'}"
-                    ><span class="plus" aria-hidden="true">+</span>ALT</button>
-                    <div class="controls">
-                        <button type="button" class="edit"
-                            aria-label="Edit image"
-                        >
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0
-                                    -3-3L5 17v3z" />
-                            </svg>
-                        </button>
-                        <button type="button" class="remove"
-                            aria-label="Remove image"
-                        >
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M5 5l14 14M19 5L5 19" />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-        ${altDialogMarkup(ImageInput.TEXT)}
-        ${cropDialogMarkup(ImageInput.TEXT)}`
+        this.innerHTML = html({
+            accept: this.accept,
+            name: this.name,
+            required: this.required,
+            alt: this.alt,
+            label: this.label,
+            text: ImageInput.TEXT
+        })
     }
 }
 
