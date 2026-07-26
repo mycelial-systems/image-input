@@ -12,6 +12,7 @@ import {
 import './crop.js'
 import './crop-math.js'
 import './html.js'
+import './client.js'
 
 test('renders a .box div instead of .wrapper', async t => {
     document.body.innerHTML += `

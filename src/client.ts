@@ -136,6 +136,7 @@ export class ImageInputClient {
         const img = this.#qs<HTMLImageElement>('img')
         if (img) img.src = this.#previewUrl
         this.#qs('.preview')?.classList.add('has-image')
+        this.#qs('.box')?.classList.add('has-image')
     }
 
     /**
@@ -151,6 +152,7 @@ export class ImageInputClient {
 
         this.#qs('img')?.removeAttribute('src')
         this.#qs('.preview')?.classList.remove('has-image')
+        this.#qs('.box')?.classList.remove('has-image')
 
         this.#resetAlt()
     }
