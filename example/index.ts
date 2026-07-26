@@ -1,46 +1,113 @@
 import '../src/index.css'
 import './index.css'
-import { render } from 'preact'
-import { useEffect, useRef } from 'preact/hooks'
+import { render, type VNode } from 'preact'
+import { useEffect, useMemo, useRef } from 'preact/hooks'
 import { html } from 'htm/preact'
 import { ImageInput } from '../src/index.js'
 import { Panel } from './panel.js'
-import {
-    handleChange,
-    handleAltChange,
-    handleRemove,
-    handleError,
-    handleEdit,
-    handleAlt,
-} from './state.js'
+import { createStore } from './state.js'
+import Debug from '@substrate-system/debug'
+const debug = Debug(true)
 
-function App () {
+interface ExampleProps {
+    crop?:string;
+    heading:VNode;
+    description:string;
+}
+
+/**
+ * One entry per `<image-input>` on the page. This is a module-level
+ * constant of fixed length and order, so each `Example` vnode keeps a
+ * stable position across renders and no `key` is needed -- see rule 4
+ * in `example/AGENTS.md`.
+ */
+const EXAMPLES:ExampleProps[] = [
+    {
+        heading: html`No crop attribute (free-form)`,
+        description: 'The crop rectangle can be dragged and resized ' +
+            'to any shape.'
+    },
+    {
+        crop: 'circle',
+        heading: html`<code>crop="circle"</code>`,
+        description: 'Locks to 1:1 and draws the crop area as a ' +
+            'circle. The saved image is still a rectangle.'
+    },
+    {
+        crop: 'constrain',
+        heading: html`<code>crop="constrain"</code>`,
+        description: "Locks the crop to the source image's own aspect ratio."
+    },
+    {
+        crop: '4/3',
+        heading: html`<code>crop="4/3"</code>`,
+        description: 'Locks the crop to a fixed 4:3 aspect ratio.'
+    },
+    {
+        crop: '1',
+        heading: html`<code>crop="1"</code>`,
+        description: 'Use a square aspect ratio.'
+    }
+]
+
+function Example ({ crop, heading, description }:ExampleProps) {
     const ref = useRef<ImageInput>(null)
+    const store = useMemo(createStore, [])
 
     useEffect(() => {
         const el = ref.current
         if (!el) return
 
-        el.addEventListener('image-input:change', handleChange)
-        el.addEventListener('image-input:alt-change', handleAltChange)
-        el.addEventListener('image-input:remove', handleRemove)
-        el.addEventListener('image-input:error', handleError)
-        el.addEventListener('image-input:edit', handleEdit)
-        el.addEventListener('image-input:alt', handleAlt)
+        for (const [name, listener] of store.listeners) {
+            el.addEventListener(name, listener)
+        }
+
+        /**
+         * Types are inferred correctly here. The handler stays inline
+         * -- that inference is the point of this block -- so it is
+         * removed with an `AbortController` rather than by name.
+         * `on()` passes its options straight to `addEventListener`.
+         */
+        const controller = new AbortController()
+        el.on('change', (ev) => {
+            debug('got a "change" event with the .on method', ev)
+            debug('file name', ev.detail.file.name)
+        }, { signal: controller.signal })
 
         return () => {
-            el.removeEventListener('image-input:change', handleChange)
-            el.removeEventListener('image-input:alt-change', handleAltChange)
-            el.removeEventListener('image-input:remove', handleRemove)
-            el.removeEventListener('image-input:error', handleError)
-            el.removeEventListener('image-input:edit', handleEdit)
-            el.removeEventListener('image-input:alt', handleAlt)
+            for (const [name, listener] of store.listeners) {
+                el.removeEventListener(name, listener)
+            }
+            controller.abort()
         }
     }, [])
 
+    /**
+     * Omit the attribute entirely for the free-form example, rather
+     * than passing an empty or null `crop`. The value is fixed per
+     * instance, so this never changes across renders (rule 1).
+     */
+    const cropAttr = crop ? { crop } : {}
+
     return html`
-        <${ImageInput.TAG} ref=${ref} accept="image/*" />
-        <${Panel} />
+        <section class="example">
+            <h2>${heading}</h2>
+            <p>${description}</p>
+            <${ImageInput.TAG}
+                ref=${ref}
+                accept="image/*"
+                ...${cropAttr}
+            />
+            <${Panel} signals=${store.signals} />
+        </section>
+    `
+}
+
+function App () {
+    return html`
+        ${EXAMPLES.map(example => {
+            return html`<${Example} ...${example} />`
+        })}
     `
 }
 

@@ -10,7 +10,14 @@ import {
 import { html, DEFAULT_LABEL as LABEL } from './html.js'
 import { ImageCrop } from './crop.js'
 import { EXT, toFile } from './file.js'
+// The type-only import is enough to pull `events.d.ts` into a
+// consumer's program, which is what activates its `declare global`
+// augmentation of `HTMLElementEventMap`. No runtime import needed --
+// events.ts emits no JS.
+import type { ImageInputEventMap } from './events.js'
 const debug = createDebug('image-input')
+
+export type { ImageInputEventMap }
 
 // for document.querySelector
 declare global {
@@ -53,6 +60,56 @@ export class ImageInput extends WebComponent {
     #previewUrl:string|null = null
     #cleanupDrop:(() => void)|null = null
     #cropInFlight = false
+
+    /**
+     * Listen for a (non-namespaced) `image-input` event, with the
+     * `detail` typed from {@link ImageInputEventMap}.
+     *
+     * The `EventListenerObject` overload is not optional decoration:
+     * the base class declares one, an implementation signature is not
+     * part of a subclass's public type, and a single-overload `on`
+     * here is therefore not assignable to the inherited member
+     * (TS2416).
+     */
+    on<K extends keyof ImageInputEventMap> (
+        evName:K,
+        handler:(ev:ImageInputEventMap[K]) => any,
+        options?:boolean|AddEventListenerOptions
+    ):void
+
+    on<K extends keyof ImageInputEventMap> (
+        evName:K,
+        handler:EventListenerObject,
+        options?:boolean|AddEventListenerOptions
+    ):void
+
+    on (
+        evName:string,
+        handler:any,
+        options?:boolean|AddEventListenerOptions
+    ):void {
+        super.on(evName, handler, options)
+    }
+
+    off<K extends keyof ImageInputEventMap> (
+        evName:K,
+        handler:(ev:ImageInputEventMap[K]) => any,
+        options?:boolean|EventListenerOptions
+    ):void
+
+    off<K extends keyof ImageInputEventMap> (
+        evName:K,
+        handler:EventListenerObject,
+        options?:boolean|EventListenerOptions
+    ):void
+
+    off (
+        evName:string,
+        handler:any,
+        options?:boolean|EventListenerOptions
+    ):void {
+        super.off(evName, handler, options)
+    }
 
     connectedCallback () {
         debug('connected')

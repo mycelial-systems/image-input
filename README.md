@@ -29,7 +29,8 @@ tool, and `alt` text input.
   * [Built-in dialogs](#built-in-dialogs)
   * [`image-crop`](#image-crop)
 - [API](#api)
-- [API](#api-1)
+  * [Server rendering](#server-rendering)
+- [Modules](#modules)
   * [JS](#js)
   * [HTML](#html)
   * [pre-built](#pre-built)
@@ -44,7 +45,7 @@ npm i -S @substrate-system/image-input
 
 ### ESM
 ```js
-import '@substrate-system/image-input'
+import { ImageInput } from '@substrate-system/image-input'
 ```
 
 ### Common JS
@@ -121,6 +122,10 @@ overridable from your own stylesheet:
 * `--image-input-dialog-duration`, `--image-input-dialog-scale-from`
   -- the duration of the dialogs' open/close fade-and-scale, and the
   scale they animate in from.
+
+
+------------------------------
+
 
 ## Example
 
@@ -216,6 +221,48 @@ They bubble, so you can listen on the element or an ancestor.
 * `image-input:error` -- A picked or dropped file was not an image.
   `detail` is `{ reason:'not-an-image' }`. The component shows no
   message of its own; use this event to report the error yourself.
+
+#### Typescript
+
+The `detail` shapes above are typed, so listeners do not need an
+annotation or a cast. `.on()` and `.off()` take the *non*-namespaced
+name and infer the event from it:
+
+```ts
+import { ImageInput } from '@substrate-system/image-input'
+
+const input = document.querySelector('image-input')!
+
+input.on('change', ev => {
+    ev.detail.file.name  // File
+    ev.detail.alt        // string
+})
+```
+
+`addEventListener` is typed too, under the namespaced name. These
+events bubble, so this works on an ancestor as well as on the element
+itself:
+
+```ts
+document.body.addEventListener('image-input:error', ev => {
+    ev.detail.reason  // 'not-an-image'
+})
+```
+
+The map itself is exported as `ImageInputEventMap` if you want to name
+a handler's parameter type:
+
+```ts
+import type { ImageInputEventMap } from '@substrate-system/image-input'
+
+function handleChange (ev:ImageInputEventMap['change']) {
+    console.log(ev.detail.file.name)
+}
+```
+
+Note the `addEventListener` typing works by augmenting the global
+`HTMLElementEventMap`, so the six `image-input:*` keys become visible
+on every `HTMLElement` in a project that imports this package.
 
 ### Built-in dialogs
 
@@ -398,7 +445,7 @@ Some differences from the custom element:
 
 Use the custom element where any of these matter.
 
-## API
+## Modules
 
 This exposes ESM and common JS via
 [package.json `exports` field](https://nodejs.org/api/packages.html#exports).

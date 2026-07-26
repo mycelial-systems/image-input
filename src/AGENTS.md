@@ -158,6 +158,29 @@
   node. The combined `:not(a, b)` form is required by stylelint's
   `selector-not-notation` rule; it is De Morgan equivalent to
   `:not(:defined):not(:has(.box))`.
+- `src/events.ts` is the single definition of the `image-input:*`
+  events and their `detail` shapes (`ImageInputEventMap`). Both
+  `ImageInput` and `ImageInputClient` dispatch that same set, which is
+  why it lives in its own module rather than in either one. It emits no
+  JS, so `index.ts` pulls it in with a *type-only* import -- that is
+  still enough to activate its `declare global` augmentation of
+  `HTMLElementEventMap` in a consumer's program, and it keeps a dead
+  import of an empty module out of `dist/index.js`. When adding or
+  changing an event, update the interface, the `declare global` block
+  under it, and the README's Events section together.
+- `ImageInput.on()`/`.off()` override the base class's with overloads
+  keyed to `ImageInputEventMap`, so `el.on('change', ev => ...)` infers
+  `ev`. Each one needs *two* overload signatures: the callback form and
+  an `EventListenerObject` form. The base class declares both, a
+  subclass's implementation signature is not part of its public type,
+  and so a single-overload override is not assignable to the inherited
+  member -- `tsc` rejects the whole class with TS2416 ("Property 'on'
+  in type 'ImageInput' is not assignable to the same property in base
+  type 'WebComponent'"). Note also that `noImplicitAny: false` in this
+  project's tsconfig means a *failed* inference degrades silently to
+  `any` instead of erroring, so a clean `tsc` run does not by itself
+  prove these overloads work. Verify with a throwaway file that reads
+  a bogus `detail` field and check that it errors.
 - `src/file.ts` holds the Blob-to-File promotion both `ImageInput` and
   `ImageInputClient` use. Both must guarantee the file they hold is a
   `File`: `ImageCrop.setFile()` requires one, and consumers read
