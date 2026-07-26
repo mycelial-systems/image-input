@@ -1,6 +1,11 @@
 import { test } from '@substrate-system/tapzero'
 import { html } from '../src/html.js'
 import { ImageInputClient } from '../src/client.js'
+import type { ImageCrop } from '../src/crop.js'
+import {
+    makeImageFile,
+    waitForCropRect
+} from './helpers.js'
 
 /**
  * Mount markup from `html()` and attach a client to it.
@@ -195,3 +200,75 @@ test('canceling image-input:alt suppresses the built-in dialog',
         t.equal(dialog.open, false,
             'the dialog should stay closed when the event is canceled')
     })
+
+test('the edit button lazily creates an image-crop and opens the ' +
+    'crop dialog', async t => {
+    const { host } = mount('client-crop-open-test')
+    selectFile(host, new File(['abc'], 'photo.png', {
+        type: 'image/png'
+    }))
+
+    const editBtn = host.querySelector('.edit') as HTMLButtonElement
+    const dialog = host.querySelector(
+        '.crop-dialog'
+    ) as HTMLDialogElement
+
+    t.equal(host.querySelector('image-crop'), null,
+        'no image-crop should exist before the first edit click')
+
+    editBtn.click()
+
+    t.equal(dialog.open, true,
+        'clicking edit should open the crop dialog')
+    t.equal(host.querySelectorAll('image-crop').length, 1,
+        'exactly one image-crop should be created')
+
+    editBtn.click()
+    t.equal(host.querySelectorAll('image-crop').length, 1,
+        'reopening should reuse it, not append a second')
+})
+
+test('saving the crop replaces the image and closes the dialog',
+    async t => {
+        const { host } = mount('client-crop-save-test')
+        const file = await makeImageFile(100, 80)
+        selectFile(host, file)
+
+        let changed:File|null = null
+        host.addEventListener('image-input:change', ev => {
+            changed = (ev as CustomEvent).detail.file
+        })
+
+        ;(host.querySelector('.edit') as HTMLElement).click()
+
+        const cropEl = host.querySelector('image-crop') as ImageCrop
+        await waitForCropRect(cropEl, 100)
+
+        ;(host.querySelector('.crop-save') as HTMLElement).click()
+        await new Promise(resolve => setTimeout(resolve, 50))
+
+        const dialog = host.querySelector(
+            '.crop-dialog'
+        ) as HTMLDialogElement
+        t.equal(dialog.open, false, 'saving should close the dialog')
+        t.ok(changed instanceof File,
+            'saving should emit a change carrying a File')
+    })
+
+test('canceling the crop dialog leaves the image alone', async t => {
+    const { host } = mount('client-crop-cancel-test')
+    const file = await makeImageFile(60, 60)
+    selectFile(host, file)
+
+    const img = host.querySelector('img') as HTMLImageElement
+    const before = img.src
+
+    ;(host.querySelector('.edit') as HTMLElement).click()
+    ;(host.querySelector('.crop-cancel') as HTMLElement).click()
+
+    const dialog = host.querySelector(
+        '.crop-dialog'
+    ) as HTMLDialogElement
+    t.equal(dialog.open, false, 'cancel should close the dialog')
+    t.equal(img.src, before, 'cancel should leave the preview alone')
+})

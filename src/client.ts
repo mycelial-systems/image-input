@@ -1,6 +1,7 @@
 import { createDebug } from '@substrate-system/debug'
 import { toFile } from './file.js'
 import { openDialog, closeDialog } from './dialogs.js'
+import { ImageCrop } from './crop.js'
 const debug = createDebug('image-input:client')
 
 export interface ImageInputClientOptions {
@@ -44,6 +45,7 @@ export class ImageInputClient {
     #resetAlt:() => void
     #file:File|null = null
     #previewUrl:string|null = null
+    #cropInFlight = false
 
     constructor (host:HTMLElement, opts:ImageInputClientOptions = {}) {
         this.host = host
@@ -96,6 +98,10 @@ export class ImageInputClient {
             ?.addEventListener('click', this.#handleAltSave)
         this.#qs('.alt-cancel')
             ?.addEventListener('click', this.#handleAltCancel)
+        this.#qs('.crop-save')
+            ?.addEventListener('click', this.#handleCropSave)
+        this.#qs('.crop-cancel')
+            ?.addEventListener('click', this.#handleCropCancel)
     }
 
     /**
@@ -112,6 +118,10 @@ export class ImageInputClient {
             ?.removeEventListener('click', this.#handleAltSave)
         this.#qs('.alt-cancel')
             ?.removeEventListener('click', this.#handleAltCancel)
+        this.#qs('.crop-save')
+            ?.removeEventListener('click', this.#handleCropSave)
+        this.#qs('.crop-cancel')
+            ?.removeEventListener('click', this.#handleCropCancel)
         this.#revokePreviewUrl()
     }
 
@@ -136,9 +146,12 @@ export class ImageInputClient {
         event.preventDefault()
         if (!this.#file) return
         const notCanceled = this.#emit('edit', { file: this.#file })
-        if (notCanceled) {
-            // The built-in crop dialog opens here; see Task 9.
-        }
+        if (!notCanceled) return
+
+        const dialog = this.#qs<HTMLDialogElement>('.crop-dialog')
+        const cropEl = this.#getOrCreateCropEl()
+        cropEl?.setFile(this.#file)
+        if (dialog) openDialog(dialog)
     }
 
     #handleAlt = (event:Event) => {
@@ -167,6 +180,61 @@ export class ImageInputClient {
     #handleAltCancel = (event:Event) => {
         event.preventDefault()
         const dialog = this.#qs<HTMLDialogElement>('.alt-dialog')
+        if (dialog) closeDialog(dialog)
+    }
+
+    /**
+     * Reuse the `.crop-slot`'s `<image-crop>` if one exists, otherwise
+     * create it. Creating one eagerly for every mounted client would
+     * mean idle window listeners (see `ImageCrop.connectedCallback`)
+     * on pages where nobody ever crops.
+     */
+    #getOrCreateCropEl ():ImageCrop|null {
+        const slot = this.#qs<HTMLElement>('.crop-slot')
+        if (!slot) return null
+
+        let cropEl = slot.querySelector<ImageCrop>(ImageCrop.TAG)
+        if (!cropEl) {
+            cropEl = document.createElement(ImageCrop.TAG) as ImageCrop
+            slot.appendChild(cropEl)
+        }
+        return cropEl
+    }
+
+    #handleCropSave = async (event:Event):Promise<void> => {
+        event.preventDefault()
+        const dialog = this.#qs<HTMLDialogElement>('.crop-dialog')
+        const cropEl = dialog?.querySelector<ImageCrop>(ImageCrop.TAG)
+        if (!cropEl) return
+        // A second Save click, or an Esc press, while getBlob() is
+        // still running would otherwise apply the crop twice, or
+        // apply it to a dialog the user already dismissed.
+        if (this.#cropInFlight) return
+        this.#cropInFlight = true
+
+        let blob:Blob
+        try {
+            blob = await cropEl.getBlob()
+        } catch (err) {
+            // The image is not decoded yet, or the canvas refused to
+            // produce a blob. Leave the dialog open and the current
+            // image untouched.
+            debug('crop save failed', err)
+            return
+        } finally {
+            this.#cropInFlight = false
+        }
+
+        // The dialog closing during the await means the user canceled.
+        if (dialog && !dialog.open) return
+
+        this.setImage(blob)
+        if (dialog) closeDialog(dialog)
+    }
+
+    #handleCropCancel = (event:Event) => {
+        event.preventDefault()
+        const dialog = this.#qs<HTMLDialogElement>('.crop-dialog')
         if (dialog) closeDialog(dialog)
     }
 
