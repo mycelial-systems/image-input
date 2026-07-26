@@ -1,7 +1,7 @@
 import { test } from '@substrate-system/tapzero'
 import { waitFor } from '@substrate-system/dom'
 import '../src/index.js'
-import type { ImageInput } from '../src/index.js'
+import { ImageInput } from '../src/index.js'
 import type { ImageCrop } from '../src/crop.js'
 import { html } from '../src/html.js'
 import {
@@ -1432,7 +1432,7 @@ test('setting the label attribute updates the prompt text and the ' +
         'the prompt text should match the label attribute')
 })
 
-test('render() and html() produce the same box markup', async t => {
+test('render() and html() produce the same markup', async t => {
     document.body.innerHTML += `
         <image-input class="parity-test" accept="image/png"
             name="photo" required></image-input>
@@ -1443,7 +1443,13 @@ test('render() and html() produce the same box markup', async t => {
     fromHtml.innerHTML = html({
         accept: 'image/png',
         name: 'photo',
-        required: true
+        required: true,
+        // Pass ImageInput.TEXT explicitly, matching what render()
+        // supplies. Relying on html()'s own DEFAULT_TEXT fallback
+        // would make this test pass by coincidence today, and fail
+        // for an unrelated reason the first time a caller reassigns
+        // the documented ImageInput.TEXT customization point.
+        text: ImageInput.TEXT
     })
 
     t.ok(el.querySelector('.box'), 'the element should render a box')
@@ -1459,4 +1465,34 @@ test('render() and html() produce the same box markup', async t => {
     // here. That is the lock this task installs.
     t.equal(el.innerHTML, fromHtml.innerHTML,
         'the element and html() should emit identical markup')
+})
+
+test('render() and html() produce the same markup with alt and ' +
+    'label set', async t => {
+    // The all-defaults case above never exercises the branchy
+    // interpolations -- the alt-badge's has-alt class, the hasAlt
+    // aria-label ternary, and the label fallback. Set alt and label
+    // so the lock covers those branches too, not just the trunk.
+    document.body.innerHTML += `
+        <image-input class="parity-alt-label-test" accept="image/png"
+            name="photo" required alt="a cat" label="Drop here"
+        ></image-input>
+    `
+    const el = await waitFor(
+        'image-input.parity-alt-label-test'
+    ) as ImageInput
+
+    const fromHtml = document.createElement('div')
+    fromHtml.innerHTML = html({
+        accept: 'image/png',
+        name: 'photo',
+        required: true,
+        alt: 'a cat',
+        label: 'Drop here',
+        text: ImageInput.TEXT
+    })
+
+    t.equal(el.innerHTML, fromHtml.innerHTML,
+        'the element and html() should emit identical markup ' +
+        'when alt and label are set')
 })

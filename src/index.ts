@@ -339,7 +339,7 @@ export class ImageInput extends WebComponent {
             name: this.name,
             required: this.required,
             alt: this.alt,
-            label: this.label,
+            label: this.label ?? ImageInput.DEFAULT_LABEL,
             text: ImageInput.TEXT
         })
     }
