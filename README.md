@@ -336,7 +336,15 @@ and exposes `setImage(blob)`, `clear()` and `destroy()`.
 
 `html()` takes `accept`, `name`, `required`, `alt` and `label`, plus
 `dialogs: false` to leave the built-in dialogs out when you supply
-your own editing UI.
+your own editing UI. Pass `text` (the same shape as `ImageInput.TEXT`)
+to set the built-in dialogs' copy on this path, without importing the
+custom element:
+
+```js
+import { DEFAULT_TEXT } from '@substrate-system/image-input/dialogs'
+
+html({ name: 'avatar', text: { ...DEFAULT_TEXT, cropHeading: 'Crop' } })
+```
 
 One difference from the custom element: `ImageInputClient` does not
 write the picked file back into `input.files`, so a cropped image does

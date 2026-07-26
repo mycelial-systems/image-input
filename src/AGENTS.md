@@ -146,7 +146,7 @@
   template. The two used to be separate copies and drifted: `html()`
   was still emitting a `.wrapper` div long after `render()` moved to
   `.box`/`.picker`/`.prompt`, so every stylesheet rule missed it.
-  `test/index.ts`'s "render() and html() produce the same box markup"
+  `test/index.ts`'s "render() and html() produce the same markup"
   test is what holds the two together -- do not delete it, and do not
   reintroduce a second template.
 - `image-input:not(:defined, :has(.box))` in `src/index.css` hides an
