@@ -300,6 +300,49 @@ import { ImageCrop } from '@substrate-system/image-input/crop'
 
 ## API
 
+### Server rendering
+
+The same markup is available as a string, so a page can render the
+input server-side and attach behavior later, or never.
+
+```js
+import { html } from '@substrate-system/image-input/html'
+
+res.send(`<image-input>${html({ name: 'avatar' })}</image-input>`)
+```
+
+Two rules:
+
+* **The host element must be an `<image-input>` tag.** Every rule in
+  the stylesheet is scoped under that element selector, so markup
+  dropped into a `<div>` renders unstyled.
+* **Import the CSS.** The markup carries no inline styles.
+
+The page is styled and the picker works with no JavaScript at all,
+because the control is a real `<input type="file">`. To add the
+preview, the overlay buttons and the dialogs, hydrate it:
+
+```js
+import { ImageInputClient } from '@substrate-system/image-input/client'
+
+const client = new ImageInputClient(
+    document.querySelector('image-input')
+)
+```
+
+`ImageInputClient` emits the same `image-input:*` events as the custom
+element, honors `preventDefault()` on `:edit` and `:alt` the same way,
+and exposes `setImage(blob)`, `clear()` and `destroy()`.
+
+`html()` takes `accept`, `name`, `required`, `alt` and `label`, plus
+`dialogs: false` to leave the built-in dialogs out when you supply
+your own editing UI.
+
+One difference from the custom element: `ImageInputClient` does not
+write the picked file back into `input.files`, so a cropped image does
+not submit with a surrounding form on this path. Use the custom
+element where form submission matters.
+
 ## API
 
 This exposes ESM and common JS via

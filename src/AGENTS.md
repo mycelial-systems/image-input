@@ -132,12 +132,33 @@
   `dataTransfer.files` does not, so scan `record`, not `files`.
 - `#setFile(file:File|Blob, name?:string)` is the single place that
   normalizes every input path (pick, drop, `setImage()`) to a `File`
-  and calls `#syncInputFiles`. A plain `Blob` (or a `File` passed with
-  an explicit `name` override) gets wrapped with `new File([file],
-  name ?? this.#deriveName(file.type), { type: file.type })` before
-  anything else happens -- `#deriveName` must read `this.#file` (the
-  *previous* file, for its base name) before `#setFile` overwrites
-  `this.#file` with the new one. Because of this, `#file` is always a
+  and calls `#syncInputFiles`. It hands the promotion itself to
+  `toFile()` in `src/file.ts`, but must read `this.#file?.name` (the
+  *previous* file's name) in that same call, before reassigning
+  `this.#file` to the new one -- `toFile()` falls back to that name
+  when none is passed, so reading it after reassignment would name a
+  cropped image after itself. Because of this, `#file` is always a
   `File`, never a bare `Blob`, so callers/tests can assume
   `detail.file instanceof File` on every `image-input:change`/`:edit`/
   `:alt` event, even after a `setImage(croppedBlob)` call.
+- `src/html.ts` is the only place this package's markup is written.
+  `ImageInput.render()` calls `html()` rather than keeping its own
+  template. The two used to be separate copies and drifted: `html()`
+  was still emitting a `.wrapper` div long after `render()` moved to
+  `.box`/`.picker`/`.prompt`, so every stylesheet rule missed it.
+  `test/index.ts`'s "render() and html() produce the same box markup"
+  test is what holds the two together -- do not delete it, and do not
+  reintroduce a second template.
+- `image-input:not(:defined, :has(.box))` in `src/index.css` hides an
+  un-upgraded element only while it is empty. Server-rendered markup
+  from `html()` contains a `.box`, so it stays visible before (or
+  without) the custom element upgrading. Plain `:not(:defined)` would
+  hide the whole static markup path, and `:empty` would not work
+  because `<image-input>\n</image-input>` contains a whitespace text
+  node. The combined `:not(a, b)` form is required by stylelint's
+  `selector-not-notation` rule; it is De Morgan equivalent to
+  `:not(:defined):not(:has(.box))`.
+- `src/file.ts` holds the Blob-to-File promotion both `ImageInput` and
+  `ImageInputClient` use. Both must guarantee the file they hold is a
+  `File`: `ImageCrop.setFile()` requires one, and consumers read
+  `detail.file.name`. Don't copy the logic into either caller.

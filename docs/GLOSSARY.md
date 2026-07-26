@@ -112,8 +112,9 @@ text *value*, which is per element.
 **Static markup path** -- The no-custom-element route: `html()` emits
 the markup as a string for a server-rendered page, and
 `ImageInputClient` attaches the behavior to markup already in the
-document. Presentation and behavior are kept separate so this path
-exists at all.
+document. `html()` is also what `ImageInput.render()` calls, so there
+is exactly one template. The host element must be an `<image-input>`
+tag, because the stylesheet is scoped to that element selector.
 
 **Author-sized** -- The rule that the component sets no width, height,
 min-height or aspect ratio on itself. Sizing is the consuming page's
