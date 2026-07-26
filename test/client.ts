@@ -89,3 +89,109 @@ test('setImage promotes a Blob to a File on the client', async t => {
     t.equal((seen as File).name, 'photo.jpg',
         'should keep the base name and swap the extension')
 })
+
+test('the ALT badge opens the alt dialog, seeded with the alt text',
+    async t => {
+        const { host } = mount('client-alt-open-test')
+        selectFile(host, new File(['abc'], 'photo.png', {
+            type: 'image/png'
+        }))
+
+        const badge = host.querySelector('.alt-badge') as HTMLElement
+        const dialog = host.querySelector(
+            '.alt-dialog'
+        ) as HTMLDialogElement
+        const textarea = dialog.querySelector(
+            'textarea'
+        ) as HTMLTextAreaElement
+
+        t.equal(dialog.open, false,
+            'the dialog should start closed')
+
+        badge.click()
+
+        t.equal(dialog.open, true,
+            'clicking the badge should open the alt dialog')
+        t.equal(textarea.value, '',
+            'the textarea should be seeded with the current alt text')
+    })
+
+test('saving alt text updates the image and emits alt-change',
+    async t => {
+        const { host } = mount('client-alt-save-test')
+        selectFile(host, new File(['abc'], 'photo.png', {
+            type: 'image/png'
+        }))
+
+        let emitted:string|null = null
+        host.addEventListener('image-input:alt-change', ev => {
+            emitted = (ev as CustomEvent).detail.alt
+        })
+
+        const badge = host.querySelector('.alt-badge') as HTMLElement
+        const dialog = host.querySelector(
+            '.alt-dialog'
+        ) as HTMLDialogElement
+        const textarea = dialog.querySelector(
+            'textarea'
+        ) as HTMLTextAreaElement
+
+        badge.click()
+        textarea.value = 'a red square'
+        ;(host.querySelector('.alt-save') as HTMLElement).click()
+
+        const img = host.querySelector('img') as HTMLImageElement
+        t.equal(dialog.open, false, 'saving should close the dialog')
+        t.equal(img.getAttribute('alt'), 'a red square',
+            'saving should write the alt text onto the img')
+        t.equal(badge.classList.contains('has-alt'), true,
+            'saving should mark the badge')
+        t.equal(emitted, 'a red square',
+            'saving should emit alt-change')
+    })
+
+test('canceling the alt dialog leaves the alt text alone', async t => {
+    const { host } = mount('client-alt-cancel-test')
+    selectFile(host, new File(['abc'], 'photo.png', {
+        type: 'image/png'
+    }))
+
+    const badge = host.querySelector('.alt-badge') as HTMLElement
+    const dialog = host.querySelector(
+        '.alt-dialog'
+    ) as HTMLDialogElement
+    const textarea = dialog.querySelector(
+        'textarea'
+    ) as HTMLTextAreaElement
+
+    badge.click()
+    textarea.value = 'discard me'
+    ;(host.querySelector('.alt-cancel') as HTMLElement).click()
+
+    const img = host.querySelector('img') as HTMLImageElement
+    t.equal(dialog.open, false, 'cancel should close the dialog')
+    t.equal(img.getAttribute('alt'), '',
+        'cancel should not write the alt text')
+})
+
+test('canceling image-input:alt suppresses the built-in dialog',
+    async t => {
+        const { host } = mount('client-alt-optout-test')
+        selectFile(host, new File(['abc'], 'photo.png', {
+            type: 'image/png'
+        }))
+
+        host.addEventListener('image-input:alt', ev => {
+            ev.preventDefault()
+        })
+
+        const badge = host.querySelector('.alt-badge') as HTMLElement
+        const dialog = host.querySelector(
+            '.alt-dialog'
+        ) as HTMLDialogElement
+
+        badge.click()
+
+        t.equal(dialog.open, false,
+            'the dialog should stay closed when the event is canceled')
+    })

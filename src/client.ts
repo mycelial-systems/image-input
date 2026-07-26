@@ -1,18 +1,25 @@
 import { createDebug } from '@substrate-system/debug'
 import { toFile } from './file.js'
+import { openDialog, closeDialog } from './dialogs.js'
 const debug = createDebug('image-input:client')
 
 export interface ImageInputClientOptions {
     /**
-     * Emit a (non-namespaced) event. Defaults to dispatching a bubbling,
-     * cancelable `image-input:<type>` CustomEvent on the host element.
+     * Emit a (non-namespaced) event, returning `false` when a listener
+     * canceled it. Defaults to dispatching a bubbling, cancelable
+     * `image-input:<type>` CustomEvent on the host element.
      */
-    emit?:(type:string, detail?:unknown) => void;
+    emit?:(type:string, detail?:unknown) => boolean;
     /**
      * Read the current alt text. Defaults to the preview image's `alt`
      * attribute.
      */
     getAlt?:() => string;
+    /**
+     * Write the alt text. Defaults to setting the preview image's
+     * `alt`, updating the ALT badge, and emitting `alt-change`.
+     */
+    setAlt?:(alt:string) => void;
     /**
      * Reset the alt text when the image is removed. Defaults to clearing
      * the preview image's `alt`, un-highlighting the ALT badge, and
@@ -31,8 +38,9 @@ export interface ImageInputClientOptions {
  */
 export class ImageInputClient {
     readonly host:HTMLElement
-    #emit:(type:string, detail?:unknown) => void
+    #emit:(type:string, detail?:unknown) => boolean
     #getAlt:() => string
+    #setAlt:(alt:string) => void
     #resetAlt:() => void
     #file:File|null = null
     #previewUrl:string|null = null
@@ -41,11 +49,13 @@ export class ImageInputClient {
         this.host = host
 
         this.#emit = opts.emit ?? ((type, detail) => {
-            host.dispatchEvent(new CustomEvent(`image-input:${type}`, {
-                bubbles: true,
-                cancelable: true,
-                detail
-            }))
+            return host.dispatchEvent(
+                new CustomEvent(`image-input:${type}`, {
+                    bubbles: true,
+                    cancelable: true,
+                    detail
+                })
+            )
         })
 
         this.#getAlt = opts.getAlt ?? (() => {
@@ -53,15 +63,21 @@ export class ImageInputClient {
             return img?.getAttribute('alt') ?? ''
         })
 
-        this.#resetAlt = opts.resetAlt ?? (() => {
-            this.#qs('img')?.setAttribute('alt', '')
+        this.#setAlt = opts.setAlt ?? ((alt:string) => {
+            this.#qs('img')?.setAttribute('alt', alt)
             const badge = this.#qs('.alt-badge')
             if (badge) {
-                badge.classList.remove('has-alt')
-                badge.setAttribute('aria-label', 'Add alt text')
+                const hasAlt = !!alt
+                badge.classList.toggle('has-alt', hasAlt)
+                badge.setAttribute(
+                    'aria-label',
+                    hasAlt ? 'Edit alt text' : 'Add alt text'
+                )
             }
-            this.#emit('alt-change', { alt: '' })
+            this.#emit('alt-change', { alt })
         })
+
+        this.#resetAlt = opts.resetAlt ?? (() => this.#setAlt(''))
 
         this.#setup()
     }
@@ -76,6 +92,10 @@ export class ImageInputClient {
         this.#qs('.remove')?.addEventListener('click', this.#handleRemove)
         this.#qs('.edit')?.addEventListener('click', this.#handleEdit)
         this.#qs('.alt-badge')?.addEventListener('click', this.#handleAlt)
+        this.#qs('.alt-save')
+            ?.addEventListener('click', this.#handleAltSave)
+        this.#qs('.alt-cancel')
+            ?.addEventListener('click', this.#handleAltCancel)
     }
 
     /**
@@ -88,6 +108,10 @@ export class ImageInputClient {
         this.#qs('.remove')?.removeEventListener('click', this.#handleRemove)
         this.#qs('.edit')?.removeEventListener('click', this.#handleEdit)
         this.#qs('.alt-badge')?.removeEventListener('click', this.#handleAlt)
+        this.#qs('.alt-save')
+            ?.removeEventListener('click', this.#handleAltSave)
+        this.#qs('.alt-cancel')
+            ?.removeEventListener('click', this.#handleAltCancel)
         this.#revokePreviewUrl()
     }
 
@@ -111,13 +135,39 @@ export class ImageInputClient {
     #handleEdit = (event:Event) => {
         event.preventDefault()
         if (!this.#file) return
-        this.#emit('edit', { file: this.#file })
+        const notCanceled = this.#emit('edit', { file: this.#file })
+        if (notCanceled) {
+            // The built-in crop dialog opens here; see Task 9.
+        }
     }
 
     #handleAlt = (event:Event) => {
         event.preventDefault()
         if (!this.#file) return
-        this.#emit('alt', { file: this.#file, alt: this.#getAlt() })
+        const notCanceled = this.#emit('alt', {
+            file: this.#file,
+            alt: this.#getAlt()
+        })
+        if (!notCanceled) return
+
+        const dialog = this.#qs<HTMLDialogElement>('.alt-dialog')
+        const textarea = dialog?.querySelector('textarea')
+        if (textarea) textarea.value = this.#getAlt()
+        if (dialog) openDialog(dialog)
+    }
+
+    #handleAltSave = (event:Event) => {
+        event.preventDefault()
+        const dialog = this.#qs<HTMLDialogElement>('.alt-dialog')
+        const textarea = dialog?.querySelector('textarea')
+        this.#setAlt(textarea?.value ?? '')
+        if (dialog) closeDialog(dialog)
+    }
+
+    #handleAltCancel = (event:Event) => {
+        event.preventDefault()
+        const dialog = this.#qs<HTMLDialogElement>('.alt-dialog')
+        if (dialog) closeDialog(dialog)
     }
 
     /**
