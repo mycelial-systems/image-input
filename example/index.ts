@@ -64,9 +64,7 @@ function Example ({ crop, heading, description }:ExampleProps) {
         }
 
         /**
-         * Types are inferred correctly here. The handler stays inline
-         * -- that inference is the point of this block -- so it is
-         * removed with an `AbortController` rather than by name.
+         * Types are inferred correctly here.
          * `on()` passes its options straight to `addEventListener`.
          */
         const controller = new AbortController()

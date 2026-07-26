@@ -12,16 +12,6 @@ export interface ExampleSignals {
 }
 
 /**
- * One example's signals plus the listeners that write them, paired as
- * `[eventName, listener]` so the caller can add and remove the whole
- * set in a symmetric loop.
- */
-export interface ExampleStore {
-    signals:ExampleSignals;
-    listeners:[string, EventListener][];
-}
-
-/**
  * Build the state for a single example.
  *
  * These used to be module-level signals, which was fine while the page
@@ -29,7 +19,7 @@ export interface ExampleStore {
  * signals would mean every panel showed whichever input fired last, so
  * each example gets its own set instead.
  */
-export function createStore ():ExampleStore {
+export function State ():ExampleSignals {
     const signals:ExampleSignals = {
         altText: signal(''),
         fileName: signal(''),
@@ -99,3 +89,34 @@ export function createStore ():ExampleStore {
 
     return { signals, listeners }
 }
+
+State.handleChange = function (state:ExampleSignals, ev:Event):void {
+    const { file } = (ev as CustomEvent).detail
+    const { fileName } = state
+
+    batch(() => {
+        fileName.value = file.name
+        fileSize.value = file.size
+        lastEvent.value = ev.type
+        errorReason.value = ''
+    })
+}
+
+export const listeners:[string, EventListener][] = [
+    ['image-input:change', handleChange],
+    ['image-input:alt-change', handleAltChange],
+    ['image-input:remove', handleRemove],
+    ['image-input:error', handleError],
+    ['image-input:edit', handleEdit],
+    ['image-input:alt', handleAlt]
+]
+
+// function handleChange (event:Event):void {
+//     const { file } = (event as CustomEvent).detail
+//     batch(() => {
+//         fileName.value = file.name
+//         fileSize.value = file.size
+//         lastEvent.value = event.type
+//         errorReason.value = ''
+//     })
+// }
