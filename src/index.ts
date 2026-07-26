@@ -34,6 +34,15 @@ export class ImageInput extends WebComponent {
 
     static TEXT:DialogText = { ...DEFAULT_TEXT }
 
+    /**
+     * The MIME-type-to-extension map shared with `src/file.ts`. This
+     * is the same object `deriveName` reads, not a copy -- mutate it
+     * in place (e.g. `ImageInput.EXT['image/heic'] = 'heic'`) to add
+     * or change an extension. Reassigning this property entirely
+     * (`ImageInput.EXT = {...}`) does not change `deriveName`'s
+     * behavior, since it still closes over the original module
+     * binding.
+     */
     static EXT:Record<string, string> = EXT
 
     #file:File|null = null
