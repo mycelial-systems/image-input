@@ -95,6 +95,62 @@ test('html() omits name and required when not asked for', async t => {
         'accept should default to image/*')
 })
 
+test('html() escapes a double quote in alt so it cannot break out ' +
+    'of the attribute', async t => {
+    const evil = '" onerror="alert(1)'
+    const host = parse(html({ alt: evil }))
+    const img = host.querySelector('img') as HTMLImageElement
+
+    t.equal(img.getAttribute('alt'), evil,
+        'the parsed alt attribute should equal the original string')
+    t.equal(img.hasAttribute('onerror'), false,
+        'no onerror attribute should have been injected')
+})
+
+test('html() escapes a double quote in label so it cannot break ' +
+    'out of the input\'s aria-label attribute', async t => {
+    const evil = '" onerror="alert(1)'
+    const host = parse(html({ label: evil }))
+    const input = host.querySelector(
+        'input[type="file"]'
+    ) as HTMLInputElement
+
+    t.equal(input.getAttribute('aria-label'), evil,
+        'the parsed aria-label attribute should equal the original ' +
+        'string')
+    t.equal(input.hasAttribute('onerror'), false,
+        'no onerror attribute should have been injected')
+})
+
+test('html() escapes a double quote in name so it cannot break out ' +
+    'of the input\'s name attribute', async t => {
+    const evil = '" onerror="alert(1)'
+    const host = parse(html({ name: evil }))
+    const input = host.querySelector(
+        'input[type="file"]'
+    ) as HTMLInputElement
+
+    t.equal(input.getAttribute('name'), evil,
+        'the parsed name attribute should equal the original string')
+    t.equal(input.hasAttribute('onerror'), false,
+        'no onerror attribute should have been injected')
+})
+
+test('html() escapes a double quote in accept so it cannot break ' +
+    'out of the input\'s accept attribute', async t => {
+    const evil = '" onerror="alert(1)'
+    const host = parse(html({ accept: evil }))
+    const input = host.querySelector(
+        'input[type="file"]'
+    ) as HTMLInputElement
+
+    t.equal(input.getAttribute('accept'), evil,
+        'the parsed accept attribute should equal the original ' +
+        'string')
+    t.equal(input.hasAttribute('onerror'), false,
+        'no onerror attribute should have been injected')
+})
+
 test('html() reflects alt onto the img and the badge', async t => {
     const withAlt = parse(html({ alt: 'a cat' }))
     const img = withAlt.querySelector('img') as HTMLImageElement

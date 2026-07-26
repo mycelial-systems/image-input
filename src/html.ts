@@ -10,6 +10,19 @@ import {
  */
 export const DEFAULT_LABEL = 'Drop an image, or click to choose one'
 
+/**
+ * Escape a string for safe interpolation inside a double-quoted HTML
+ * attribute. `&` must run first, or the entities this introduces
+ * would themselves get escaped.
+ */
+function escapeAttr (value:string):string {
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+}
+
 export interface ImageInputHtmlOptions {
     accept?:string|null;
     name?:string|null;
@@ -35,12 +48,14 @@ export interface ImageInputHtmlOptions {
  * it up with `ImageInputClient` (see `./client.ts`).
  */
 export function html (opts:ImageInputHtmlOptions = {}):string {
-    const accept = opts.accept ?? 'image/*'
-    const name = opts.name ? ` name="${opts.name}"` : ''
+    const accept = escapeAttr(opts.accept ?? 'image/*')
+    const name = opts.name ?
+        ` name="${escapeAttr(opts.name)}"` :
+        ''
     const required = opts.required ? ' required' : ''
-    const alt = opts.alt ?? ''
+    const alt = escapeAttr(opts.alt ?? '')
     const hasAlt = !!opts.alt
-    const label = opts.label ?? DEFAULT_LABEL
+    const label = escapeAttr(opts.label ?? DEFAULT_LABEL)
     const text = opts.text ?? DEFAULT_TEXT
     const wantsDialogs = opts.dialogs ?? true
 
