@@ -270,10 +270,16 @@ image-input {
 }
 
 /**
- * Don't show until JavaScript is instantiated
+ * Don't show until JavaScript is instantiated -- but only when there
+ * is nothing to show. An element that already contains server-
+ * rendered markup from `html()` is styled and usable before, or
+ * without, the custom element upgrading, so hiding it would defeat
+ * the whole static markup path. `:has()` rather than `:empty`
+ * because `<image-input>\n</image-input>` contains a whitespace text
+ * node and so is not `:empty`.
  */
-image-input:not(:defined) {
-	visibility: hidden;
+image-input:not(:defined, :has(.box)) {
+    visibility: hidden;
 }
 
 image-crop {
