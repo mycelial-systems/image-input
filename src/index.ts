@@ -9,6 +9,7 @@ import {
 } from './dialogs.js'
 import { html, DEFAULT_LABEL as LABEL } from './html.js'
 import { ImageCrop } from './crop.js'
+import { EXT, toFile } from './file.js'
 const debug = createDebug('image-input')
 
 // for document.querySelector
@@ -33,13 +34,7 @@ export class ImageInput extends WebComponent {
 
     static TEXT:DialogText = { ...DEFAULT_TEXT }
 
-    static EXT:Record<string, string> = {
-        'image/jpeg': 'jpg',
-        'image/png': 'png',
-        'image/webp': 'webp',
-        'image/gif': 'gif',
-        'image/avif': 'avif'
-    }
+    static EXT:Record<string, string> = EXT
 
     #file:File|null = null
     #previewUrl:string|null = null
@@ -269,21 +264,8 @@ export class ImageInput extends WebComponent {
         return cropEl
     }
 
-    #deriveName (type:string):string {
-        const prevName = this.#file?.name
-        const base = prevName ?
-            prevName.replace(/\.[^.]+$/, '') :
-            'image'
-        const ext = ImageInput.EXT[type] ?? 'jpg'
-        return `${base}.${ext}`
-    }
-
     #setFile (file:File|Blob, name?:string):File {
-        const asFile = (file instanceof File && !name) ?
-            file :
-            new File([file], name ?? this.#deriveName(file.type), {
-                type: file.type
-            })
+        const asFile = toFile(file, name, this.#file?.name)
 
         this.#syncInputFiles(asFile)
         this.#revokePreviewUrl()

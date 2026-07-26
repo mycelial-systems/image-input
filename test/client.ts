@@ -70,3 +70,22 @@ test('clear() removes has-image from both', async t => {
     t.equal(box.classList.contains('has-image'), false,
         'the box should lose has-image')
 })
+
+test('setImage promotes a Blob to a File on the client', async t => {
+    const { host, client } = mount('client-promote-test')
+    selectFile(host, new File(['abc'], 'photo.png', {
+        type: 'image/png'
+    }))
+
+    let seen:unknown = null
+    host.addEventListener('image-input:change', ev => {
+        seen = (ev as CustomEvent).detail.file
+    })
+
+    client.setImage(new Blob(['xyz'], { type: 'image/jpeg' }))
+
+    t.ok(seen instanceof File,
+        'the change detail should carry a File, not a bare Blob')
+    t.equal((seen as File).name, 'photo.jpg',
+        'should keep the base name and swap the extension')
+})

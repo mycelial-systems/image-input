@@ -1,4 +1,5 @@
 import { createDebug } from '@substrate-system/debug'
+import { toFile } from './file.js'
 const debug = createDebug('image-input:client')
 
 export interface ImageInputClientOptions {
@@ -33,7 +34,7 @@ export class ImageInputClient {
     #emit:(type:string, detail?:unknown) => void
     #getAlt:() => string
     #resetAlt:() => void
-    #file:File|Blob|null = null
+    #file:File|null = null
     #previewUrl:string|null = null
 
     constructor (host:HTMLElement, opts:ImageInputClientOptions = {}) {
@@ -123,20 +124,24 @@ export class ImageInputClient {
      * Replace the preview with a Blob (e.g. a cropped image), and use it
      * as the file emitted in the resulting `image-input:change` event.
      */
-    setImage (blob:Blob):void {
-        this.#setFile(blob)
-        this.#emit('change', { file: blob, alt: this.#getAlt() })
+    setImage (blob:Blob, name?:string):void {
+        const file = this.#setFile(blob, name)
+        this.#emit('change', { file, alt: this.#getAlt() })
     }
 
-    #setFile (file:File|Blob):void {
+    #setFile (file:File|Blob, name?:string):File {
+        const asFile = toFile(file, name, this.#file?.name)
+
         this.#revokePreviewUrl()
-        this.#file = file
-        this.#previewUrl = URL.createObjectURL(file)
+        this.#file = asFile
+        this.#previewUrl = URL.createObjectURL(asFile)
 
         const img = this.#qs<HTMLImageElement>('img')
         if (img) img.src = this.#previewUrl
         this.#qs('.preview')?.classList.add('has-image')
         this.#qs('.box')?.classList.add('has-image')
+
+        return asFile
     }
 
     /**
