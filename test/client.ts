@@ -234,24 +234,27 @@ test('saving the crop replaces the image and closes the dialog',
         const file = await makeImageFile(100, 80)
         selectFile(host, file)
 
-        let changed:File|null = null
-        host.addEventListener('image-input:change', ev => {
-            changed = (ev as CustomEvent).detail.file
-        })
-
         ;(host.querySelector('.edit') as HTMLElement).click()
 
         const cropEl = host.querySelector('image-crop') as ImageCrop
         await waitForCropRect(cropEl, 100)
 
+        // Register before clicking Save so there is no window in
+        // which the event could fire before we are listening.
+        const changed = new Promise<File>(resolve => {
+            host.addEventListener('image-input:change', ev => {
+                resolve((ev as CustomEvent).detail.file)
+            }, { once: true })
+        })
+
         ;(host.querySelector('.crop-save') as HTMLElement).click()
-        await new Promise(resolve => setTimeout(resolve, 50))
+        const changedFile = await changed
 
         const dialog = host.querySelector(
             '.crop-dialog'
         ) as HTMLDialogElement
         t.equal(dialog.open, false, 'saving should close the dialog')
-        t.ok(changed instanceof File,
+        t.ok(changedFile instanceof File,
             'saving should emit a change carrying a File')
     })
 
