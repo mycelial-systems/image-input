@@ -105,7 +105,12 @@ export class ImageInputClient {
     }
 
     /**
-     * Remove all event listeners and revoke any outstanding preview URL.
+     * Remove all event listeners, revoke any outstanding preview URL,
+     * and remove the lazily created `<image-crop>` (if any) from the
+     * DOM. Without that last step, `ImageCrop.connectedCallback`'s
+     * window listeners would outlive the client that created it --
+     * the custom element avoids this for free, since disconnecting it
+     * disconnects its crop child too.
      */
     destroy ():void {
         debug('destroy')
@@ -122,6 +127,7 @@ export class ImageInputClient {
             ?.removeEventListener('click', this.#handleCropSave)
         this.#qs('.crop-cancel')
             ?.removeEventListener('click', this.#handleCropCancel)
+        this.#qs<ImageCrop>(ImageCrop.TAG)?.remove()
         this.#revokePreviewUrl()
     }
 

@@ -228,6 +228,24 @@ test('the edit button lazily creates an image-crop and opens the ' +
         'reopening should reuse it, not append a second')
 })
 
+test('destroy() removes the lazily created image-crop from the DOM',
+    async t => {
+        const { host, client } = mount('client-destroy-crop-test')
+        selectFile(host, new File(['abc'], 'photo.png', {
+            type: 'image/png'
+        }))
+
+        ;(host.querySelector('.edit') as HTMLElement).click()
+
+        t.ok(host.querySelector('image-crop'),
+            'sanity check: image-crop was created')
+
+        client.destroy()
+
+        t.equal(host.querySelector('image-crop'), null,
+            'image-crop should be removed from the DOM after destroy()')
+    })
+
 test('saving the crop replaces the image and closes the dialog',
     async t => {
         const { host } = mount('client-crop-save-test')
