@@ -1434,38 +1434,48 @@ test('setting the label attribute updates the prompt text and the ' +
 })
 
 test('render() and html() produce the same markup', async t => {
-    document.body.innerHTML += `
-        <image-input class="parity-test" accept="image/png"
-            name="photo" required></image-input>
-    `
-    const el = await waitFor('image-input.parity-test') as ImageInput
+    // Reassign ImageInput.TEXT to something other than DEFAULT_TEXT
+    // before rendering, and restore it in `finally` even if an
+    // assertion below fails. Passing `text: ImageInput.TEXT` to
+    // html() below only proves render() forwards the option if the
+    // two sides can actually disagree -- with TEXT left untouched,
+    // html()'s own DEFAULT_TEXT fallback is value-identical to it,
+    // and a render() that dropped the option entirely would still
+    // pass here by coincidence.
+    const originalText = ImageInput.TEXT
+    ImageInput.TEXT = { ...originalText, cropHeading: 'Custom crop heading' }
 
-    const fromHtml = document.createElement('div')
-    fromHtml.innerHTML = html({
-        accept: 'image/png',
-        name: 'photo',
-        required: true,
-        // Pass ImageInput.TEXT explicitly, matching what render()
-        // supplies. Relying on html()'s own DEFAULT_TEXT fallback
-        // would make this test pass by coincidence today, and fail
-        // for an unrelated reason the first time a caller reassigns
-        // the documented ImageInput.TEXT customization point.
-        text: ImageInput.TEXT
-    })
+    try {
+        document.body.innerHTML += `
+            <image-input class="parity-test" accept="image/png"
+                name="photo" required></image-input>
+        `
+        const el = await waitFor('image-input.parity-test') as ImageInput
 
-    t.ok(el.querySelector('.box'), 'the element should render a box')
-    t.ok(el.querySelector('.alt-dialog'),
-        'the element should still render the alt dialog')
-    t.ok(el.querySelector('.crop-dialog'),
-        'the element should still render the crop dialog')
+        const fromHtml = document.createElement('div')
+        fromHtml.innerHTML = html({
+            accept: 'image/png',
+            name: 'photo',
+            required: true,
+            text: ImageInput.TEXT
+        })
 
-    // Compare the whole rendered subtree, not just the box. Both
-    // sides are browser-serialized from the same parse path, so this
-    // is an exact comparison -- which is the point. A drift anywhere,
-    // including in the whitespace between the two dialogs, fails
-    // here. That is the lock this task installs.
-    t.equal(el.innerHTML, fromHtml.innerHTML,
-        'the element and html() should emit identical markup')
+        t.ok(el.querySelector('.box'), 'the element should render a box')
+        t.ok(el.querySelector('.alt-dialog'),
+            'the element should still render the alt dialog')
+        t.ok(el.querySelector('.crop-dialog'),
+            'the element should still render the crop dialog')
+
+        // Compare the whole rendered subtree, not just the box. Both
+        // sides are browser-serialized from the same parse path, so
+        // this is an exact comparison -- which is the point. A drift
+        // anywhere, including in the whitespace between the two
+        // dialogs, fails here. That is the lock this task installs.
+        t.equal(el.innerHTML, fromHtml.innerHTML,
+            'the element and html() should emit identical markup')
+    } finally {
+        ImageInput.TEXT = originalText
+    }
 })
 
 test('render() and html() produce the same markup with alt and ' +
