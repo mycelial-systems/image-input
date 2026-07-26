@@ -31,7 +31,8 @@ const EXAMPLES:ExampleProps[] = [
         crop: 'circle',
         heading: html`<code>crop="circle"</code>`,
         description: 'Locks to 1:1 and draws the crop area as a ' +
-            'circle. The saved image is still a rectangle.'
+            'circle. The circle is UI only -- the saved image is a ' +
+            'cropped square with its corners intact. Round it with CSS.'
     },
     {
         crop: 'constrain',
