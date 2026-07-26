@@ -330,9 +330,11 @@ const client = new ImageInputClient(
 )
 ```
 
-`ImageInputClient` emits the same `image-input:*` events as the custom
-element, honors `preventDefault()` on `:edit` and `:alt` the same way,
-and exposes `setImage(blob)`, `clear()` and `destroy()`.
+`ImageInputClient` emits `image-input:change`, `image-input:remove`,
+`image-input:edit`, `image-input:alt` and `image-input:alt-change`,
+honors `preventDefault()` on `:edit` and `:alt` the same way the
+custom element does, and exposes `setImage(blob)`, `clear()` and
+`destroy()`.
 
 `html()` takes `accept`, `name`, `required`, `alt` and `label`, plus
 `dialogs: false` to leave the built-in dialogs out when you supply
@@ -346,10 +348,22 @@ import { DEFAULT_TEXT } from '@substrate-system/image-input/dialogs'
 html({ name: 'avatar', text: { ...DEFAULT_TEXT, cropHeading: 'Crop' } })
 ```
 
-One difference from the custom element: `ImageInputClient` does not
-write the picked file back into `input.files`, so a cropped image does
-not submit with a surrounding form on this path. Use the custom
-element where form submission matters.
+Some differences from the custom element:
+
+* `ImageInputClient` does not write the picked file back into
+  `input.files`, so a cropped image does not submit with a
+  surrounding form on this path. Use the custom element where form
+  submission matters.
+* There is no drop target on this path. Dropping a file onto the box
+  falls through to the browser's default behavior (typically
+  navigating to the file) instead of showing a preview -- only the
+  file picker works. The custom element's drag-and-drop wiring is not
+  part of `ImageInputClient`.
+* `ImageInputClient` never emits `image-input:error`. Picking a
+  non-image file is silently ignored rather than reported; there is
+  no drop path to report errors from either.
+
+Use the custom element where any of these matter.
 
 ## API
 
