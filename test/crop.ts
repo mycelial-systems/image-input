@@ -480,3 +480,209 @@ test('re-lays out to fill the container again after it grows back',
         t.equal(parseFloat(frame.style.height), startHeight,
             'should restore the frame height along with the width')
     })
+
+test('crop="3/4" locks the initial rect to that ratio, centered', async t => {
+    document.body.innerHTML += `
+        <image-crop class="ratio-literal-test" crop="3/4"
+            style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.ratio-literal-test') as ImageCrop
+    const file = await makeImageFile(400, 200)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    t.deepEqual(el.crop, { x: 125, y: 0, width: 150, height: 200 },
+        'should be the largest 3:4 rect inside a 400x200 image, centered')
+
+    const frame = el.querySelector('.image-crop-frame') as HTMLElement
+    t.ok(frame.classList.contains('locked'),
+        'the frame should be marked locked')
+})
+
+test('crop="constrain" locks to the source image\'s own ratio -- the ' +
+    'starting rect covers the whole image, but edge handles are inert',
+async t => {
+    document.body.innerHTML += `
+            <image-crop class="constrain-test" crop="constrain"
+                style="display:block;width:200px;"></image-crop>
+        `
+    const el = await waitFor('image-crop.constrain-test') as ImageCrop
+    const file = await makeImageFile(200, 100)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    t.deepEqual(el.crop, { x: 0, y: 0, width: 200, height: 100 },
+        'a lock to the image\'s own ratio still covers the whole image')
+
+    const frame = el.querySelector('.image-crop-frame') as HTMLElement
+    t.ok(frame.classList.contains('locked'),
+        'the frame should be marked locked')
+
+    const edgeHandle = el.querySelector('.handle-n') as HTMLElement
+    const handleRect = edgeHandle.getBoundingClientRect()
+    edgeHandle.dispatchEvent(
+        pointer('pointerdown', handleRect.left, handleRect.top)
+    )
+    window.dispatchEvent(
+        pointer('pointermove', handleRect.left, handleRect.top + 30)
+    )
+    window.dispatchEvent(
+        pointer('pointerup', handleRect.left, handleRect.top + 30)
+    )
+
+    t.deepEqual(el.crop, { x: 0, y: 0, width: 200, height: 100 },
+        'dragging an edge handle should do nothing while locked')
+})
+
+test('crop="circle" locks to 1:1 and marks the frame for circular chrome',
+    async t => {
+        document.body.innerHTML += `
+            <image-crop class="circle-test" crop="circle"
+                style="display:block;width:200px;"></image-crop>
+        `
+        const el = await waitFor('image-crop.circle-test') as ImageCrop
+        const file = await makeImageFile(400, 200)
+        el.setFile(file)
+        await waitForImageLoad(el)
+
+        t.deepEqual(el.crop, { x: 100, y: 0, width: 200, height: 200 },
+            'should be the largest square inside a 400x200 image, centered')
+
+        const frame = el.querySelector('.image-crop-frame') as HTMLElement
+        t.ok(frame.classList.contains('locked'), 'should be locked')
+        t.ok(frame.classList.contains('circle'), 'should be marked circle')
+    })
+
+test('a circle-locked crop yields a square Blob, not a masked one', async t => {
+    document.body.innerHTML += `
+        <image-crop class="circle-blob-test" crop="circle"
+            style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.circle-blob-test') as ImageCrop
+    const file = await makeImageFile(400, 200)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    const blob = await el.getBlob()
+    const dims = await loadBlobDimensions(blob)
+    t.equal(dims.width, dims.height,
+        'the blob should be square -- circle is UI chrome, not a mask')
+})
+
+test('an invalid crop value falls back to free-form cropping, without ' +
+    'throwing', async t => {
+    document.body.innerHTML += `
+        <image-crop class="invalid-crop-test" crop="sideways"
+            style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.invalid-crop-test') as ImageCrop
+    const file = await makeImageFile(200, 100)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    t.deepEqual(el.crop, { x: 0, y: 0, width: 200, height: 100 },
+        'should behave exactly like free-form: full image')
+
+    const frame = el.querySelector('.image-crop-frame') as HTMLElement
+    t.equal(frame.classList.contains('locked'), false,
+        'the frame should not be marked locked')
+})
+
+test('a corner drag under a lock scales the rect proportionally, ' +
+    'anchoring the opposite corner', async t => {
+    document.body.innerHTML += `
+        <image-crop class="locked-drag-test" crop="1/1"
+            style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.locked-drag-test') as ImageCrop
+    const file = await makeImageFile(200, 100)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    t.deepEqual(el.crop, { x: 50, y: 0, width: 100, height: 100 },
+        'sanity check: initial square rect')
+
+    const handle = el.querySelector('.handle-se') as HTMLElement
+    const handleRect = handle.getBoundingClientRect()
+    const startX = handleRect.left + handleRect.width / 2
+    const startY = handleRect.top + handleRect.height / 2
+
+    handle.dispatchEvent(pointer('pointerdown', startX, startY))
+    window.dispatchEvent(pointer('pointermove', startX - 30, startY - 10))
+    window.dispatchEvent(pointer('pointerup', startX - 30, startY - 10))
+
+    t.deepEqual(el.crop, { x: 50, y: 0, width: 90, height: 90 },
+        'should shrink, preserving the 1:1 ratio, anchored at the nw corner')
+})
+
+test('shift+arrow keys scale the locked rect proportionally, unlike ' +
+    'the free-form case where only one axis changes', async t => {
+    document.body.innerHTML += `
+        <image-crop class="locked-key-test" crop="1/1"
+            style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.locked-key-test') as ImageCrop
+    const file = await makeImageFile(200, 100)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    const rectEl = el.querySelector('.crop-rect') as HTMLElement
+    const before = el.crop
+
+    rectEl.dispatchEvent(key('ArrowLeft', true))
+
+    const after = el.crop
+    t.ok(after.width < before.width, 'shift+ArrowLeft should shrink width')
+    t.ok(after.height < before.height,
+        'shift+ArrowLeft should also shrink height')
+    t.equal(after.width, after.height, 'the 1:1 ratio should be preserved')
+})
+
+test('plain arrow keys still move (not resize) a locked crop rect', async t => {
+    document.body.innerHTML += `
+        <image-crop class="locked-key-move-test" crop="1/1"
+            style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.locked-key-move-test') as ImageCrop
+    const file = await makeImageFile(200, 100)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    const rectEl = el.querySelector('.crop-rect') as HTMLElement
+    const before = el.crop
+
+    rectEl.dispatchEvent(key('ArrowLeft'))
+
+    const after = el.crop
+    t.equal(after.width, before.width, 'size should be unchanged')
+    t.equal(after.height, before.height, 'size should be unchanged')
+    t.ok(after.x < before.x, 'should have moved left')
+})
+
+test('changing the crop attribute after an image has loaded re-fits ' +
+    'the rect to the new constraint', async t => {
+    document.body.innerHTML += `
+        <image-crop class="refit-test"
+            style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.refit-test') as ImageCrop
+    const file = await makeImageFile(400, 200)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    t.deepEqual(el.crop, { x: 0, y: 0, width: 400, height: 200 },
+        'sanity check: free-form starts out covering the whole image')
+
+    const frameBefore = el.querySelector('.image-crop-frame') as HTMLElement
+    t.equal(frameBefore.classList.contains('locked'), false,
+        'should not be locked yet')
+
+    el.setAttribute('crop', '1/1')
+
+    t.deepEqual(el.crop, { x: 100, y: 0, width: 200, height: 200 },
+        'should immediately re-fit to the largest square, centered')
+
+    const frameAfter = el.querySelector('.image-crop-frame') as HTMLElement
+    t.ok(frameAfter.classList.contains('locked'),
+        'should now be marked locked')
+})

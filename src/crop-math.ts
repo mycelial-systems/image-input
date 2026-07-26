@@ -117,6 +117,9 @@ export function moveRect (
 }
 
 export type HandleDir = 'nw'|'n'|'ne'|'e'|'se'|'s'|'sw'|'w'
+export type CornerDir = 'nw'|'ne'|'se'|'sw'
+
+export const CORNER_DIRS:CornerDir[] = ['nw', 'ne', 'se', 'sw']
 
 /**
  * Resize a rect by dragging one of its 8 handles by (dx, dy). Corner
@@ -160,4 +163,186 @@ export function resizeRect (
         width: newRight - newX,
         height: newBottom - newY
     }
+}
+
+const CORNER_SIGN:Record<CornerDir, { signX:number, signY:number }> = {
+    nw: { signX: -1, signY: -1 },
+    ne: { signX: 1, signY: -1 },
+    se: { signX: 1, signY: 1 },
+    sw: { signX: -1, signY: 1 }
+}
+
+/**
+ * Resize a rect by dragging one of its 4 corner handles by (dx, dy),
+ * keeping `width / height` equal to `ratio` throughout. The opposite
+ * corner is the anchor and never moves. Growth is clamped to `bounds`
+ * by shrinking the rect proportionally rather than letting either
+ * axis push past an edge, so the ratio can never break. Never shrinks
+ * below `minSize` on either axis.
+ */
+export function resizeRectLocked (
+    rect:CropRect,
+    handle:CornerDir,
+    dx:number,
+    dy:number,
+    bounds:DisplaySize,
+    minSize:number,
+    ratio:number
+):CropRect {
+    const { signX, signY } = CORNER_SIGN[handle]
+    const anchorX = signX > 0 ? rect.x : rect.x + rect.width
+    const anchorY = signY > 0 ? rect.y : rect.y + rect.height
+
+    // Two candidate sizes, each preserving the ratio -- one driven by
+    // the horizontal delta, one by the vertical. A diagonal drag (both
+    // nonzero) picks whichever candidate has the larger area, so the
+    // rect grows as far as the user actually dragged. A drag or
+    // keyboard step on a single axis leaves the other delta at exactly
+    // zero -- the larger-area candidate would then always be the
+    // *unchanged* axis (its area never shrinks), which would make
+    // shrinking via one axis impossible. Drive off that axis alone
+    // instead whenever the other is exactly zero.
+    const widthFromDx = rect.width + dx * signX
+    const heightFromDy = rect.height + dy * signY
+
+    let width:number
+    let height:number
+    if (dy === 0 && dx !== 0) {
+        width = widthFromDx
+        height = widthFromDx / ratio
+    } else if (dx === 0 && dy !== 0) {
+        width = heightFromDy * ratio
+        height = heightFromDy
+    } else {
+        const areaA = widthFromDx > 0 ? widthFromDx * widthFromDx / ratio : -1
+        const areaB = heightFromDy > 0 ?
+            heightFromDy * heightFromDy * ratio :
+            -1
+        if (areaA >= areaB) {
+            width = widthFromDx
+            height = widthFromDx / ratio
+        } else {
+            width = heightFromDy * ratio
+            height = heightFromDy
+        }
+    }
+
+    const minWidth = Math.max(minSize, minSize * ratio)
+    if (width < minWidth) {
+        width = minWidth
+        height = width / ratio
+    }
+
+    // Clamp so the anchored rect stays inside bounds, shrinking both
+    // axes by the same factor rather than breaking the ratio.
+    const maxWidth = signX > 0 ? bounds.width - anchorX : anchorX
+    const maxHeight = signY > 0 ? bounds.height - anchorY : anchorY
+    const scale = Math.min(1, maxWidth / width, maxHeight / height)
+    if (scale < 1) {
+        width *= scale
+        height *= scale
+    }
+
+    return {
+        x: signX > 0 ? anchorX : anchorX - width,
+        y: signY > 0 ? anchorY : anchorY - height,
+        width,
+        height
+    }
+}
+
+/**
+ * The largest rect of the given `ratio` (width / height) that fits
+ * inside a `naturalWidth` x `naturalHeight` image, centered.
+ */
+export function fitRatioRect (
+    ratio:number,
+    naturalWidth:number,
+    naturalHeight:number
+):CropRect {
+    let width = naturalWidth
+    let height = width / ratio
+    if (height > naturalHeight) {
+        height = naturalHeight
+        width = height * ratio
+    }
+    return {
+        x: (naturalWidth - width) / 2,
+        y: (naturalHeight - height) / 2,
+        width,
+        height
+    }
+}
+
+/**
+ * Parse a CSS `aspect-ratio`-style value: a bare number (`0.75`) or a
+ * `w/h` ratio (`3/4`, `3 / 4`). Returns `null` for anything that does
+ * not resolve to a finite, positive ratio.
+ */
+export function parseAspectRatio (raw:string):number|null {
+    const trimmed = raw.trim()
+    if (!trimmed) return null
+
+    const slash = trimmed.match(/^(-?[\d.]+)\s*\/\s*(-?[\d.]+)$/)
+    let value:number
+    if (slash) {
+        const w = Number(slash[1])
+        const h = Number(slash[2])
+        if (!Number.isFinite(w) || !Number.isFinite(h) || h === 0) {
+            return null
+        }
+        value = w / h
+    } else {
+        value = Number(trimmed)
+    }
+
+    return (Number.isFinite(value) && value > 0) ? value : null
+}
+
+/**
+ * A parsed `crop` attribute value. `'constrain'` defers the ratio to
+ * whatever image is loaded; `'ratio'` already knows its number,
+ * whether it came from a literal or the `circle` keyword.
+ */
+export type CropConstraint =
+    | { kind:'constrain' }
+    | { kind:'ratio', ratio:number, circle:boolean }
+
+/**
+ * Parse the `crop` attribute's three value forms -- `constrain`,
+ * `circle`, and a CSS `aspect-ratio` literal -- into one shape.
+ * Returns `null` for no value, an empty value, or anything unusable,
+ * which callers treat as free-form cropping.
+ */
+export function parseCropAttribute (
+    raw:string|null|undefined
+):CropConstraint|null {
+    if (raw == null) return null
+    const trimmed = raw.trim()
+    if (!trimmed) return null
+    if (trimmed === 'constrain') return { kind: 'constrain' }
+    if (trimmed === 'circle') {
+        return { kind: 'ratio', ratio: 1, circle: true }
+    }
+
+    const ratio = parseAspectRatio(trimmed)
+    return ratio === null ? null : { kind: 'ratio', ratio, circle: false }
+}
+
+/**
+ * Resolve a `CropConstraint` to a concrete aspect ratio. `constrain`
+ * reads it off the loaded image's natural size, returning `null` when
+ * no image has finished loading yet.
+ */
+export function resolveCropRatio (
+    constraint:CropConstraint,
+    naturalWidth:number,
+    naturalHeight:number
+):number|null {
+    if (constraint.kind === 'constrain') {
+        return (naturalWidth > 0 && naturalHeight > 0) ?
+            naturalWidth / naturalHeight :
+            null
+    }
+    return constraint.ratio
 }

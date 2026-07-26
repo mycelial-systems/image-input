@@ -22,12 +22,16 @@ declare global {
 export class ImageInput extends WebComponent {
     static TAG = 'image-input'
     TAG = ImageInput.TAG
-    static reflectedStringAttributes = ['accept', 'name', 'alt', 'label']
+    static reflectedStringAttributes = [
+        'accept', 'name', 'alt', 'label', 'crop'
+    ]
+
     static reflectedBooleanAttributes = ['required']
     declare accept:string|null
     declare name:string|null
     declare alt:string|null
     declare label:string|null
+    declare crop:string|null
     declare required:boolean
 
     static DEFAULT_LABEL = LABEL
@@ -164,6 +168,17 @@ export class ImageInput extends WebComponent {
 
         const dialog = this.qs<HTMLDialogElement>('.crop-dialog')
         const cropEl = this.#getOrCreateCropEl()
+        // `ImageCrop` does not reflect `crop` as a property (it already
+        // has a `.crop` getter for the current rect) -- forward the
+        // attribute directly, every open, in case it changed since the
+        // last one.
+        if (cropEl) {
+            if (this.crop == null) {
+                cropEl.removeAttribute('crop')
+            } else {
+                cropEl.setAttribute('crop', this.crop)
+            }
+        }
         cropEl?.setFile(this.#file)
         if (dialog) openDialog(dialog)
     }

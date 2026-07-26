@@ -156,6 +156,18 @@ export class ImageInputClient {
 
         const dialog = this.#qs<HTMLDialogElement>('.crop-dialog')
         const cropEl = this.#getOrCreateCropEl()
+        // `ImageCrop` does not reflect `crop` as a property (it already
+        // has a `.crop` getter for the current rect) -- forward the
+        // host's attribute directly, every open, in case it changed
+        // since the last one.
+        if (cropEl) {
+            const crop = this.host.getAttribute('crop')
+            if (crop == null) {
+                cropEl.removeAttribute('crop')
+            } else {
+                cropEl.setAttribute('crop', crop)
+            }
+        }
         cropEl?.setFile(this.#file)
         if (dialog) openDialog(dialog)
     }

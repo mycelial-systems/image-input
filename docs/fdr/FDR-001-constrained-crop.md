@@ -1,6 +1,6 @@
 # FDR-001: Constrained crop
 
-**Status:** Planned
+**Status:** Implemented
 **Last reviewed:** 2026-07-25
 
 ## Overview

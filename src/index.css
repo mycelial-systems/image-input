@@ -387,6 +387,41 @@ image-crop {
             top: 50%;
             cursor: w-resize;
         }
+
+        /**
+         * An edge handle has no honest behavior once the ratio is
+         * locked -- resizing it would have to move a side the user
+         * did not grab (see FDR-001). Only the four corners, which
+         * each have exactly one sensible anchor, stay interactive.
+         */
+        &.locked {
+            & .handle-n,
+            & .handle-e,
+            & .handle-s,
+            & .handle-w {
+                display: none;
+            }
+        }
+
+        /**
+         * Four rectangular dim panels cannot cut a round hole. In
+         * circle mode the crop rect itself dims the rest of the image
+         * via a spread `box-shadow` that follows its own border
+         * radius -- one element, no second rendering technique.
+         * `overflow: hidden` contains the oversized shadow.
+         */
+        &.circle {
+            overflow: hidden;
+
+            & .dim {
+                display: none;
+            }
+
+            & .crop-rect {
+                border-radius: 50%;
+                box-shadow: 0 0 0 9999px var(--image-crop-dim-color);
+            }
+        }
     }
 }
 

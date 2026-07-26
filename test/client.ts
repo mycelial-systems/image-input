@@ -228,6 +228,19 @@ test('the edit button lazily creates an image-crop and opens the ' +
         'reopening should reuse it, not append a second')
 })
 
+test('the edit button forwards the host\'s crop attribute to the ' +
+    'lazily created image-crop', async t => {
+    const { host } = mount('client-crop-forward-test')
+    host.setAttribute('crop', 'circle')
+    selectFile(host, new File(['abc'], 'photo.png', { type: 'image/png' }))
+
+    ;(host.querySelector('.edit') as HTMLElement).click()
+
+    const cropEl = host.querySelector('image-crop') as ImageCrop
+    t.equal(cropEl.getAttribute('crop'), 'circle',
+        'the crop attribute should be forwarded onto the image-crop')
+})
+
 test('destroy() removes the lazily created image-crop from the DOM',
     async t => {
         const { host, client } = mount('client-destroy-crop-test')

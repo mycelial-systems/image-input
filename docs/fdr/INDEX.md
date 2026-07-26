@@ -7,4 +7,4 @@ instead.
 
 | # | Feature | Status | Last reviewed |
 |---|---------|--------|---------------|
-| [FDR-001](FDR-001-constrained-crop.md) | Constrained crop | Planned | 2026-07-25 |
+| [FDR-001](FDR-001-constrained-crop.md) | Constrained crop | Implemented | 2026-07-25 |

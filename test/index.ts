@@ -883,6 +883,25 @@ test('clicking the edit button lazily creates an image-crop and ' +
         'setFile should be called with the current file')
 })
 
+test('clicking edit forwards the crop attribute onto the lazily ' +
+    'created image-crop', async t => {
+    document.body.innerHTML += `
+        <image-input class="crop-forward-test" crop="circle"></image-input>
+    `
+    const el = await waitFor(
+        'image-input.crop-forward-test'
+    ) as ImageInput
+    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    selectFile(el, file)
+
+    const editBtn = el.querySelector('.edit') as HTMLButtonElement
+    editBtn.click()
+
+    const cropEl = el.querySelector('image-crop') as HTMLElement
+    t.equal(cropEl.getAttribute('crop'), 'circle',
+        'the crop attribute should be forwarded onto the image-crop')
+})
+
 test('reopening the crop dialog reuses the existing image-crop, ' +
     'without appending a duplicate', async t => {
     document.body.innerHTML += `

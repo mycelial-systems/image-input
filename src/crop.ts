@@ -6,9 +6,16 @@ import {
     toNaturalRect,
     moveRect,
     resizeRect,
+    resizeRectLocked,
+    fitRatioRect,
+    parseCropAttribute,
+    resolveCropRatio,
+    CORNER_DIRS,
     type CropRect,
+    type CropConstraint,
     type DisplaySize,
-    type HandleDir
+    type HandleDir,
+    type CornerDir
 } from './crop-math.js'
 const debug = createDebug('image-crop')
 
@@ -52,12 +59,29 @@ export class ImageCrop extends WebComponent {
     static reflectedStringAttributes = ['src']
     declare src:string|null
 
+    /**
+     * `crop` is deliberately *not* in `reflectedStringAttributes`.
+     * `ImageCrop.prototype` already has a `crop` getter (the current
+     * crop rect, below) -- `WebComponent.define()` skips generating a
+     * reflected accessor for any name that already has an own property
+     * descriptor, so a `crop` string property would silently fail to
+     * exist rather than override it. The attribute is still observed
+     * (see `observedAttributes` below) and drives `handleChange_crop`;
+     * set it with `setAttribute('crop', ...)`, not `el.crop = ...`.
+     */
+    static get observedAttributes ():string[] {
+        return [...super.observedAttributes, 'crop']
+    }
+
     #file:File|null = null
     #objectUrl:string|null = null
     #naturalWidth = 0
     #naturalHeight = 0
     #crop:CropRect = { x: 0, y: 0, width: 0, height: 0 }
     #drag:DragState|null = null
+    #constraint:CropConstraint|null = null
+    #ratio:number|null = null
+    #circle = false
 
     connectedCallback () {
         debug('connected')
@@ -98,6 +122,47 @@ export class ImageCrop extends WebComponent {
     handleChange_src (_old:string|null, newValue:string|null) {
         const img = this.qs('img')
         if (img) img.src = newValue ?? ''
+    }
+
+    /**
+     * Re-parses the `crop` constraint and, if an image is already
+     * loaded, re-fits the rect to it right away. Before an image has
+     * loaded there is nothing to fit yet -- `#handleImageLoad` applies
+     * `#constraint` itself once one has.
+     */
+    handleChange_crop (_old:string|null, newValue:string|null) {
+        this.#parseConstraint(newValue)
+        if (!this.#naturalWidth) return
+
+        this.#crop = this.#ratio ?
+            fitRatioRect(this.#ratio, this.#naturalWidth, this.#naturalHeight) :
+            {
+                x: 0,
+                y: 0,
+                width: this.#naturalWidth,
+                height: this.#naturalHeight
+            }
+        this.#layout()
+        this.emit('change', { detail: { ...this.#crop } })
+    }
+
+    /**
+     * Parse the `crop` attribute into `#constraint`/`#ratio`/`#circle`.
+     * A value that is not `constrain`, `circle`, or a usable ratio
+     * falls back to free-form cropping (matching no attribute at all)
+     * and is reported through the debug channel rather than thrown.
+     */
+    #parseConstraint (raw:string|null):void {
+        const parsed = parseCropAttribute(raw)
+        if (raw && raw.trim() && !parsed) {
+            debug('unrecognized crop value, falling back to ' +
+                'free-form crop:', raw)
+        }
+        this.#constraint = parsed
+        this.#circle = parsed?.kind === 'ratio' && parsed.circle
+        this.#ratio = parsed ?
+            resolveCropRatio(parsed, this.#naturalWidth, this.#naturalHeight) :
+            null
     }
 
     /**
@@ -168,12 +233,25 @@ export class ImageCrop extends WebComponent {
         if (!img) return
         this.#naturalWidth = img.naturalWidth
         this.#naturalHeight = img.naturalHeight
-        this.#crop = {
-            x: 0,
-            y: 0,
-            width: this.#naturalWidth,
-            height: this.#naturalHeight
-        }
+
+        // `constrain` can only resolve its ratio once an image is
+        // loaded, so re-resolve `#ratio` against the size that just
+        // became available rather than trusting whatever it was left
+        // at (0, from `#parseConstraint` seeing no image yet).
+        this.#ratio = this.#constraint ?
+            resolveCropRatio(
+                this.#constraint, this.#naturalWidth, this.#naturalHeight
+            ) :
+            null
+
+        this.#crop = this.#ratio ?
+            fitRatioRect(this.#ratio, this.#naturalWidth, this.#naturalHeight) :
+            {
+                x: 0,
+                y: 0,
+                width: this.#naturalWidth,
+                height: this.#naturalHeight
+            }
         this.#layout()
     }
 
@@ -255,6 +333,12 @@ export class ImageCrop extends WebComponent {
             dir => handleEl.classList.contains(`handle-${dir}`)
         )
         if (!handle) return
+        // Edge handles have no honest behavior once the ratio is
+        // locked (see FDR-001) -- CSS hides them, but ignore a drag
+        // that somehow still reaches one rather than break the ratio.
+        if (this.#ratio && !CORNER_DIRS.includes(handle as CornerDir)) {
+            return
+        }
 
         try {
             handleEl.setPointerCapture(e.pointerId)
@@ -281,9 +365,15 @@ export class ImageCrop extends WebComponent {
 
         const newDisplayRect = drag.mode === 'move' ?
             moveRect(drag.startRect, dx, dy, bounds) :
-            resizeRect(
-                drag.startRect, drag.handle!, dx, dy, bounds, MIN_DISPLAY_SIZE
-            )
+            this.#ratio ?
+                resizeRectLocked(
+                    drag.startRect, drag.handle as CornerDir, dx, dy,
+                    bounds, MIN_DISPLAY_SIZE, this.#ratio
+                ) :
+                resizeRect(
+                    drag.startRect, drag.handle!, dx, dy, bounds,
+                    MIN_DISPLAY_SIZE
+                )
 
         const scale = this.#scale()
         this.#crop = toNaturalRect(newDisplayRect, scale)
@@ -303,14 +393,19 @@ export class ImageCrop extends WebComponent {
         const displayRect = toDisplayRect(this.#crop, scale)
 
         const newDisplayRect = e.shiftKey ?
-            resizeRect(
-                displayRect,
-                (dx !== 0 ? 'e' : 's'),
-                dx,
-                dy,
-                bounds,
-                MIN_DISPLAY_SIZE
-            ) :
+            (this.#ratio ?
+                resizeRectLocked(
+                    displayRect, 'se', dx, dy, bounds, MIN_DISPLAY_SIZE,
+                    this.#ratio
+                ) :
+                resizeRect(
+                    displayRect,
+                    (dx !== 0 ? 'e' : 's'),
+                    dx,
+                    dy,
+                    bounds,
+                    MIN_DISPLAY_SIZE
+                )) :
             moveRect(displayRect, dx, dy, bounds)
 
         this.#crop = toNaturalRect(newDisplayRect, scale)
@@ -328,6 +423,14 @@ export class ImageCrop extends WebComponent {
         const img = this.qs('img')
         const rect = this.qs<HTMLElement>('.crop-rect')
         if (!frame || !img || !rect || !this.#naturalWidth) return
+
+        frame.classList.toggle('locked', !!this.#ratio)
+        frame.classList.toggle('circle', this.#circle)
+        rect.setAttribute('aria-label', this.#ratio ?
+            'Crop area, locked to a fixed shape. Use arrow keys to ' +
+                'move, shift plus arrow keys to scale.' :
+            'Crop area. Use arrow keys to move, shift plus arrow keys ' +
+                'to resize.')
 
         const displaySize = this.#fitted()
         frame.style.width = `${displaySize.width}px`

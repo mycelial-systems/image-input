@@ -175,12 +175,17 @@ is the same as setting the attribute in HTML.
 * `label` -- Prompt text shown in the empty box, and used as the file
   input's `aria-label`. Defaults to `Drop an image, or click to
   choose one`.
+* `crop` -- Locks the crop dialog's rect to a fixed shape, instead of
+  the default free-form crop. Forwarded as-is to the `<image-crop>`
+  the dialog creates -- see [`image-crop`](#image-crop) below for the
+  three value forms and what locking actually changes.
 
 ```html
 <image-input
     accept="image/png, image/jpeg"
     name="avatar"
     alt="A description of the image"
+    crop="circle"
     required
 ></image-input>
 ```
@@ -289,6 +294,34 @@ import { ImageCrop } from '@substrate-system/image-input/crop'
 
 * `src` -- URL of the image to crop. Reflected as a property. You can
   also pass a `File` directly with `cropEl.setFile(file)`.
+* `crop` -- Locks the crop rect to a fixed aspect ratio, instead of
+  the default free-form rect that starts at the whole image with all
+  eight resize handles. **Not** reflected as a property --
+  `image-crop` already has a `.crop` getter for the current rect (see
+  below), so set this with `cropEl.setAttribute('crop', 'circle')`,
+  not `cropEl.crop = 'circle'`. Three value forms:
+  * `constrain` -- locks to the loaded image's own aspect ratio.
+  * `circle` -- locks to 1:1 and draws the crop area as a circle.
+  * A ratio literal, following CSS `aspect-ratio` syntax: `3/4`,
+    `3 / 4`, or the bare number `0.75` all mean the same thing.
+
+  Locking changes three things: the rect starts as the largest rect
+  of that ratio, centered, instead of covering the whole image; only
+  the four corner handles are shown, and a corner drag (or shift plus
+  an arrow key) anchors the opposite corner and scales the rect
+  proportionally instead of resizing one side; and the rect can never
+  be dragged, or keyed, past the image's edges without breaking the
+  ratio. Changing the attribute after an image has loaded re-fits the
+  rect to the new constraint.
+
+  `circle` is crop-UI chrome, not a pixel mask -- `getBlob()` still
+  returns an ordinary square image, in whatever type you requested.
+  Round it with CSS `border-radius` when you display it.
+
+  A value that is not one of the keywords and not a usable ratio (a
+  typo, `0`, a negative number) falls back to free-form cropping and
+  is reported through the debug channel. Nothing throws and no error
+  event fires.
 
 #### Events
 
