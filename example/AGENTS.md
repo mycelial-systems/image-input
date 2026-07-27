@@ -5,9 +5,9 @@
 `example/index.ts` is a small `preact` app (via `htm/preact`) that
 renders one `<image-input>` per entry in its `EXAMPLES` array -- one
 per `crop` value the component accepts -- each with its own live state
-panel (`example/panel.ts`, `example/state.ts`) driven by
-`@preact/signals`. Five rules govern how it renders and talks to the
-component. Breaking any of them either reintroduces a real bug or
+panel (`example/panel.ts`, `example/state.ts`) and Save/Clear buttons
+(`example/controls.ts`), driven by `@preact/signals`. Six rules govern
+how it renders and talks to the component. Breaking any of them either reintroduces a real bug or
 silently defeats the point of the demo, so they are recorded here
 rather than left to be rediscovered.
 
@@ -99,6 +99,32 @@ rather than left to be rediscovered.
    `@preact/signals` binds a text node and does no vdom work at all.
    `Panel`'s `computed`s are built in a `useMemo` keyed on the signals
    object, so a re-render does not allocate a fresh set each pass.
+
+6. **`Controls` shows both halves of the API, and is its own
+   component for that reason.** Save is enabled only when
+   `signals.altText` is non-empty -- the page never asks the element
+   for its state, it only listens, so the button enables itself off
+   `image-input:alt-change` and disables itself again off the
+   `alt-change` that `clear()` and the remove button emit. Clear calls
+   `ref.current.clear()`, a method on the element. Keep the two
+   demonstrating different halves; collapsing them into one style
+   defeats the point of having both.
+
+   `disabled` is an attribute, not text, so binding it means *reading*
+   `altText.value` during render, which subscribes the reading
+   component. That is exactly why `Controls` is separate from
+   `Example`: reading it in `Example` would subscribe the subtree
+   holding the `<image-input>` vnode (rule 5).
+
+   `clear()` does not emit `image-input:remove`, so nothing resets the
+   panel on its own -- `Example`'s `onClear` calls `State.reset(state)`
+   right after the method. Do not "fix" this by making the component
+   emit `remove` from `clear()`; see `src/AGENTS.md`.
+
+   The wrapper is `.actions`, not `.controls`: the component's own
+   overlay already uses `.controls`, and this page's CSS is not scoped
+   away from the component's markup. Check `src/html.ts` before adding
+   a class name here.
 
 Full rationale and the state/event wiring lives in
 `specs/tasks/example-preact.md`.

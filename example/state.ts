@@ -9,6 +9,7 @@ export interface ExampleSignals {
     fileSize:Signal<number>;
     lastEvent:Signal<string>;
     errorReason:Signal<string>;
+    saved:Signal<string>;
 }
 
 /**
@@ -33,19 +34,22 @@ export function State ():ExampleSignals {
         fileName: signal(''),
         fileSize: signal(0),
         lastEvent: signal(''),
-        errorReason: signal('')
+        errorReason: signal(''),
+        saved: signal('')
     }
 }
 
 State.handleChange = function (state:ExampleSignals, ev:Event):void {
     const { file } = (ev as CustomEvent).detail
-    const { fileName, fileSize, lastEvent, errorReason } = state
+    const { fileName, fileSize, lastEvent, errorReason, saved } = state
 
     batch(() => {
         fileName.value = file.name
         fileSize.value = file.size
         lastEvent.value = ev.type
         errorReason.value = ''
+        // A new (or newly cropped) image has not been saved yet.
+        saved.value = ''
     })
 }
 
@@ -60,12 +64,13 @@ State.handleAltChange = function (state:ExampleSignals, ev:Event):void {
 }
 
 State.handleRemove = function (state:ExampleSignals, ev:Event):void {
-    const { fileName, fileSize, lastEvent } = state
+    const { fileName, fileSize, lastEvent, saved } = state
 
     batch(() => {
         fileName.value = ''
         fileSize.value = 0
         lastEvent.value = ev.type
+        saved.value = ''
     })
 }
 
@@ -85,6 +90,39 @@ State.handleEdit = function (state:ExampleSignals, ev:Event):void {
 
 State.handleAlt = function (state:ExampleSignals, ev:Event):void {
     state.lastEvent.value = ev.type
+}
+
+/**
+ * Record what a consumer would have uploaded. This is not an event
+ * handler -- the Save button calls it directly, since "saved" is the
+ * page's own idea, not something the component reports.
+ */
+State.save = function (state:ExampleSignals):void {
+    state.saved.value = `${state.fileName.value} -- "${state.altText.value}"`
+}
+
+/**
+ * Put the panel back in its empty state.
+ *
+ * The Clear button calls this itself, right after `imageInput.clear()`.
+ * Clearing the component from script is not a user removing an image,
+ * so it does not emit `image-input:remove` and nothing here runs on its
+ * own -- the one `image-input:alt-change` that `clear()` does emit (alt
+ * is reset to empty) is then overwritten by the `lastEvent` write
+ * below. A page that only ever removes images through the component's
+ * own button would never need this.
+ */
+State.reset = function (state:ExampleSignals):void {
+    const { altText, fileName, fileSize, lastEvent, errorReason, saved } = state
+
+    batch(() => {
+        altText.value = ''
+        fileName.value = ''
+        fileSize.value = 0
+        lastEvent.value = ''
+        errorReason.value = ''
+        saved.value = ''
+    })
 }
 
 /**

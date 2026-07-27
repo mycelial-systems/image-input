@@ -181,6 +181,26 @@
   `any` instead of erroring, so a clean `tsc` run does not by itself
   prove these overloads work. Verify with a throwaway file that reads
   a bogus `detail` field and check that it errors.
+- Every `ImageInput` method meant to be called from outside the
+  component is written as a *static* taking the instance as its first
+  argument, with a one-line instance method delegating to it
+  (`clear()` calls `ImageInput.clear(this)`). The static holds the
+  implementation, which is why it can touch `#file`/`#previewUrl` --
+  private fields are reachable from a static method of the same class.
+  Keep the pair in that direction: an instance method holding the body
+  with a static that calls back into it would not survive being passed
+  around without a `this` binding, which is the point of the static
+  form (`els.forEach(ImageInput.clear)`). This applies to `setImage`
+  and `clear`; it does not apply to `on`/`off` (overrides of the base
+  class's, keyed to `ImageInputEventMap`) or to the lifecycle and
+  `handleChange_*` callbacks the base class calls on an instance.
+  `ImageInputClient` deliberately does not follow this -- it is
+  constructed per host and always has an instance to hand.
+- `clear()` does not emit `image-input:remove`, and must not start:
+  that event means the user clicked the remove button. `handleRemove`
+  calls `this.clear()` and then emits it. Code that calls `clear()`
+  already knows it cleared the input; a consumer syncing its own state
+  off `:remove` would otherwise see an event it caused itself.
 - `src/file.ts` holds the Blob-to-File promotion both `ImageInput` and
   `ImageInputClient` use. Both must guarantee the file they hold is a
   `File`: `ImageCrop.setFile()` requires one, and consumers read

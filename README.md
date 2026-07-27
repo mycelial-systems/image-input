@@ -29,6 +29,7 @@ tool, and `alt` text input.
   * [Built-in dialogs](#built-in-dialogs)
   * [`image-crop`](#image-crop)
 - [API](#api)
+  * [Methods](#methods)
   * [Server rendering](#server-rendering)
 - [Modules](#modules)
   * [JS](#js)
@@ -390,6 +391,32 @@ import { ImageCrop } from '@substrate-system/image-input/crop'
   cropped image as a `Blob`.
 
 ## API
+
+### Methods
+
+Each method meant to be called from outside the component exists in two
+forms: an instance method, and a static taking the element as its first
+argument. They are the same code -- the instance method delegates to the
+static -- so use whichever reads better. The static form is handy when
+you have no `this` to bind:
+
+```js
+document.querySelectorAll('image-input').forEach(ImageInput.clear)
+```
+
+* `setImage(blob, name?)` / `ImageInput.setImage(el, blob, name?)` --
+  Replace the preview with a `Blob`, e.g. a cropped image from your own
+  crop UI. The blob is promoted to a `File` (named after the current
+  file, with an extension matching the blob's type, unless you pass
+  `name`), written into the internal `<input>` so a surrounding form
+  sees it, and emitted as `image-input:change`.
+* `clear()` / `ImageInput.clear(el)` -- Clear the selected file and put
+  the box back in its empty state: the preview is hidden, the object URL
+  is revoked, the internal `<input>` is reset, and `alt` is set to
+  `null` (which emits `image-input:alt-change` with an empty string).
+  This does *not* emit `image-input:remove` -- that event means the user
+  clicked the remove button, so a page that clears the input itself
+  already knows it happened.
 
 ### Server rendering
 

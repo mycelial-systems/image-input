@@ -70,6 +70,25 @@ button {
     }
 }
 
+.actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1rem;
+
+    & button[disabled] {
+        cursor: default;
+        opacity: 0.45;
+
+        &:hover, &:focus-visible {
+            outline-color: transparent;
+            background-color: transparent;
+            transform: translate(0);
+        }
+    }
+}
+
 image-input {
     & .box {
         width: 400px;

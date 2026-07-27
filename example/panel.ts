@@ -21,12 +21,14 @@ export function Panel ({ signals }:{ signals:ExampleSignals }) {
         altTextText,
         fileNameText,
         lastEventText,
-        errorReasonText
+        errorReasonText,
+        savedText
     } = useMemo(() => ({
         altTextText: orDash(signals.altText),
         fileNameText: orDash(signals.fileName),
         lastEventText: orDash(signals.lastEvent),
-        errorReasonText: orDash(signals.errorReason)
+        errorReasonText: orDash(signals.errorReason),
+        savedText: orDash(signals.saved)
     }), [signals])
 
     return html`
@@ -45,6 +47,9 @@ export function Panel ({ signals }:{ signals:ExampleSignals }) {
 
             <dt>error reason</dt>
             <dd>${errorReasonText}</dd>
+
+            <dt>saved</dt>
+            <dd>${savedText}</dd>
         </dl>
     `
 }

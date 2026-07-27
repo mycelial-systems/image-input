@@ -758,6 +758,54 @@ test('setImage replaces the preview with the given blob', async t => {
         'the synced file name should carry an extension matching the blob type')
 })
 
+test('clear() is public and does not emit remove', async t => {
+    document.body.innerHTML += `
+        <image-input class="public-clear-test"></image-input>
+    `
+    const el = await waitFor('image-input.public-clear-test') as ImageInput
+    selectFile(el, new File(['abc'], 'photo.png', { type: 'image/png' }))
+    el.alt = 'a description'
+
+    let removeCount = 0
+    el.addEventListener('image-input:remove', () => { removeCount++ })
+
+    el.clear()
+
+    const box = el.querySelector('.box')
+    t.equal(box?.classList.contains('has-image'), false,
+        'the box should lose has-image after clear()')
+    t.equal(el.alt, null, 'should reset the alt text')
+
+    const input = el.querySelector('input[type="file"]') as HTMLInputElement
+    t.equal(input.value, '', 'should reset the file input')
+    t.equal(input.files?.length, 0, 'should reset input.files')
+
+    t.equal(removeCount, 0,
+        'clear() should not emit image-input:remove -- that event ' +
+        'means the user clicked the remove button')
+})
+
+test('the static form works without a this binding', async t => {
+    document.body.innerHTML += `
+        <image-input class="static-clear-test"></image-input>
+    `
+    const el = await waitFor('image-input.static-clear-test') as ImageInput
+    selectFile(el, new File(['abc'], 'photo.png', { type: 'image/png' }))
+
+    const clear = ImageInput.clear
+    clear(el)
+
+    const box = el.querySelector('.box')
+    t.equal(box?.classList.contains('has-image'), false,
+        'ImageInput.clear(el) should clear the element')
+
+    const setImage = ImageInput.setImage
+    setImage(el, new Blob(['cropped'], { type: 'image/jpeg' }))
+
+    t.equal(box?.classList.contains('has-image'), true,
+        'ImageInput.setImage(el, blob) should set the preview')
+})
+
 test('setImage revokes the previous preview object URL', async t => {
     document.body.innerHTML += `
         <image-input class="set-image-revoke-test"></image-input>

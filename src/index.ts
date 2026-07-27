@@ -211,7 +211,7 @@ export class ImageInput extends WebComponent {
 
     handleRemove = (event:Event) => {
         event.preventDefault()
-        this.#clear()
+        this.clear()
         this.emit('remove')
     }
 
@@ -321,10 +321,50 @@ export class ImageInput extends WebComponent {
     /**
      * Replace the preview with a Blob (e.g. a cropped image), and use it
      * as the file emitted in the resulting `image-input:change` event.
+     *
+     * This is the implementation; the instance method delegates to it.
+     * See the note above {@link ImageInput.clear}.
      */
+    static setImage (el:ImageInput, blob:Blob, name?:string):void {
+        const file = el.#setFile(blob, name)
+        el.emit('change', { detail: { file, alt: el.alt ?? '' } })
+    }
+
     setImage (blob:Blob, name?:string):void {
-        const file = this.#setFile(blob, name)
-        this.emit('change', { detail: { file, alt: this.alt ?? '' } })
+        ImageInput.setImage(this, blob, name)
+    }
+
+    /**
+     * Clear the selected file and reset the preview back to its empty
+     * state. Does not emit `image-input:remove` -- that event means the
+     * user clicked the remove button. Setting `alt` to `null` here does
+     * emit `image-input:alt-change` with an empty string.
+     *
+     * Every method meant to be called from outside the component is
+     * written as a static taking the instance first, with a one-line
+     * instance method delegating to it. The static is callable without
+     * a `this` binding -- `el.querySelectorAll('image-input')
+     * .forEach(ImageInput.clear)` and `promise.then(ImageInput.clear)`
+     * both work -- and the instance form stays the natural way to call
+     * it. Private fields are reachable here because a static method is
+     * inside the class body.
+     */
+    static clear (el:ImageInput):void {
+        el.#revokePreviewUrl()
+        el.#file = null
+
+        const input = el.qs('input')
+        if (input) input.value = ''
+
+        el.qs('img')?.removeAttribute('src')
+        el.qs('.preview')?.classList.remove('has-image')
+        el.qs('.box')?.classList.remove('has-image')
+
+        el.alt = null
+    }
+
+    clear ():void {
+        ImageInput.clear(this)
     }
 
     /**
@@ -359,20 +399,6 @@ export class ImageInput extends WebComponent {
         this.qs('.box')?.classList.add('has-image')
 
         return asFile
-    }
-
-    #clear ():void {
-        this.#revokePreviewUrl()
-        this.#file = null
-
-        const input = this.qs('input')
-        if (input) input.value = ''
-
-        this.qs('img')?.removeAttribute('src')
-        this.qs('.preview')?.classList.remove('has-image')
-        this.qs('.box')?.classList.remove('has-image')
-
-        this.alt = null
     }
 
     #syncInputFiles (file:File):void {

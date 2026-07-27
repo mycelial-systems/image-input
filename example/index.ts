@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef } from 'preact/hooks'
 import { html } from 'htm/preact'
 import { ImageInput } from '../src/index.js'
 import { Panel } from './panel.js'
+import { Controls } from './controls.js'
 import { State, listeners } from './state.js'
 import Debug from '@substrate-system/debug'
 const debug = Debug(true)
@@ -90,6 +91,20 @@ function Example ({ crop, heading, description }:ExampleProps) {
      */
     const cropAttr = crop ? { crop } : {}
 
+    /**
+     * Clear calls a method on the element. `clear()` does not emit
+     * `image-input:remove` -- that event means a user clicked the
+     * component's own remove button -- so this page resets its own
+     * panel afterwards rather than waiting to be told.
+     */
+    const onClear = () => {
+        debug('calling clear() on the element')
+        ref.current?.clear()
+        State.reset(state)
+    }
+
+    const onSave = () => State.save(state)
+
     return html`
         <section class="example">
             <h2>${heading}</h2>
@@ -100,6 +115,11 @@ function Example ({ crop, heading, description }:ExampleProps) {
                 ...${cropAttr}
             />
             <${Panel} signals=${state} />
+            <${Controls}
+                signals=${state}
+                onSave=${onSave}
+                onClear=${onClear}
+            />
         </section>
     `
 }
