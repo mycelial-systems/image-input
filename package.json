@@ -1,6 +1,5 @@
 {
   "name": "@substrate-system/image-input",
-  "private": true,
   "type": "module",
   "version": "0.0.0",
   "main": "dist/index.js",
@@ -47,8 +46,7 @@
   },
   "dependencies": {
     "@substrate-system/drag-drop": "^0.4.12",
-    "@substrate-system/web-component": "^0.0.56",
-    "microtags": "^0.0.12"
+    "@substrate-system/web-component": "^0.0.56"
   },
   "devDependencies": {
     "@preact/signals": "^2.10.0",
