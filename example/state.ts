@@ -12,6 +12,14 @@ export interface ExampleSignals {
 }
 
 /**
+ * A handler takes the state it writes to as its first argument, so the
+ * handlers can live on `State` as statics instead of closing over one
+ * instance's signals. The caller binds a handler to an instance when it
+ * attaches the listener.
+ */
+export type StateListener = (state:ExampleSignals, ev:Event) => void
+
+/**
  * Build the state for a single example.
  *
  * These used to be module-level signals, which was fine while the page
@@ -20,79 +28,18 @@ export interface ExampleSignals {
  * each example gets its own set instead.
  */
 export function State ():ExampleSignals {
-    const signals:ExampleSignals = {
+    return {
         altText: signal(''),
         fileName: signal(''),
         fileSize: signal(0),
         lastEvent: signal(''),
         errorReason: signal('')
     }
-
-    const {
-        altText,
-        fileName,
-        fileSize,
-        lastEvent,
-        errorReason
-    } = signals
-
-    function handleChange (event:Event):void {
-        const { file } = (event as CustomEvent).detail
-        batch(() => {
-            fileName.value = file.name
-            fileSize.value = file.size
-            lastEvent.value = event.type
-            errorReason.value = ''
-        })
-    }
-
-    function handleAltChange (event:Event):void {
-        const { alt } = (event as CustomEvent).detail
-        batch(() => {
-            altText.value = alt
-            lastEvent.value = event.type
-        })
-    }
-
-    function handleRemove (event:Event):void {
-        batch(() => {
-            fileName.value = ''
-            fileSize.value = 0
-            lastEvent.value = event.type
-        })
-    }
-
-    function handleError (event:Event):void {
-        const { reason } = (event as CustomEvent).detail
-        batch(() => {
-            errorReason.value = reason
-            lastEvent.value = event.type
-        })
-    }
-
-    function handleEdit (event:Event):void {
-        lastEvent.value = event.type
-    }
-
-    function handleAlt (event:Event):void {
-        lastEvent.value = event.type
-    }
-
-    const listeners:[string, EventListener][] = [
-        ['image-input:change', handleChange],
-        ['image-input:alt-change', handleAltChange],
-        ['image-input:remove', handleRemove],
-        ['image-input:error', handleError],
-        ['image-input:edit', handleEdit],
-        ['image-input:alt', handleAlt]
-    ]
-
-    return { signals, listeners }
 }
 
 State.handleChange = function (state:ExampleSignals, ev:Event):void {
     const { file } = (ev as CustomEvent).detail
-    const { fileName } = state
+    const { fileName, fileSize, lastEvent, errorReason } = state
 
     batch(() => {
         fileName.value = file.name
@@ -102,21 +49,53 @@ State.handleChange = function (state:ExampleSignals, ev:Event):void {
     })
 }
 
-export const listeners:[string, EventListener][] = [
-    ['image-input:change', handleChange],
-    ['image-input:alt-change', handleAltChange],
-    ['image-input:remove', handleRemove],
-    ['image-input:error', handleError],
-    ['image-input:edit', handleEdit],
-    ['image-input:alt', handleAlt]
-]
+State.handleAltChange = function (state:ExampleSignals, ev:Event):void {
+    const { alt } = (ev as CustomEvent).detail
+    const { altText, lastEvent } = state
 
-// function handleChange (event:Event):void {
-//     const { file } = (event as CustomEvent).detail
-//     batch(() => {
-//         fileName.value = file.name
-//         fileSize.value = file.size
-//         lastEvent.value = event.type
-//         errorReason.value = ''
-//     })
-// }
+    batch(() => {
+        altText.value = alt
+        lastEvent.value = ev.type
+    })
+}
+
+State.handleRemove = function (state:ExampleSignals, ev:Event):void {
+    const { fileName, fileSize, lastEvent } = state
+
+    batch(() => {
+        fileName.value = ''
+        fileSize.value = 0
+        lastEvent.value = ev.type
+    })
+}
+
+State.handleError = function (state:ExampleSignals, ev:Event):void {
+    const { reason } = (ev as CustomEvent).detail
+    const { errorReason, lastEvent } = state
+
+    batch(() => {
+        errorReason.value = reason
+        lastEvent.value = ev.type
+    })
+}
+
+State.handleEdit = function (state:ExampleSignals, ev:Event):void {
+    state.lastEvent.value = ev.type
+}
+
+State.handleAlt = function (state:ExampleSignals, ev:Event):void {
+    state.lastEvent.value = ev.type
+}
+
+/**
+ * One array for the whole page. The handlers no longer close over any
+ * instance, so this does not need to be rebuilt per `<image-input>`.
+ */
+export const listeners:[string, StateListener][] = [
+    ['image-input:change', State.handleChange],
+    ['image-input:alt-change', State.handleAltChange],
+    ['image-input:remove', State.handleRemove],
+    ['image-input:error', State.handleError],
+    ['image-input:edit', State.handleEdit],
+    ['image-input:alt', State.handleAlt]
+]

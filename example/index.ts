@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef } from 'preact/hooks'
 import { html } from 'htm/preact'
 import { ImageInput } from '../src/index.js'
 import { Panel } from './panel.js'
-import { createStore } from './state.js'
+import { State, listeners } from './state.js'
 import Debug from '@substrate-system/debug'
 const debug = Debug(true)
 
@@ -31,8 +31,9 @@ const EXAMPLES:ExampleProps[] = [
         crop: 'circle',
         heading: html`<code>crop="circle"</code>`,
         description: 'Locks to 1:1 and draws the crop area as a ' +
-            'circle. The circle is UI only -- the saved image is a ' +
-            'cropped square with its corners intact. Round it with CSS.'
+            'circle. The preview is rounded to match, but that is ' +
+            'CSS -- the saved image is a square with its corners ' +
+            'intact.'
     },
     {
         crop: 'constrain',
@@ -53,32 +54,33 @@ const EXAMPLES:ExampleProps[] = [
 
 function Example ({ crop, heading, description }:ExampleProps) {
     const ref = useRef<ImageInput>(null)
-    const store = useMemo(createStore, [])
+    const state = useMemo(State, [])
 
     useEffect(() => {
         const el = ref.current
         if (!el) return
 
-        for (const [name, listener] of store.listeners) {
-            el.addEventListener(name, listener)
+        const controller = new AbortController()
+        const { signal } = controller
+
+        /**
+         * The handlers are shared across every `<image-input>` on the
+         * page, so each one is bound to this instance's state here.
+         */
+        for (const [name, listener] of listeners) {
+            el.addEventListener(name, ev => listener(state, ev), { signal })
         }
 
         /**
          * Types are inferred correctly here.
          * `on()` passes its options straight to `addEventListener`.
          */
-        const controller = new AbortController()
         el.on('change', (ev) => {
             debug('got a "change" event with the .on method', ev)
             debug('file name', ev.detail.file.name)
-        }, { signal: controller.signal })
+        }, { signal })
 
-        return () => {
-            for (const [name, listener] of store.listeners) {
-                el.removeEventListener(name, listener)
-            }
-            controller.abort()
-        }
+        return () => controller.abort()
     }, [])
 
     /**
@@ -97,7 +99,7 @@ function Example ({ crop, heading, description }:ExampleProps) {
                 accept="image/*"
                 ...${cropAttr}
             />
-            <${Panel} signals=${store.signals} />
+            <${Panel} signals=${state} />
         </section>
     `
 }

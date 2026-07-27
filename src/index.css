@@ -157,6 +157,32 @@ image-input {
         }
     }
 
+    /**
+     * `crop="circle"` is crop-UI chrome, not a pixel mask -- `getBlob()`
+     * hands back an ordinary square with its corners intact (FDR-001,
+     * decision 3), and rounding it is the display's job. This preview is
+     * the first display of that square, and it is the one surface that
+     * already knows the attribute, so it rounds itself rather than
+     * showing a square crop of what the user framed as a circle.
+     *
+     * `aspect-ratio`/`object-fit` are for the not-yet-cropped case: a
+     * file that was picked but never run through the crop dialog is
+     * whatever shape it was, and `border-radius` alone would draw it as
+     * an ellipse. They are inert once the blob is square. The file is
+     * untouched either way -- only the preview is squared.
+     *
+     * The attribute is matched inside `:where()` so this weighs the
+     * same as the `.preview img` rule above, which it only has to
+     * outrank by coming later. Full specificity here would make the
+     * circle preview harder for a consumer to restyle than the square
+     * one, for no reason.
+     */
+    &:where([crop="circle"]) .preview img {
+        aspect-ratio: 1;
+        object-fit: cover;
+        border-radius: 50%;
+    }
+
     & dialog {
         box-sizing: border-box;
         background: var(--image-input-dialog-bg);

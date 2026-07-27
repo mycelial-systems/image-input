@@ -47,6 +47,11 @@ without validating it afterwards or writing their own crop UI.
   dimensions. A circle crop yields an ordinary square image at the
   rect's natural-pixel size, in whatever type the caller requested.
   Displaying it as a circle is the consumer's `border-radius`.
+* `<image-input>` is such a consumer, so under `crop="circle"` its own
+  preview image is drawn as a circle by the package stylesheet. The
+  preview is also squared with `object-fit: cover`, which only shows
+  when the file was picked but never cropped -- a rectangular source
+  would otherwise render as an ellipse. Neither changes the file.
 * A value that is not a keyword and not a usable ratio -- misspellings,
   zero, negative, non-finite -- falls back to free-form cropping and is
   reported through the debug channel. Nothing is thrown and no error

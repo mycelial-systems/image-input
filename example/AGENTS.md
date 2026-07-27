@@ -46,10 +46,17 @@ rather than left to be rediscovered.
    name, so there is no `onImage-input:change` to write. `Example`
    takes a `ref` to the element and adds listeners with
    `addEventListener` inside a `useEffect`, whose cleanup removes every
-   listener it added. `createStore()` returns those listeners as
-   `[eventName, listener]` pairs precisely so the add and remove loops
-   stay symmetric -- a hand-written pair of six-line blocks is what
-   drifts.
+   listener it added. `state.ts` exports those listeners as
+   `[eventName, handler]` pairs, and the effect loops over them once to
+   add -- a hand-written block per event is what drifts.
+
+   Every listener is added with the `signal` of a single
+   `AbortController`, and the cleanup only aborts it. Removal cannot go
+   by name here: the exported handlers take `(state, ev)`, so the loop
+   attaches a fresh arrow that binds this instance's state, and that
+   arrow is not a reference `removeEventListener` could be handed
+   later. The `AbortController` makes teardown symmetric by
+   construction instead of by matching two loops.
 
    The `el.on('change', ...)` block in the same effect exists only to
    show that `.on` infers its `detail` type. That inference comes from
@@ -75,10 +82,12 @@ rather than left to be rediscovered.
    break that guarantee, and adding a `key` to paper over it would
    reintroduce exactly the node-recreation this rule forbids.
 
-5. **Signals are per instance and read inside `Panel`.**
-   `createStore()` builds a fresh set of signals per `<image-input>`;
-   `Example` holds the store via `useMemo(createStore, [])` and passes
-   `store.signals` down without ever reading a `.value`. They were
+5. **Signals are per instance and read inside `Panel`.** `State()`
+   builds a fresh set of signals per `<image-input>`; `Example` holds
+   them via `useMemo(State, [])` and passes that object down without
+   ever reading a `.value`. The event handlers hang off `State` as
+   statics taking `(state, ev)` rather than closing over one
+   instance's signals, so the state stays plain data. They were
    module-level while the page held one input -- with several, that
    would mean every panel showed whichever input fired last. A signal
    read inside `Example` or `App` would subscribe that component, so

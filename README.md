@@ -185,6 +185,15 @@ is the same as setting the attribute in HTML.
   the dialog creates -- see [`image-crop`](#image-crop) below for the
   three value forms and what locking actually changes.
 
+  `crop="circle"` also rounds the preview: the stylesheet draws the
+  preview image as a circle, so what you see after saving a crop
+  matches what you framed in the dialog. That is display only. The
+  file in `input.files`, and the one in the `image-input:change`
+  event, is still a square with its corners intact. A file that was
+  picked but never cropped is centered and squared in the preview by
+  `object-fit: cover`, so it reads as a circle too, while the file
+  itself keeps its original shape.
+
 ```html
 <image-input
     accept="image/png, image/jpeg"
@@ -363,7 +372,9 @@ import { ImageCrop } from '@substrate-system/image-input/crop'
 
   `circle` is crop-UI chrome, not a pixel mask -- `getBlob()` still
   returns an ordinary square image, in whatever type you requested.
-  Round it with CSS `border-radius` when you display it.
+  Round it with CSS `border-radius` when you display it. Using
+  `image-crop` through `image-input` already does that for the
+  preview; this applies when you display the blob yourself.
 
   A value that is not one of the keywords and not a usable ratio (a
   typo, `0`, a negative number) falls back to free-form cropping and
