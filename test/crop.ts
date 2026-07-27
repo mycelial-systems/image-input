@@ -1,0 +1,688 @@
+import { test } from '@substrate-system/tapzero'
+import { waitFor } from '@substrate-system/dom'
+import '../src/crop.js'
+import type { ImageCrop } from '../src/crop.js'
+import { makeImageFile, waitForImageLoad } from './helpers.js'
+
+test('example test', async t => {
+    document.body.innerHTML += `
+        <image-crop class="test"></image-crop>
+    `
+    const el = await waitFor('image-crop')
+    t.ok(el, 'should find an element')
+})
+
+test('accepts an image via setFile and renders it at a size that ' +
+    'fits the element, preserving aspect ratio', async t => {
+    document.body.innerHTML += `
+        <image-crop class="setfile-test" style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.setfile-test') as ImageCrop
+    const file = await makeImageFile(400, 200)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    const frame = el.querySelector('.image-crop-frame') as HTMLElement
+    const frameHeight = parseFloat(frame.style.height)
+
+    t.equal(frameHeight, 100,
+        'should size the frame to preserve the 2:1 aspect ratio at ' +
+        '200px wide')
+})
+
+test('accepts an image via the src attribute', async t => {
+    document.body.innerHTML += `
+        <image-crop class="src-test"></image-crop>
+    `
+    const el = await waitFor('image-crop.src-test') as ImageCrop
+    const file = await makeImageFile(10, 10)
+    el.src = URL.createObjectURL(file)
+
+    const img = el.querySelector('img') as HTMLImageElement
+    t.ok(img.getAttribute('src'), 'should set the img src from the src attribute')
+})
+
+test('renders a crop rectangle with 8 handles, covering the full ' +
+    'image initially', async t => {
+    document.body.innerHTML += `
+        <image-crop class="rect-test" style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.rect-test') as ImageCrop
+    const file = await makeImageFile(200, 100)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    const handles = el.querySelectorAll('.handle')
+    t.equal(handles.length, 8, 'should render 8 handles')
+
+    const rect = el.querySelector('.crop-rect') as HTMLElement
+    const frame = el.querySelector('.image-crop-frame') as HTMLElement
+
+    t.equal(rect.style.left, '0px',
+        'crop rect should start at the left edge of the image')
+    t.equal(rect.style.top, '0px',
+        'crop rect should start at the top edge of the image')
+    t.equal(parseFloat(rect.style.width), frame.clientWidth,
+        'crop rect should cover the full displayed image width')
+    t.equal(parseFloat(rect.style.height), parseFloat(frame.style.height),
+        'crop rect should cover the full displayed image height')
+})
+
+test('dims the area outside the crop rectangle', async t => {
+    document.body.innerHTML += `
+        <image-crop class="dim-test" style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.dim-test') as ImageCrop
+    const file = await makeImageFile(200, 100)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    const top = el.querySelector('.dim-top') as HTMLElement
+    const bottom = el.querySelector('.dim-bottom') as HTMLElement
+    const left = el.querySelector('.dim-left') as HTMLElement
+    const right = el.querySelector('.dim-right') as HTMLElement
+
+    t.ok(top && bottom && left && right,
+        'should render four dimming panels around the crop')
+
+    t.equal(parseFloat(top.style.height), 0,
+        'top dim panel should be empty when the crop covers the ' +
+        'full image')
+    t.equal(parseFloat(left.style.width), 0,
+        'left dim panel should be empty when the crop covers the ' +
+        'full image')
+})
+
+function pointer (
+    type:string,
+    clientX:number,
+    clientY:number,
+    pointerId = 1
+):PointerEvent {
+    return new PointerEvent(type, {
+        clientX,
+        clientY,
+        pointerId,
+        bubbles: true,
+        cancelable: true
+    })
+}
+
+test('dragging a corner handle resizes the crop rectangle', async t => {
+    document.body.innerHTML += `
+        <image-crop class="resize-test" style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.resize-test') as ImageCrop
+    const file = await makeImageFile(200, 100)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    const frame = el.querySelector('.image-crop-frame') as HTMLElement
+    const frameRect = frame.getBoundingClientRect()
+    const handle = el.querySelector('.handle-nw') as HTMLElement
+
+    handle.dispatchEvent(pointer('pointerdown', frameRect.left, frameRect.top))
+    window.dispatchEvent(
+        pointer('pointermove', frameRect.left + 20, frameRect.top + 10)
+    )
+    window.dispatchEvent(
+        pointer('pointerup', frameRect.left + 20, frameRect.top + 10)
+    )
+
+    const rectEl = el.querySelector('.crop-rect') as HTMLElement
+    t.equal(parseFloat(rectEl.style.left), 20,
+        'left should move by the drag delta')
+    t.equal(parseFloat(rectEl.style.top), 10,
+        'top should move by the drag delta')
+    t.equal(parseFloat(rectEl.style.width), 180,
+        'width should shrink to compensate')
+    t.equal(parseFloat(rectEl.style.height), 90,
+        'height should shrink to compensate')
+})
+
+test('the crop rectangle cannot be resized below the minimum size', async t => {
+    document.body.innerHTML += `
+        <image-crop class="minsize-test" style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.minsize-test') as ImageCrop
+    const file = await makeImageFile(200, 100)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    const frame = el.querySelector('.image-crop-frame') as HTMLElement
+    const frameRect = frame.getBoundingClientRect()
+    const handle = el.querySelector('.handle-se') as HTMLElement
+
+    handle.dispatchEvent(
+        pointer('pointerdown', frameRect.right, frameRect.bottom)
+    )
+    window.dispatchEvent(pointer('pointermove', frameRect.left, frameRect.top))
+    window.dispatchEvent(pointer('pointerup', frameRect.left, frameRect.top))
+
+    const rectEl = el.querySelector('.crop-rect') as HTMLElement
+    t.equal(parseFloat(rectEl.style.width), 32,
+        'width should not shrink below 32px')
+    t.equal(parseFloat(rectEl.style.height), 32,
+        'height should not shrink below 32px')
+})
+
+test('dragging inside the rectangle moves it, clamped to image bounds', async t => {
+    document.body.innerHTML += `
+        <image-crop class="move-test" style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.move-test') as ImageCrop
+    const file = await makeImageFile(200, 100)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    const frame = el.querySelector('.image-crop-frame') as HTMLElement
+    const frameRect = frame.getBoundingClientRect()
+
+    // shrink the crop first via the se handle, so there's room to move
+    const seHandle = el.querySelector('.handle-se') as HTMLElement
+    seHandle.dispatchEvent(
+        pointer('pointerdown', frameRect.right, frameRect.bottom)
+    )
+    window.dispatchEvent(
+        pointer('pointermove', frameRect.right - 50, frameRect.bottom - 30)
+    )
+    window.dispatchEvent(
+        pointer('pointerup', frameRect.right - 50, frameRect.bottom - 30)
+    )
+
+    const rectEl = el.querySelector('.crop-rect') as HTMLElement
+    t.equal(parseFloat(rectEl.style.width), 150, 'sanity check width after shrink')
+    t.equal(parseFloat(rectEl.style.height), 70, 'sanity check height after shrink')
+
+    // now drag the body of the rect far past the bottom-right bound
+    rectEl.dispatchEvent(pointer('pointerdown', frameRect.left, frameRect.top))
+    window.dispatchEvent(
+        pointer('pointermove', frameRect.left + 1000, frameRect.top + 1000)
+    )
+    window.dispatchEvent(
+        pointer('pointerup', frameRect.left + 1000, frameRect.top + 1000)
+    )
+
+    t.equal(parseFloat(rectEl.style.left), 50,
+        'should clamp so the right edge stays inside the image')
+    t.equal(parseFloat(rectEl.style.top), 30,
+        'should clamp so the bottom edge stays inside the image')
+})
+
+test('crop state changes emit image-crop:change with natural pixel ' +
+    'coordinates', async t => {
+    document.body.innerHTML += `
+        <image-crop class="change-test" style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.change-test') as ImageCrop
+    const file = await makeImageFile(400, 200)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    const frame = el.querySelector('.image-crop-frame') as HTMLElement
+    const frameRect = frame.getBoundingClientRect()
+    const handle = el.querySelector('.handle-nw') as HTMLElement
+
+    let detail:{ x:number, y:number, width:number, height:number }|null = null
+    el.addEventListener('image-crop:change', (e:Event) => {
+        detail = (e as CustomEvent).detail
+    })
+
+    handle.dispatchEvent(pointer('pointerdown', frameRect.left, frameRect.top))
+    window.dispatchEvent(
+        pointer('pointermove', frameRect.left + 10, frameRect.top + 5)
+    )
+    window.dispatchEvent(
+        pointer('pointerup', frameRect.left + 10, frameRect.top + 5)
+    )
+
+    t.ok(detail, 'should have emitted image-crop:change')
+    t.equal(detail!.x, 20, 'x should be scaled to natural pixels')
+    t.equal(detail!.y, 10, 'y should be scaled to natural pixels')
+    t.equal(detail!.width, 380, 'width should be scaled to natural pixels')
+    t.equal(detail!.height, 190, 'height should be scaled to natural pixels')
+})
+
+function key (
+    key:string,
+    shiftKey = false
+):KeyboardEvent {
+    return new KeyboardEvent('keydown', {
+        key,
+        shiftKey,
+        bubbles: true,
+        cancelable: true
+    })
+}
+
+test('the crop rectangle is focusable with an accessible name', async t => {
+    document.body.innerHTML += `
+        <image-crop class="a11y-test" style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.a11y-test') as ImageCrop
+    const file = await makeImageFile(200, 100)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    const rectEl = el.querySelector('.crop-rect') as HTMLElement
+    t.equal(rectEl.tabIndex, 0, 'crop rect should be in the tab order')
+    t.ok(rectEl.getAttribute('role'), 'crop rect should have an ARIA role')
+    t.ok(rectEl.getAttribute('aria-label'), 'crop rect should have an accessible label')
+})
+
+test('arrow keys move the crop rectangle', async t => {
+    document.body.innerHTML += `
+        <image-crop class="key-move-test" style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.key-move-test') as ImageCrop
+    const file = await makeImageFile(200, 100)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    // shrink first so there's room to move
+    const frame = el.querySelector('.image-crop-frame') as HTMLElement
+    const frameRect = frame.getBoundingClientRect()
+    const seHandle = el.querySelector('.handle-se') as HTMLElement
+    seHandle.dispatchEvent(
+        pointer('pointerdown', frameRect.right, frameRect.bottom)
+    )
+    window.dispatchEvent(
+        pointer('pointermove', frameRect.right - 50, frameRect.bottom - 30)
+    )
+    window.dispatchEvent(
+        pointer('pointerup', frameRect.right - 50, frameRect.bottom - 30)
+    )
+
+    const rectEl = el.querySelector('.crop-rect') as HTMLElement
+    const leftBefore = parseFloat(rectEl.style.left)
+    const topBefore = parseFloat(rectEl.style.top)
+
+    rectEl.dispatchEvent(key('ArrowRight'))
+    t.ok(parseFloat(rectEl.style.left) > leftBefore,
+        'ArrowRight should move the crop rect right')
+
+    rectEl.dispatchEvent(key('ArrowDown'))
+    t.ok(parseFloat(rectEl.style.top) > topBefore,
+        'ArrowDown should move the crop rect down')
+})
+
+test('shift+arrow keys resize the crop rectangle', async t => {
+    document.body.innerHTML += `
+        <image-crop class="key-resize-test" style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.key-resize-test') as ImageCrop
+    const file = await makeImageFile(200, 100)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    const rectEl = el.querySelector('.crop-rect') as HTMLElement
+    const widthBefore = parseFloat(rectEl.style.width)
+    const heightBefore = parseFloat(rectEl.style.height)
+
+    rectEl.dispatchEvent(key('ArrowLeft', true))
+    t.ok(parseFloat(rectEl.style.width) < widthBefore,
+        'shift+ArrowLeft should shrink the crop rect width')
+
+    rectEl.dispatchEvent(key('ArrowUp', true))
+    t.ok(parseFloat(rectEl.style.height) < heightBefore,
+        'shift+ArrowUp should shrink the crop rect height')
+})
+
+function loadBlobDimensions (blob:Blob):Promise<{ width:number, height:number }> {
+    return new Promise((resolve, reject) => {
+        const img = new Image()
+        const url = URL.createObjectURL(blob)
+        img.onload = () => {
+            URL.revokeObjectURL(url)
+            resolve({ width: img.naturalWidth, height: img.naturalHeight })
+        }
+        img.onerror = reject
+        img.src = url
+    })
+}
+
+test('the crop getter returns the current rect in natural pixels', async t => {
+    document.body.innerHTML += `
+        <image-crop class="crop-getter-test" style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.crop-getter-test') as ImageCrop
+    const file = await makeImageFile(400, 200)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    t.deepEqual(el.crop, { x: 0, y: 0, width: 400, height: 200 },
+        'crop getter should cover the full natural image initially')
+})
+
+test('getBlob returns a Blob of the cropped region at natural resolution',
+    async t => {
+        document.body.innerHTML += `
+            <image-crop class="getblob-test" style="display:block;width:200px;"></image-crop>
+        `
+        const el = await waitFor('image-crop.getblob-test') as ImageCrop
+        const file = await makeImageFile(400, 200)
+        el.setFile(file)
+        await waitForImageLoad(el)
+
+        const frame = el.querySelector('.image-crop-frame') as HTMLElement
+        const frameRect = frame.getBoundingClientRect()
+        const handle = el.querySelector('.handle-nw') as HTMLElement
+
+        handle.dispatchEvent(
+            pointer('pointerdown', frameRect.left, frameRect.top)
+        )
+        window.dispatchEvent(
+            pointer('pointermove', frameRect.left + 50, frameRect.top + 25)
+        )
+        window.dispatchEvent(
+            pointer('pointerup', frameRect.left + 50, frameRect.top + 25)
+        )
+
+        t.deepEqual(el.crop, { x: 100, y: 50, width: 300, height: 150 },
+            'sanity check crop rect after resize')
+
+        const blob = await el.getBlob()
+        t.ok(blob instanceof Blob, 'should resolve a Blob')
+        t.equal(blob.type, 'image/jpeg', 'should default to image/jpeg')
+
+        const dims = await loadBlobDimensions(blob)
+        t.equal(dims.width, 300, 'blob width should match the crop width')
+        t.equal(dims.height, 150, 'blob height should match the crop height')
+    })
+
+test('getBlob accepts a type option', async t => {
+    document.body.innerHTML += `
+        <image-crop class="getblob-type-test" style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.getblob-type-test') as ImageCrop
+    const file = await makeImageFile(100, 100)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    const blob = await el.getBlob({ type: 'image/png' })
+    t.equal(blob.type, 'image/png', 'should use the requested mime type')
+})
+
+test('keyboard interactions emit image-crop:change in natural pixels', async t => {
+    document.body.innerHTML += `
+        <image-crop class="key-change-test" style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.key-change-test') as ImageCrop
+    const file = await makeImageFile(400, 200)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    let detail:{ x:number, y:number, width:number, height:number }|null = null
+    el.addEventListener('image-crop:change', (e:Event) => {
+        detail = (e as CustomEvent).detail
+    })
+
+    const rectEl = el.querySelector('.crop-rect') as HTMLElement
+    rectEl.dispatchEvent(key('ArrowDown', true))
+
+    t.ok(detail, 'should have emitted image-crop:change from a keydown')
+})
+
+test('constrains the displayed height by the element\'s max-height, ' +
+    'preserving aspect ratio', async t => {
+    document.body.innerHTML += `
+        <image-crop class="max-height-test"
+            style="display:block;width:400px;max-height:100px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.max-height-test') as ImageCrop
+    // 1:2, so fitting 400px wide would be 800px tall -- far over the cap
+    el.setFile(await makeImageFile(400, 800))
+    await waitForImageLoad(el)
+
+    const frame = el.querySelector('.image-crop-frame') as HTMLElement
+    const width = parseFloat(frame.style.width)
+    const height = parseFloat(frame.style.height)
+
+    t.equal(height, 100, 'should cap the frame height at max-height')
+    t.equal(width, 50,
+        'should narrow the frame to keep the 1:2 aspect ratio at the ' +
+        'capped height')
+})
+
+/**
+ * Regression test. `#fitted` used to take its height budget from
+ * `clientHeight`, which is the height of the frame it had itself just
+ * sized. That fed each layout back into the next one, so the displayed
+ * image could only ever shrink -- widening the container again left it
+ * stuck at whatever size it first landed on.
+ */
+test('re-lays out to fill the container again after it grows back',
+    async t => {
+        document.body.innerHTML += `
+        <image-crop class="regrow-test"
+            style="display:block;width:200px;"></image-crop>
+    `
+        const el = await waitFor('image-crop.regrow-test') as ImageCrop
+        el.setFile(await makeImageFile(400, 200))
+        await waitForImageLoad(el)
+
+        const frame = el.querySelector('.image-crop-frame') as HTMLElement
+        const startWidth = parseFloat(frame.style.width)
+        const startHeight = parseFloat(frame.style.height)
+        t.equal(startWidth, 200,
+            'sanity check: should start out filling the container')
+
+        el.style.width = '100px'
+        window.dispatchEvent(new Event('resize'))
+        t.equal(parseFloat(frame.style.width), 100,
+            'should shrink the frame when the container narrows')
+
+        el.style.width = '200px'
+        window.dispatchEvent(new Event('resize'))
+
+        t.equal(parseFloat(frame.style.width), startWidth,
+            'should widen the frame back when the container widens')
+        t.equal(parseFloat(frame.style.height), startHeight,
+            'should restore the frame height along with the width')
+    })
+
+test('crop="3/4" locks the initial rect to that ratio, centered', async t => {
+    document.body.innerHTML += `
+        <image-crop class="ratio-literal-test" crop="3/4"
+            style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.ratio-literal-test') as ImageCrop
+    const file = await makeImageFile(400, 200)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    t.deepEqual(el.crop, { x: 125, y: 0, width: 150, height: 200 },
+        'should be the largest 3:4 rect inside a 400x200 image, centered')
+
+    const frame = el.querySelector('.image-crop-frame') as HTMLElement
+    t.ok(frame.classList.contains('locked'),
+        'the frame should be marked locked')
+})
+
+test('crop="constrain" locks to the source image\'s own ratio -- the ' +
+    'starting rect covers the whole image, but edge handles are inert',
+async t => {
+    document.body.innerHTML += `
+            <image-crop class="constrain-test" crop="constrain"
+                style="display:block;width:200px;"></image-crop>
+        `
+    const el = await waitFor('image-crop.constrain-test') as ImageCrop
+    const file = await makeImageFile(200, 100)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    t.deepEqual(el.crop, { x: 0, y: 0, width: 200, height: 100 },
+        'a lock to the image\'s own ratio still covers the whole image')
+
+    const frame = el.querySelector('.image-crop-frame') as HTMLElement
+    t.ok(frame.classList.contains('locked'),
+        'the frame should be marked locked')
+
+    const edgeHandle = el.querySelector('.handle-n') as HTMLElement
+    const handleRect = edgeHandle.getBoundingClientRect()
+    edgeHandle.dispatchEvent(
+        pointer('pointerdown', handleRect.left, handleRect.top)
+    )
+    window.dispatchEvent(
+        pointer('pointermove', handleRect.left, handleRect.top + 30)
+    )
+    window.dispatchEvent(
+        pointer('pointerup', handleRect.left, handleRect.top + 30)
+    )
+
+    t.deepEqual(el.crop, { x: 0, y: 0, width: 200, height: 100 },
+        'dragging an edge handle should do nothing while locked')
+})
+
+test('crop="circle" locks to 1:1 and marks the frame for circular chrome',
+    async t => {
+        document.body.innerHTML += `
+            <image-crop class="circle-test" crop="circle"
+                style="display:block;width:200px;"></image-crop>
+        `
+        const el = await waitFor('image-crop.circle-test') as ImageCrop
+        const file = await makeImageFile(400, 200)
+        el.setFile(file)
+        await waitForImageLoad(el)
+
+        t.deepEqual(el.crop, { x: 100, y: 0, width: 200, height: 200 },
+            'should be the largest square inside a 400x200 image, centered')
+
+        const frame = el.querySelector('.image-crop-frame') as HTMLElement
+        t.ok(frame.classList.contains('locked'), 'should be locked')
+        t.ok(frame.classList.contains('circle'), 'should be marked circle')
+    })
+
+test('a circle-locked crop yields a square Blob, not a masked one', async t => {
+    document.body.innerHTML += `
+        <image-crop class="circle-blob-test" crop="circle"
+            style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.circle-blob-test') as ImageCrop
+    const file = await makeImageFile(400, 200)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    const blob = await el.getBlob()
+    const dims = await loadBlobDimensions(blob)
+    t.equal(dims.width, dims.height,
+        'the blob should be square -- circle is UI chrome, not a mask')
+})
+
+test('an invalid crop value falls back to free-form cropping, without ' +
+    'throwing', async t => {
+    document.body.innerHTML += `
+        <image-crop class="invalid-crop-test" crop="sideways"
+            style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.invalid-crop-test') as ImageCrop
+    const file = await makeImageFile(200, 100)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    t.deepEqual(el.crop, { x: 0, y: 0, width: 200, height: 100 },
+        'should behave exactly like free-form: full image')
+
+    const frame = el.querySelector('.image-crop-frame') as HTMLElement
+    t.equal(frame.classList.contains('locked'), false,
+        'the frame should not be marked locked')
+})
+
+test('a corner drag under a lock scales the rect proportionally, ' +
+    'anchoring the opposite corner', async t => {
+    document.body.innerHTML += `
+        <image-crop class="locked-drag-test" crop="1/1"
+            style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.locked-drag-test') as ImageCrop
+    const file = await makeImageFile(200, 100)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    t.deepEqual(el.crop, { x: 50, y: 0, width: 100, height: 100 },
+        'sanity check: initial square rect')
+
+    const handle = el.querySelector('.handle-se') as HTMLElement
+    const handleRect = handle.getBoundingClientRect()
+    const startX = handleRect.left + handleRect.width / 2
+    const startY = handleRect.top + handleRect.height / 2
+
+    handle.dispatchEvent(pointer('pointerdown', startX, startY))
+    window.dispatchEvent(pointer('pointermove', startX - 30, startY - 10))
+    window.dispatchEvent(pointer('pointerup', startX - 30, startY - 10))
+
+    t.deepEqual(el.crop, { x: 50, y: 0, width: 90, height: 90 },
+        'should shrink, preserving the 1:1 ratio, anchored at the nw corner')
+})
+
+test('shift+arrow keys scale the locked rect proportionally, unlike ' +
+    'the free-form case where only one axis changes', async t => {
+    document.body.innerHTML += `
+        <image-crop class="locked-key-test" crop="1/1"
+            style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.locked-key-test') as ImageCrop
+    const file = await makeImageFile(200, 100)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    const rectEl = el.querySelector('.crop-rect') as HTMLElement
+    const before = el.crop
+
+    rectEl.dispatchEvent(key('ArrowLeft', true))
+
+    const after = el.crop
+    t.ok(after.width < before.width, 'shift+ArrowLeft should shrink width')
+    t.ok(after.height < before.height,
+        'shift+ArrowLeft should also shrink height')
+    t.equal(after.width, after.height, 'the 1:1 ratio should be preserved')
+})
+
+test('plain arrow keys still move (not resize) a locked crop rect', async t => {
+    document.body.innerHTML += `
+        <image-crop class="locked-key-move-test" crop="1/1"
+            style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.locked-key-move-test') as ImageCrop
+    const file = await makeImageFile(200, 100)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    const rectEl = el.querySelector('.crop-rect') as HTMLElement
+    const before = el.crop
+
+    rectEl.dispatchEvent(key('ArrowLeft'))
+
+    const after = el.crop
+    t.equal(after.width, before.width, 'size should be unchanged')
+    t.equal(after.height, before.height, 'size should be unchanged')
+    t.ok(after.x < before.x, 'should have moved left')
+})
+
+test('changing the crop attribute after an image has loaded re-fits ' +
+    'the rect to the new constraint', async t => {
+    document.body.innerHTML += `
+        <image-crop class="refit-test"
+            style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.refit-test') as ImageCrop
+    const file = await makeImageFile(400, 200)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    t.deepEqual(el.crop, { x: 0, y: 0, width: 400, height: 200 },
+        'sanity check: free-form starts out covering the whole image')
+
+    const frameBefore = el.querySelector('.image-crop-frame') as HTMLElement
+    t.equal(frameBefore.classList.contains('locked'), false,
+        'should not be locked yet')
+
+    el.setAttribute('crop', '1/1')
+
+    t.deepEqual(el.crop, { x: 100, y: 0, width: 200, height: 200 },
+        'should immediately re-fit to the largest square, centered')
+
+    const frameAfter = el.querySelector('.image-crop-frame') as HTMLElement
+    t.ok(frameAfter.classList.contains('locked'),
+        'should now be marked locked')
+})

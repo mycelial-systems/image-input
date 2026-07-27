@@ -1,5 +1,4 @@
 import { defineConfig } from 'vite'
-import postcssNesting from 'postcss-nesting'
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -13,14 +12,10 @@ export default defineConfig({
     },
     publicDir: '_public',
     css: {
-        postcss: {
-            plugins: [
-                postcssNesting
-            ],
-        },
+        transformer: 'lightningcss'
     },
     server: {
-        port: 8888,
+        port: 8901,
         host: true,
         open: true,
     },
