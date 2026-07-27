@@ -1,9 +1,9 @@
 # image input
-![tests](https://github.com/substrate-system/image-input/actions/workflows/nodejs.yml/badge.svg)
+[![tests](https://img.shields.io/github/actions/workflow/status/nichoth/image-input/nodejs.yml?style=flat-square)](https://github.com/nichoth/image-input/actions/workflows/nodejs.yml)
 [![types](https://img.shields.io/npm/types/@substrate-system/image-input?style=flat-square)](README.md)
 [![module](https://img.shields.io/badge/module-ESM%2FCJS-blue?style=flat-square)](README.md)
 [![install size](https://flat.badgen.net/packagephobia/install/@bicycle-codes/keys?cache-control=no-cache)](https://packagephobia.com/result?p=@bicycle-codes/keys)
-[![GZip size](https://img.badgesize.io/https%3A%2F%2Fesm.sh%2F%40substrate-system%2Fimage-input%2Fes2022%2Ffile.mjs?style=flat-square&compression=gzip)](https://esm.sh/@substrate-system/image-input/es2022/image-input.mjs)
+[![GZip size](https://flat.badgen.net/bundlephobia/minzip/@substrate-system/image-input?color=green)](https://bundlephobia.com/package/@substrate-system/image-input)
 [![dependencies](https://img.shields.io/badge/dependencies-zero-brightgreen.svg?style=flat-square)](package.json)
 [![semantic versioning](https://img.shields.io/badge/semver-2.0.0-blue?logo=semver&style=flat-square)](https://semver.org/)
 [![Common Changelog](https://nichoth.github.io/badge/common-changelog.svg)](./CHANGELOG.md)
@@ -12,7 +12,7 @@
 Web component for inputting images. Includes client-side preview, a crop
 tool, and `alt` text input.
 
-[See a live demo](https://substrate-system.github.io/image-input/)
+[See a live demo](https://nichoth.github.io/image-input/)
 
 <!-- toc -->
 
