@@ -1,5 +1,5 @@
 # image input
-[![tests](https://img.shields.io/github/actions/workflow/status/nichoth/image-input/nodejs.yml?style=flat-square)](https://github.com/nichoth/image-input/actions/workflows/nodejs.yml)
+[![tests](https://img.shields.io/github/actions/workflow/status/mycelial-systems/image-input/nodejs.yml?style=flat-square)](https://github.com/mycelial-systems/image-input/actions/workflows/nodejs.yml)
 [![types](https://img.shields.io/npm/types/@substrate-system/image-input?style=flat-square)](README.md)
 [![module](https://img.shields.io/badge/module-ESM%2FCJS-blue?style=flat-square)](README.md)
 [![install size](https://flat.badgen.net/packagephobia/install/@bicycle-codes/keys?cache-control=no-cache)](https://packagephobia.com/result?p=@bicycle-codes/keys)
@@ -12,7 +12,7 @@
 Web component for inputting images. Includes client-side preview, a crop
 tool, and `alt` text input.
 
-[See a live demo](https://nichoth.github.io/image-input/)
+[See a live demo](https://mycelial-systems.github.io/image-input/)
 
 <!-- toc -->
 
