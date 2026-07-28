@@ -3,6 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <title>tests</title>
+    <!--
+        Bundled from src/index.css by `npm run build-tests`. Some of
+        this component's contracts are CSS-only -- `touch-action` on
+        the crop rect, for one -- and cannot be asserted at all
+        without the real stylesheet applied.
+    -->
+    <link rel="stylesheet" href="/index.css">
     <script src="/reporter.js"></script>
 </head>
 <body>

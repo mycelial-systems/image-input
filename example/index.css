@@ -90,8 +90,11 @@ button {
 }
 
 image-input {
+    --image-input-overlay-gap: 1.5rem;  /* override the default */
+
     & .box {
         width: 400px;
+        max-width: 90vw;
     }
 }
 

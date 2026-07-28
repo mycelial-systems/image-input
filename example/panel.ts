@@ -18,13 +18,13 @@ function orDash (sig:Signal<string>):Signal<string> {
  */
 export function Panel ({ signals }:{ signals:ExampleSignals }) {
     const {
-        altTextText,
+        altText,
         fileNameText,
         lastEventText,
         errorReasonText,
         savedText
     } = useMemo(() => ({
-        altTextText: orDash(signals.altText),
+        altText: orDash(signals.altText),
         fileNameText: orDash(signals.fileName),
         lastEventText: orDash(signals.lastEvent),
         errorReasonText: orDash(signals.errorReason),
@@ -34,7 +34,7 @@ export function Panel ({ signals }:{ signals:ExampleSignals }) {
     return html`
         <dl class="panel">
             <dt>alt text</dt>
-            <dd>${altTextText}</dd>
+            <dd>${altText}</dd>
 
             <dt>file name</dt>
             <dd>${fileNameText}</dd>

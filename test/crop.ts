@@ -68,6 +68,33 @@ test('renders a crop rectangle with 8 handles, covering the full ' +
         'crop rect should cover the full displayed image height')
 })
 
+test('the crop rectangle opts out of the browser\'s own touch ' +
+    'gestures', async t => {
+    document.body.innerHTML += `
+        <image-crop class="touch-test" style="display:block;width:200px;"></image-crop>
+    `
+    const el = await waitFor('image-crop.touch-test') as ImageCrop
+    const file = await makeImageFile(200, 100)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    const rect = el.querySelector('.crop-rect') as HTMLElement
+
+    t.equal(getComputedStyle(rect).touchAction, 'none',
+        'the crop rect should set touch-action: none, so a touch drag ' +
+        'is not stolen by the page as a pan and cancelled')
+
+    // `touch-action` is not inherited, but the behavior for a touch is
+    // the intersection of the hit element's value with its ancestors',
+    // so the one declaration on `.crop-rect` covers every handle
+    // inside it. That only holds while the handles stay descendants.
+    const handles = Array.from(el.querySelectorAll<HTMLElement>('.handle'))
+    t.equal(handles.length, 8, 'should find the 8 handles')
+    t.ok(handles.every(h => h.closest('.crop-rect') === rect),
+        'every handle should be a descendant of the crop rect, so the ' +
+        'rect\'s touch-action applies to it too')
+})
+
 test('dims the area outside the crop rectangle', async t => {
     document.body.innerHTML += `
         <image-crop class="dim-test" style="display:block;width:200px;"></image-crop>

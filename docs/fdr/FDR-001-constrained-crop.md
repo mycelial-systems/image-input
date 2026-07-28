@@ -167,7 +167,8 @@ consumer checks the returned blob's dimensions.
 ## Related
 
 * **ADRs:** ADR-001
-* **FDRs:** none yet
+* **FDRs:** [FDR-002](FDR-002-crop-rect-direct-manipulation.md) -- the
+  drag/keyboard interaction this feature constrains.
 
 ## Open Questions
 

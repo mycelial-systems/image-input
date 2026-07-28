@@ -344,9 +344,25 @@ image-crop {
             pointer-events: none;
         }
 
+        /**
+         * `touch-action: none` is what makes dragging work on a
+         * touchscreen at all (FDR-002). Without it the browser's gesture
+         * recognizer claims a touch drag as a page pan after a couple
+         * of pixels and fires `pointercancel`, which `crop.ts` --
+         * correctly -- treats as the end of the drag. The rect then
+         * freezes and the page scrolls instead. `preventDefault()` on
+         * `pointerdown` does not stop this; only `touch-action` does.
+         *
+         * It sits on `.crop-rect`, not the frame: the effective value
+         * for a touch is the intersection of the hit element's with
+         * its ancestors', so this one declaration also covers the
+         * `.handle` children, while a touch on the dimmed area
+         * outside the rect still pans the page normally.
+         */
         & .crop-rect {
             position: absolute;
             box-sizing: border-box;
+            touch-action: none;
             border: var(--image-crop-rect-border-width) dashed
                 var(--image-crop-rect-border-color);
 

@@ -16,6 +16,21 @@
   recompute the new rect from that snapshot plus the *total*
   `(current - start)` delta on each `pointermove`. Don't accumulate
   incremental per-event deltas onto the live rect -- it drifts.
+- A pointer-drag surface must set `touch-action: none` in CSS or it
+  simply does not work on a touchscreen. `.crop-rect` does. Without
+  it the browser's gesture recognizer claims the drag as a page pan
+  after a couple of pixels, fires `pointercancel`, and pans the page;
+  `#handlePointerEnd` treats that cancel as the end of the drag, which
+  is correct behavior on its part. `e.preventDefault()` in
+  `pointerdown` does *not* prevent this. The declaration goes on
+  `.crop-rect` rather than the frame because the effective value for a
+  touch is the intersection of the hit element's with all its
+  ancestors' -- so it covers the `.handle` children too, while leaving
+  the dimmed area outside the rect free to pan the page. Keep the
+  handles as descendants of `.crop-rect` or that coverage silently
+  disappears. `test/crop.ts` asserts both halves; note this is only
+  testable because `test/index.html` loads the real bundled stylesheet
+  (built by `npm run build-tests`).
 - `setPointerCapture` calls should be wrapped in `try/catch`: synthetic
   `PointerEvent`s dispatched in tests don't correspond to a real active
   pointer session, and some environments throw when capture is
