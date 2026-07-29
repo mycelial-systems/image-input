@@ -9,8 +9,8 @@
   "scripts": {
     "lint": "eslint \"./**/*.{ts,js}\"",
     "build-tests": "esbuild test/index.ts --target=es2020 --bundle --keep-names > test/test-bundle.js && lightningcss --bundle --targets '>= 0.25%' src/index.css -o test/index.css",
-    "test": "npm run lint && npm run build && npm run build-tests && npm run test-tape-run",
-    "test-tape-run": "cat test/index.html | tape-run --input=html --static=test | tap-spec",
+    "test": "npm run lint && npm run build && npm run build-tests && npm run test-tapout",
+    "test-tapout": "cat test/test-bundle.js | tapout --html test/index.html --timeout 60000 | tap-spec",
     "build-css": "lightningcss --bundle --targets '>= 0.25%' src/index.css -o dist/index.css",
     "build-css:min": "lightningcss --bundle --minify --targets '>= 0.25%' src/index.css -o dist/index.min.css",
     "build-cjs": "esbuild src/*.ts --format=cjs --keep-names --tsconfig=tsconfig.build.json --outdir=./dist --out-extension:.js=.cjs --sourcemap",

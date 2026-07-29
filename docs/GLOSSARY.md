@@ -191,9 +191,11 @@ non-obvious constraints of that directory's code, so they are not
 rediscovered. `src/AGENTS.md` covers the component; `example/AGENTS.md`
 covers the demo's preact contract.
 
-**tape-run** -- The test runner. Tests execute in a real browser rather
-than jsdom, because `DataTransfer`, canvas encoding and pointer capture
-are all involved and none of them work in a fake DOM.
+**tapout** -- The test runner. Tests execute in a real browser
+(Playwright-driven) rather than jsdom, because `DataTransfer`, canvas
+encoding and pointer capture are all involved and none of them work in a
+fake DOM. The bundle is piped in on stdin; `test/index.html` is served as
+the page via `--html`, because some contracts are CSS-only.
 
 **Baseline** -- The browser support floor, inherited from the platform
 features used rather than chosen through polyfills: custom elements,

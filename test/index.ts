@@ -1,6 +1,5 @@
 import { test } from '@substrate-system/tapzero'
 import { waitFor } from '@substrate-system/dom'
-import '../src/index.js'
 import { ImageInput } from '../src/index.js'
 import type { ImageCrop } from '../src/crop.js'
 import { html } from '../src/html.js'
@@ -16,8 +15,8 @@ import './client.js'
 
 test('renders a .box div instead of .wrapper', async t => {
     document.body.innerHTML += `
-        <image-input class="box-test" accept="image/png" name="photo"
-            required></image-input>
+        <${ImageInput.TAG} class="box-test" accept="image/png" name="photo" required>
+        </${ImageInput.TAG}>
     `
     const el = await waitFor('image-input.box-test') as ImageInput
 
@@ -1573,4 +1572,11 @@ test('render() and html() produce the same markup with alt and ' +
     t.equal(el.innerHTML, fromHtml.innerHTML,
         'the element and html() should emit identical markup ' +
         'when alt and label are set')
+})
+
+test('all done', () => {
+    // tapout closes the browser as soon as this is set, instead of
+    // waiting out the inactivity timeout.
+    // @ts-expect-error tests
+    window.testsFinished = true
 })

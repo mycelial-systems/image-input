@@ -10,7 +10,7 @@
   `addEventListener('pointerdown', ...)`) on the result -- otherwise the
   inferred type is the generic `Element`, and `tsc` fails during
   `npm run build`'s `--emitDeclarationOnly` step (not during
-  `esbuild`/tape-run) with a "No overload matches this call" error.
+  `esbuild`/tapout) with a "No overload matches this call" error.
 - For drag-style pointer interactions (see `crop.ts`), snapshot the
   *start* rect and pointer position on `pointerdown`, then always
   recompute the new rect from that snapshot plus the *total*
@@ -74,7 +74,7 @@
   erroring outright. Fix: assign to an explicitly typed intermediate
   variable first -- `const files:File[] = Object.values(record)` --
   then call `.find`/etc. on that. This class of bug won't show up in
-  `esbuild`/tape-run, only in the `tsc` build step.
+  `esbuild`/tapout, only in the `tsc` build step.
 - `#syncInputFiles(file:File)` writes a picked/dropped/cropped file
   into the native `<input>`'s `.files` so a surrounding `<form>` sees
   it: build a `new DataTransfer()`, `dt.items.add(file)`, then assign

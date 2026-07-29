@@ -105,7 +105,7 @@ Harder:
   requires `DataTransfer`, which is not constructible in every
   environment and needs a `try`/`catch`. `setPointerCapture` throws
   for synthetic pointers.
-* Tests must run in a real browser (`tape-run`), not jsdom, because
+* Tests must run in a real browser (`tapout`), not jsdom, because
   `<dialog>`, `DataTransfer`, canvas encoding and pointer capture are
   all involved.
 * We inherit a browser support floor from Baseline features rather
