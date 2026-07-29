@@ -54,6 +54,7 @@
     "@substrate-system/dom": "^0.1.13",
     "@substrate-system/drag-drop": "^0.4.12",
     "@substrate-system/human-bytes": "^0.0.6",
+    "@substrate-system/tapout": "^0.0.40",
     "@substrate-system/tapzero": "^0.10.16",
     "auto-changelog": "^2.6.0",
     "esbuild": "^0.28.1",
@@ -67,7 +68,6 @@
     "stylelint": "^17.14.1",
     "stylelint-config-standard": "^40.0.0",
     "tap-spec": "^5.0.0",
-    "tape-run": "^11.0.0",
     "typedoc": "^0.28.20",
     "typescript": "^5.9.3",
     "vite": "^8.1.5"

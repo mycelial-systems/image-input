@@ -1,5 +1,3 @@
-import '../src/index.css'
-import './index.css'
 import { render, type VNode } from 'preact'
 import { useEffect, useMemo, useRef } from 'preact/hooks'
 import { html } from 'htm/preact'
@@ -7,6 +5,8 @@ import { ImageInput } from '../src/index.js'
 import { Panel } from './panel.js'
 import { Controls } from './controls.js'
 import { State, listeners } from './state.js'
+import '../src/index.css'
+import './index.css'
 import Debug from '@substrate-system/debug'
 const debug = Debug(true)
 

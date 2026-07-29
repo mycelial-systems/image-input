@@ -2,7 +2,8 @@
 
 The vocabulary of `image-input`. A reference for what a word means in
 this package's context, not a tutorial and not an API reference. Longer
-concepts link to the [ADR](adr/INDEX.md) that owns them.
+concepts link to the [ADR](adr/INDEX.md) or [FDR](fdr/INDEX.md) that
+owns them.
 
 Four sections, ordered by who uses the word:
 
@@ -46,19 +47,14 @@ selected image, plus the Overlay painted on top of it. Carries the
 ALT Badge on one side, the Controls on the other.
 
 **ALT Badge** (`.alt-badge`) -- The pill button in the Overlay that
-opens the Alt Dialog. Carries `has-alt` when alt text is set, which is
-what switches it from "Add alt text" to "Edit alt text".
+emits `image-input:alt`. Carries `has-alt` when alt text is set, which
+is what switches it from "Add alt text" to "Edit alt text". It is a
+trigger only; the surface it leads to is the consumer's, see *Editing
+handoff*.
 
 **Controls** (`.controls`) -- The edit (`.edit`) and remove
-(`.remove`) buttons in the Overlay.
-
-**Alt Dialog** (`.alt-dialog`) -- The built-in native `<dialog>`
-holding a `<textarea>` for alt text, with `.alt-cancel` and
-`.alt-save` buttons. Opened by the ALT Badge.
-
-**Crop Dialog** (`.crop-dialog`) -- The built-in native `<dialog>`
-holding the Crop Slot, with `.crop-cancel` and `.crop-save` buttons.
-Opened by the edit button.
+(`.remove`) buttons in the Overlay. Edit emits `image-input:edit` and
+is likewise only a trigger.
 
 **Crop Frame** (`.image-crop-frame`) -- `image-crop`'s positioned
 container, sized to the image's fitted display size. Everything else
@@ -91,23 +87,28 @@ is a reflected boolean.
 
 **Namespaced event** -- Every event this package emits is prefixed with
 its tag name and a colon: `image-input:change`, `:edit`, `:alt`,
-`:alt-change`, `:remove`, `:error`, and `image-crop:change`. They
-bubble and are cancelable. The colon is why frameworks that build
-listener names from prop names (preact's `on*`) cannot subscribe
+`:alt-change`, `:remove`, `:error`, and `image-crop:change`. They all
+bubble. `image-input:edit` and `image-input:alt` are notifications and
+are not cancelable; the rest are. The colon is why frameworks that
+build listener names from prop names (preact's `on*`) cannot subscribe
 without `addEventListener`; see `example/AGENTS.md`.
 
-**Dialog opt-out** -- The extension mechanism. `image-input:edit` and
-`image-input:alt` fire *before* the built-in dialog opens, so calling
-`preventDefault()` suppresses it and lets the consumer substitute their
-own UI, feeding the result back through `setImage(blob)` or the `alt`
-property. There are no callback props, render props or plugin
-registry.
+**Editing handoff** -- The seam between the package and the consumer.
+The component owns the file, the preview and the alt text, and renders
+no editing UI at all: the ALT Badge and edit button emit
+`image-input:alt` and `image-input:edit`, and the consumer's own
+surface -- typically a `<dialog>` holding an `<image-crop>` -- does the
+work and writes the result back through `setImage(blob)` or the `alt`
+property. There are no callback props, render props or plugin registry.
+See [FDR-003](fdr/FDR-003-editing-handoff.md) and
+[ADR-002](adr/ADR-002-events-not-dialogs.md). Pending: `src/dialogs.ts`
+and its `.alt-dialog` / `.crop-dialog` markup are still in the source
+until that decision is implemented.
 
-**Dialog copy** (`ImageInput.TEXT`) -- The static object holding the
-dialogs' headings and button labels. It is page-wide and read at render
-time, so reassigning it affects elements that upgrade afterwards and
-leaves already-rendered ones on the old copy. It does not cover the alt
-text *value*, which is per element.
+**Crop in flight** -- The guard a consumer's save handler needs across
+the `await` on `getBlob()`, so that a second Save click or a dismissal
+mid-crop cannot apply a crop twice or apply it to a surface the user
+has already closed.
 
 **Static markup path** -- The no-custom-element route: `html()` emits
 the markup as a string for a server-rendered page, and
@@ -131,9 +132,9 @@ adding a property is never a breaking change.
 so consumer CSS reaches its markup and form association is the
 browser's default. The costs are no style encapsulation and a hard ban
 on `id` attributes in our markup, since N elements on a page would emit
-N duplicate ids. Dialogs use `aria-label` rather than
-`aria-labelledby`, and buttons use per-dialog class names
-(`.alt-save`, `.crop-save`) rather than shared ones.
+N duplicate ids. Anything needing an accessible name therefore carries
+`aria-label` rather than `aria-labelledby`, and a `<label>` may only
+wrap its own control.
 
 **Hidden input** -- The `<input type="file">` is hidden with a
 clip-path and absolute positioning, never `display:none`,
@@ -165,15 +166,6 @@ rect and start pointer position on `pointerdown`, then recompute the
 new rect from that snapshot plus the *total* delta on every
 `pointermove`. Accumulating per-event deltas onto the live rect drifts.
 
-**Crop Slot** (`.crop-slot`) -- The empty div in the Crop Dialog that
-an `<image-crop>` is created into on the first edit click, then reused.
-Creating one eagerly would leave idle window listeners on every page
-that never crops.
-
-**Crop in flight** -- The boolean guard held across the `await` in
-`handleCropSave`, so a double Save click or an Esc press mid-crop
-cannot apply a crop twice or apply it to a dismissed dialog.
-
 **DropRecord** -- `@substrate-system/drag-drop`'s
 `Record<string, File>` drop payload. It includes files recursed out of
 a dropped *directory*, which `dataTransfer.files` does not, so drop
@@ -200,12 +192,11 @@ rediscovered. `src/AGENTS.md` covers the component; `example/AGENTS.md`
 covers the demo's preact contract.
 
 **tape-run** -- The test runner. Tests execute in a real browser rather
-than jsdom, because `<dialog>`, `DataTransfer`, canvas encoding and
-pointer capture are all involved and none of them work in a fake DOM.
+than jsdom, because `DataTransfer`, canvas encoding and pointer capture
+are all involved and none of them work in a fake DOM.
 
 **Baseline** -- The browser support floor, inherited from the platform
-features used rather than chosen through polyfills. The dialog entry
-animation (`@starting-style`, `transition-behavior: allow-discrete`) is
-Baseline since 2024-08-06; the `overlay` transition property that would
-animate the *close* is Chromium-only, so Firefox and Safari close
-instantly. Recorded as a limitation, not patched.
+features used rather than chosen through polyfills: custom elements,
+Pointer Events with `setPointerCapture`, canvas `toBlob()`, and CSS
+custom properties. Where a feature is unevenly supported, the gap is
+recorded as a limitation rather than patched.

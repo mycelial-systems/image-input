@@ -2,6 +2,13 @@
 
 **Date:** 2026-07-25
 
+**Superseded in part by
+[ADR-002](ADR-002-events-not-dialogs.md):** the component no longer
+renders dialogs of its own, so the third and fifth bullets of the
+decision below, and the closing note about `@starting-style` and the
+`overlay` transition, describe a version that has been removed. The
+rest still holds, and applies to the dialog the application now writes.
+
 ## Context
 
 `image-input` is a redistributable web component. It is consumed by

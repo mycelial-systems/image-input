@@ -1,7 +1,8 @@
 # FDR-001: Constrained crop
 
-**Status:** Implemented
-**Last reviewed:** 2026-07-25
+**Status:** Implemented, pending the revision in
+[ADR-002](../adr/ADR-002-events-not-dialogs.md)
+**Last reviewed:** 2026-07-29
 
 ## Overview
 
@@ -16,9 +17,12 @@ without validating it afterwards or writing their own crop UI.
 
 ## Behavior
 
-* The `crop` attribute is accepted on both `<image-input>` and
-  `<image-crop>`. An `<image-input>` passes its value through to the
-  `<image-crop>` it creates for the crop dialog.
+* The `crop` attribute belongs to `<image-crop>`. `<image-input>` does
+  not accept it: it neither creates nor configures a cropper, so it has
+  no shape to express. An application that wants a constrained crop
+  puts the attribute on the `<image-crop>` it renders in response to
+  `image-input:edit`. See
+  [FDR-003](FDR-003-editing-handoff.md).
 * With no `crop` attribute, the cropper behaves exactly as it does
   today: free-form rect, starting at the full image, eight resize
   handles.
@@ -46,12 +50,12 @@ without validating it afterwards or writing their own crop UI.
 * The cropped `Blob` is unaffected by the constraint beyond its
   dimensions. A circle crop yields an ordinary square image at the
   rect's natural-pixel size, in whatever type the caller requested.
-  Displaying it as a circle is the consumer's `border-radius`.
-* `<image-input>` is such a consumer, so under `crop="circle"` its own
-  preview image is drawn as a circle by the package stylesheet. The
-  preview is also squared with `object-fit: cover`, which only shows
-  when the file was picked but never cropped -- a rectangular source
-  would otherwise render as an ellipse. Neither changes the file.
+  Displaying it as a circle is the consumer's `border-radius`. That
+  includes the `<image-input>` preview: the package stylesheet does not
+  round it, because `<image-input>` does not know the crop shape. An
+  application using `crop="circle"` rounds its own preview, and squares
+  it with `object-fit: cover` so that a source picked but never cropped
+  does not render as an ellipse.
 * A value that is not a keyword and not a usable ratio -- misspellings,
   zero, negative, non-finite -- falls back to free-form cropping and is
   reported through the debug channel. Nothing is thrown and no error
@@ -79,21 +83,25 @@ attribute alone. It also spends the good name `crop` on shape
 specifically, which forecloses using the same attribute later for an
 unrelated crop concern such as disabling the feature.
 
-### 2. The same attribute name on both elements
+### 2. The constraint lives on the crop element only
 
-**Decision:** The attribute is called `crop` on `<image-input>` and on
-`<image-crop>`, and `<image-input>` forwards the raw string.
+**Decision:** `crop` is an attribute of `<image-crop>`. It is not
+mirrored, forwarded or duplicated on `<image-input>`.
 
-**Why:** `<image-crop>` is a documented, independently usable export,
-not a private implementation detail, so it needs its own way to express
-the constraint. Using one name means one vocabulary in the README and
-a forwarding step with no mapping table that could drift out of sync
-with the values it maps.
+**Why:** The constraint configures a cropper, and `<image-input>` no
+longer has one -- it emits `image-input:edit` and the application
+supplies the crop UI (ADR-002). An attribute on `<image-input>` would
+then describe something the element neither renders nor reads, and the
+application would have to fetch it back off the host to apply it. One
+attribute on the element it actually configures leaves nothing to
+forward and nothing to keep in sync.
 
 **Tradeoff:** `crop` is a redundant name on an element already called
-`image-crop`; something like `shape` would read better there in
-isolation. Symmetry with the parent was judged worth more than the
-better local name.
+`image-crop`; something like `shape` would read better. The name is
+kept because it is the published one. The bigger cost is that the crop
+shape is no longer declarable on the element a page author writes in
+their HTML -- it now lives in whatever code renders the crop UI, which
+is less discoverable and cannot be set from markup alone.
 
 ### 3. Circle is a crop-UI affordance, not a pixel mask
 
@@ -155,7 +163,7 @@ free-form cropper and a debug message.
 **Why:** The component treats bad input this way everywhere else --
 a non-image drop emits an event rather than throwing, an
 unconstructable `DataTransfer` is caught and ignored. A cropper the
-user can still operate is a better failure than a broken dialog, and
+user can still operate is a better failure than a dead one, and
 an attribute typo is a development-time mistake that the debug channel
 already serves.
 
@@ -166,9 +174,13 @@ consumer checks the returned blob's dimensions.
 
 ## Related
 
-* **ADRs:** ADR-001
+* **ADRs:** [ADR-001](../adr/ADR-001-use-platform-primitives.md),
+  [ADR-002](../adr/ADR-002-events-not-dialogs.md) -- the latter is why
+  the attribute is on `<image-crop>` alone.
 * **FDRs:** [FDR-002](FDR-002-crop-rect-direct-manipulation.md) -- the
   drag/keyboard interaction this feature constrains.
+  [FDR-003](FDR-003-editing-handoff.md) -- how an application gets from
+  an edit request to a configured `<image-crop>`.
 
 ## Open Questions
 

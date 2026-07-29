@@ -1,7 +1,7 @@
 # FDR-002: Crop rect direct manipulation
 
 **Status:** Implemented
-**Last reviewed:** 2026-07-28
+**Last reviewed:** 2026-07-29
 
 ## Overview
 
@@ -78,8 +78,8 @@ the page scrollable: the effective value for a touch is the
 intersection of the hit element's value with all of its ancestors', so
 one declaration on the rectangle also covers the handles nested inside
 it, while a touch on the dimmed area outside still pans the page. On a
-phone the crop dialog is taller than the viewport, so leaving some of
-the image pannable matters.
+phone whatever contains the cropper is usually taller than the
+viewport, so leaving some of the image pannable matters.
 
 **Tradeoff:** The guarantee depends on the handles staying descendants
 of the rectangle in the markup. Nothing in the DOM enforces that, and
@@ -156,10 +156,13 @@ comparing crops needs a tolerance rather than equality.
 
 ## Related
 
-* **ADRs:** ADR-001
+* **ADRs:** [ADR-001](../adr/ADR-001-use-platform-primitives.md)
 * **FDRs:** [FDR-001](FDR-001-constrained-crop.md) -- the shape-locking
   layer on top of this interaction. It changes which handles are shown
   and what a corner drag does, but not the mechanics described here.
+  [FDR-003](FDR-003-editing-handoff.md) -- where `<image-crop>` gets
+  rendered, which is now the application's decision rather than the
+  component's.
 
 ## Open Questions
 
