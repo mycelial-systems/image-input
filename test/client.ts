@@ -6,6 +6,7 @@ import {
     makeImageFile,
     waitForCropRect
 } from './helpers.js'
+import { imageBlob, imageFile } from './fixture.js'
 
 /**
  * Mount markup from `html()` and attach a client to it.
@@ -50,9 +51,7 @@ test('picking a file marks both the box and the preview', async t => {
     t.equal(box.classList.contains('has-image'), false,
         'the box should start without has-image')
 
-    selectFile(host, new File(['abc'], 'photo.png', {
-        type: 'image/png'
-    }))
+    selectFile(host, imageFile('photo.png', 'image/png'))
 
     t.equal(preview.classList.contains('has-image'), true,
         'the preview should gain has-image')
@@ -65,9 +64,7 @@ test('clear() removes has-image from both', async t => {
     const box = host.querySelector('.box') as HTMLElement
     const preview = host.querySelector('.preview') as HTMLElement
 
-    selectFile(host, new File(['abc'], 'photo.png', {
-        type: 'image/png'
-    }))
+    selectFile(host, imageFile('photo.png', 'image/png'))
     client.clear()
 
     t.equal(preview.classList.contains('has-image'), false,
@@ -78,16 +75,14 @@ test('clear() removes has-image from both', async t => {
 
 test('setImage promotes a Blob to a File on the client', async t => {
     const { host, client } = mount('client-promote-test')
-    selectFile(host, new File(['abc'], 'photo.png', {
-        type: 'image/png'
-    }))
+    selectFile(host, imageFile('photo.png', 'image/png'))
 
     let seen:unknown = null
     host.addEventListener('image-input:change', ev => {
         seen = (ev as CustomEvent).detail.file
     })
 
-    client.setImage(new Blob(['xyz'], { type: 'image/jpeg' }))
+    client.setImage(imageBlob())
 
     t.ok(seen instanceof File,
         'the change detail should carry a File, not a bare Blob')
@@ -98,9 +93,7 @@ test('setImage promotes a Blob to a File on the client', async t => {
 test('the ALT badge opens the alt dialog, seeded with the alt text',
     async t => {
         const { host } = mount('client-alt-open-test')
-        selectFile(host, new File(['abc'], 'photo.png', {
-            type: 'image/png'
-        }))
+        selectFile(host, imageFile('photo.png', 'image/png'))
 
         const badge = host.querySelector('.alt-badge') as HTMLElement
         const dialog = host.querySelector(
@@ -124,9 +117,7 @@ test('the ALT badge opens the alt dialog, seeded with the alt text',
 test('saving alt text updates the image and emits alt-change',
     async t => {
         const { host } = mount('client-alt-save-test')
-        selectFile(host, new File(['abc'], 'photo.png', {
-            type: 'image/png'
-        }))
+        selectFile(host, imageFile('photo.png', 'image/png'))
 
         let emitted:string|null = null
         host.addEventListener('image-input:alt-change', ev => {
@@ -157,9 +148,7 @@ test('saving alt text updates the image and emits alt-change',
 
 test('canceling the alt dialog leaves the alt text alone', async t => {
     const { host } = mount('client-alt-cancel-test')
-    selectFile(host, new File(['abc'], 'photo.png', {
-        type: 'image/png'
-    }))
+    selectFile(host, imageFile('photo.png', 'image/png'))
 
     const badge = host.querySelector('.alt-badge') as HTMLElement
     const dialog = host.querySelector(
@@ -182,9 +171,7 @@ test('canceling the alt dialog leaves the alt text alone', async t => {
 test('canceling image-input:alt suppresses the built-in dialog',
     async t => {
         const { host } = mount('client-alt-optout-test')
-        selectFile(host, new File(['abc'], 'photo.png', {
-            type: 'image/png'
-        }))
+        selectFile(host, imageFile('photo.png', 'image/png'))
 
         host.addEventListener('image-input:alt', ev => {
             ev.preventDefault()
@@ -204,9 +191,7 @@ test('canceling image-input:alt suppresses the built-in dialog',
 test('the edit button lazily creates an image-crop and opens the ' +
     'crop dialog', async t => {
     const { host } = mount('client-crop-open-test')
-    selectFile(host, new File(['abc'], 'photo.png', {
-        type: 'image/png'
-    }))
+    selectFile(host, imageFile('photo.png', 'image/png'))
 
     const editBtn = host.querySelector('.edit') as HTMLButtonElement
     const dialog = host.querySelector(
@@ -232,7 +217,7 @@ test('the edit button forwards the host\'s crop attribute to the ' +
     'lazily created image-crop', async t => {
     const { host } = mount('client-crop-forward-test')
     host.setAttribute('crop', 'circle')
-    selectFile(host, new File(['abc'], 'photo.png', { type: 'image/png' }))
+    selectFile(host, imageFile('photo.png', 'image/png'))
 
     ;(host.querySelector('.edit') as HTMLElement).click()
 
@@ -244,9 +229,7 @@ test('the edit button forwards the host\'s crop attribute to the ' +
 test('destroy() removes the lazily created image-crop from the DOM',
     async t => {
         const { host, client } = mount('client-destroy-crop-test')
-        selectFile(host, new File(['abc'], 'photo.png', {
-            type: 'image/png'
-        }))
+        selectFile(host, imageFile('photo.png', 'image/png'))
 
         ;(host.querySelector('.edit') as HTMLElement).click()
 

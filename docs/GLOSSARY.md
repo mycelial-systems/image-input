@@ -194,8 +194,13 @@ covers the demo's preact contract.
 **tapout** -- The test runner. Tests execute in a real browser
 (Playwright-driven) rather than jsdom, because `DataTransfer`, canvas
 encoding and pointer capture are all involved and none of them work in a
-fake DOM. The bundle is piped in on stdin; `test/index.html` is served as
-the page via `--html`, because some contracts are CSS-only.
+fake DOM. The bundle is piped in on stdin, and tapout serves its own
+page, so the bundle installs the stylesheet itself -- see `test/style.ts`.
+
+**`test/fixture.ts`** -- One real image, `test/cinnamon-roll.jpg`,
+inlined as base64. Every image a test hands the component comes from
+here. A `File` of arbitrary bytes does not decode, so each preview
+`<img>` fails to load and the browser logs an error for it.
 
 **Baseline** -- The browser support floor, inherited from the platform
 features used rather than chosen through polyfills: custom elements,
