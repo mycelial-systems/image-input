@@ -12,6 +12,7 @@ const debug = Debug(true)
 
 interface ExampleProps {
     crop?:string;
+    nocrop?:boolean;
     heading:VNode;
     description:string;
 }
@@ -50,10 +51,19 @@ const EXAMPLES:ExampleProps[] = [
         crop: '1',
         heading: html`<code>crop="1"</code>`,
         description: 'Use a square aspect ratio.'
+    },
+    {
+        nocrop: true,
+        heading: html`<code>nocrop</code>`,
+        description: 'No edit button in the overlay, and ' +
+            'image-input:edit never fires. Everything else is ' +
+            'untouched: the ALT badge, remove, the preview and the ' +
+            'panel below all behave as they do above. Unrelated to ' +
+            'crop, which is why the two never appear together.'
     }
 ]
 
-function Example ({ crop, heading, description }:ExampleProps) {
+function Example ({ crop, nocrop, heading, description }:ExampleProps) {
     const ref = useRef<ImageInput>(null)
     const state = useMemo(State, [])
 
@@ -88,8 +98,14 @@ function Example ({ crop, heading, description }:ExampleProps) {
      * Omit the attribute entirely for the free-form example, rather
      * than passing an empty or null `crop`. The value is fixed per
      * instance, so this never changes across renders (rule 1).
+     *
+     * `nocrop` is spread the same way, for the same reason: it is a
+     * reflected *boolean*, so `nocrop=${false}` would reach the
+     * setter and remove the attribute -- a second spelling of "not
+     * present" that this page has no reason to have.
      */
     const cropAttr = crop ? { crop } : {}
+    const nocropAttr = nocrop ? { nocrop: true } : {}
 
     /**
      * Clear calls a method on the element. `clear()` does not emit
@@ -113,6 +129,7 @@ function Example ({ crop, heading, description }:ExampleProps) {
                 ref=${ref}
                 accept="image/*"
                 ...${cropAttr}
+                ...${nocropAttr}
             />
             <${Panel} signals=${state} />
             <${Controls}

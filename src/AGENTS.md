@@ -216,6 +216,22 @@
   calls `this.clear()` and then emits it. Code that calls `clear()`
   already knows it cleared the input; a consumer syncing its own state
   off `:remove` would otherwise see an event it caused itself.
+- `nocrop` suppression lives in two files that have to stay in
+  agreement: the `&[nocrop] .edit { display: none }` rule in
+  `src/index.css` hides the button, and the early return at the top of
+  `handleEdit` (`index.ts`) / `#handleEdit` (`client.ts`) makes it
+  inert. Neither is redundant. CSS cannot stop a scripted `.click()`
+  or help a consumer who ships their own stylesheet; the guard cannot
+  remove the button from the page, the tab order or the accessibility
+  tree. The guard is the contract -- `image-input:edit` must not fire
+  while the attribute is set -- and it is the only half a test can
+  assert without loading real CSS (`test/style.ts` does load it, so
+  `test/index.ts` asserts both). `html()` deliberately has no `nocrop`
+  option: identical markup either way is what lets the attribute be
+  toggled at runtime with no re-render, and what keeps the
+  server-rendered and custom-element paths from disagreeing. The
+  client reads it off `this.host` live rather than caching it, for
+  the same reason. See FDR-003 decisions 5 and 6.
 - `src/file.ts` holds the Blob-to-File promotion both `ImageInput` and
   `ImageInputClient` use. Both must guarantee the file they hold is a
   `File`: `ImageCrop.setFile()` requires one, and consumers read

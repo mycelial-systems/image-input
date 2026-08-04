@@ -5,18 +5,18 @@ import type { ImageCrop } from '../src/crop.js'
 import { makeImageFile, waitForImageLoad } from './helpers.js'
 
 test('example test', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-crop class="test"></image-crop>
-    `
+    `)
     const el = await waitFor('image-crop')
     t.ok(el, 'should find an element')
 })
 
 test('accepts an image via setFile and renders it at a size that ' +
     'fits the element, preserving aspect ratio', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-crop class="setfile-test" style="display:block;width:200px;"></image-crop>
-    `
+    `)
     const el = await waitFor('image-crop.setfile-test') as ImageCrop
     const file = await makeImageFile(400, 200)
     el.setFile(file)
@@ -31,9 +31,9 @@ test('accepts an image via setFile and renders it at a size that ' +
 })
 
 test('accepts an image via the src attribute', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-crop class="src-test"></image-crop>
-    `
+    `)
     const el = await waitFor('image-crop.src-test') as ImageCrop
     const file = await makeImageFile(10, 10)
     el.src = URL.createObjectURL(file)
@@ -44,9 +44,9 @@ test('accepts an image via the src attribute', async t => {
 
 test('renders a crop rectangle with 8 handles, covering the full ' +
     'image initially', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-crop class="rect-test" style="display:block;width:200px;"></image-crop>
-    `
+    `)
     const el = await waitFor('image-crop.rect-test') as ImageCrop
     const file = await makeImageFile(200, 100)
     el.setFile(file)
@@ -70,9 +70,9 @@ test('renders a crop rectangle with 8 handles, covering the full ' +
 
 test('the crop rectangle opts out of the browser\'s own touch ' +
     'gestures', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-crop class="touch-test" style="display:block;width:200px;"></image-crop>
-    `
+    `)
     const el = await waitFor('image-crop.touch-test') as ImageCrop
     const file = await makeImageFile(200, 100)
     el.setFile(file)
@@ -96,9 +96,9 @@ test('the crop rectangle opts out of the browser\'s own touch ' +
 })
 
 test('dims the area outside the crop rectangle', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-crop class="dim-test" style="display:block;width:200px;"></image-crop>
-    `
+    `)
     const el = await waitFor('image-crop.dim-test') as ImageCrop
     const file = await makeImageFile(200, 100)
     el.setFile(file)
@@ -136,9 +136,9 @@ function pointer (
 }
 
 test('dragging a corner handle resizes the crop rectangle', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-crop class="resize-test" style="display:block;width:200px;"></image-crop>
-    `
+    `)
     const el = await waitFor('image-crop.resize-test') as ImageCrop
     const file = await makeImageFile(200, 100)
     el.setFile(file)
@@ -168,9 +168,9 @@ test('dragging a corner handle resizes the crop rectangle', async t => {
 })
 
 test('the crop rectangle cannot be resized below the minimum size', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-crop class="minsize-test" style="display:block;width:200px;"></image-crop>
-    `
+    `)
     const el = await waitFor('image-crop.minsize-test') as ImageCrop
     const file = await makeImageFile(200, 100)
     el.setFile(file)
@@ -194,9 +194,9 @@ test('the crop rectangle cannot be resized below the minimum size', async t => {
 })
 
 test('dragging inside the rectangle moves it, clamped to image bounds', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-crop class="move-test" style="display:block;width:200px;"></image-crop>
-    `
+    `)
     const el = await waitFor('image-crop.move-test') as ImageCrop
     const file = await makeImageFile(200, 100)
     el.setFile(file)
@@ -238,9 +238,9 @@ test('dragging inside the rectangle moves it, clamped to image bounds', async t 
 
 test('crop state changes emit image-crop:change with natural pixel ' +
     'coordinates', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-crop class="change-test" style="display:block;width:200px;"></image-crop>
-    `
+    `)
     const el = await waitFor('image-crop.change-test') as ImageCrop
     const file = await makeImageFile(400, 200)
     el.setFile(file)
@@ -283,9 +283,9 @@ function key (
 }
 
 test('the crop rectangle is focusable with an accessible name', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-crop class="a11y-test" style="display:block;width:200px;"></image-crop>
-    `
+    `)
     const el = await waitFor('image-crop.a11y-test') as ImageCrop
     const file = await makeImageFile(200, 100)
     el.setFile(file)
@@ -298,9 +298,9 @@ test('the crop rectangle is focusable with an accessible name', async t => {
 })
 
 test('arrow keys move the crop rectangle', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-crop class="key-move-test" style="display:block;width:200px;"></image-crop>
-    `
+    `)
     const el = await waitFor('image-crop.key-move-test') as ImageCrop
     const file = await makeImageFile(200, 100)
     el.setFile(file)
@@ -334,9 +334,9 @@ test('arrow keys move the crop rectangle', async t => {
 })
 
 test('shift+arrow keys resize the crop rectangle', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-crop class="key-resize-test" style="display:block;width:200px;"></image-crop>
-    `
+    `)
     const el = await waitFor('image-crop.key-resize-test') as ImageCrop
     const file = await makeImageFile(200, 100)
     el.setFile(file)
@@ -369,9 +369,9 @@ function loadBlobDimensions (blob:Blob):Promise<{ width:number, height:number }>
 }
 
 test('the crop getter returns the current rect in natural pixels', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-crop class="crop-getter-test" style="display:block;width:200px;"></image-crop>
-    `
+    `)
     const el = await waitFor('image-crop.crop-getter-test') as ImageCrop
     const file = await makeImageFile(400, 200)
     el.setFile(file)
@@ -383,9 +383,9 @@ test('the crop getter returns the current rect in natural pixels', async t => {
 
 test('getBlob returns a Blob of the cropped region at natural resolution',
     async t => {
-        document.body.innerHTML += `
+        document.body.insertAdjacentHTML('beforeend', `
             <image-crop class="getblob-test" style="display:block;width:200px;"></image-crop>
-        `
+        `)
         const el = await waitFor('image-crop.getblob-test') as ImageCrop
         const file = await makeImageFile(400, 200)
         el.setFile(file)
@@ -418,9 +418,9 @@ test('getBlob returns a Blob of the cropped region at natural resolution',
     })
 
 test('getBlob accepts a type option', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-crop class="getblob-type-test" style="display:block;width:200px;"></image-crop>
-    `
+    `)
     const el = await waitFor('image-crop.getblob-type-test') as ImageCrop
     const file = await makeImageFile(100, 100)
     el.setFile(file)
@@ -431,9 +431,9 @@ test('getBlob accepts a type option', async t => {
 })
 
 test('keyboard interactions emit image-crop:change in natural pixels', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-crop class="key-change-test" style="display:block;width:200px;"></image-crop>
-    `
+    `)
     const el = await waitFor('image-crop.key-change-test') as ImageCrop
     const file = await makeImageFile(400, 200)
     el.setFile(file)
@@ -452,10 +452,10 @@ test('keyboard interactions emit image-crop:change in natural pixels', async t =
 
 test('constrains the displayed height by the element\'s max-height, ' +
     'preserving aspect ratio', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-crop class="max-height-test"
             style="display:block;width:400px;max-height:100px;"></image-crop>
-    `
+    `)
     const el = await waitFor('image-crop.max-height-test') as ImageCrop
     // 1:2, so fitting 400px wide would be 800px tall -- far over the cap
     el.setFile(await makeImageFile(400, 800))
@@ -480,10 +480,10 @@ test('constrains the displayed height by the element\'s max-height, ' +
  */
 test('re-lays out to fill the container again after it grows back',
     async t => {
-        document.body.innerHTML += `
+        document.body.insertAdjacentHTML('beforeend', `
         <image-crop class="regrow-test"
             style="display:block;width:200px;"></image-crop>
-    `
+    `)
         const el = await waitFor('image-crop.regrow-test') as ImageCrop
         el.setFile(await makeImageFile(400, 200))
         await waitForImageLoad(el)
@@ -509,10 +509,10 @@ test('re-lays out to fill the container again after it grows back',
     })
 
 test('crop="3/4" locks the initial rect to that ratio, centered', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-crop class="ratio-literal-test" crop="3/4"
             style="display:block;width:200px;"></image-crop>
-    `
+    `)
     const el = await waitFor('image-crop.ratio-literal-test') as ImageCrop
     const file = await makeImageFile(400, 200)
     el.setFile(file)
@@ -529,10 +529,10 @@ test('crop="3/4" locks the initial rect to that ratio, centered', async t => {
 test('crop="constrain" locks to the source image\'s own ratio -- the ' +
     'starting rect covers the whole image, but edge handles are inert',
 async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
             <image-crop class="constrain-test" crop="constrain"
                 style="display:block;width:200px;"></image-crop>
-        `
+        `)
     const el = await waitFor('image-crop.constrain-test') as ImageCrop
     const file = await makeImageFile(200, 100)
     el.setFile(file)
@@ -563,10 +563,10 @@ async t => {
 
 test('crop="circle" locks to 1:1 and marks the frame for circular chrome',
     async t => {
-        document.body.innerHTML += `
+        document.body.insertAdjacentHTML('beforeend', `
             <image-crop class="circle-test" crop="circle"
                 style="display:block;width:200px;"></image-crop>
-        `
+        `)
         const el = await waitFor('image-crop.circle-test') as ImageCrop
         const file = await makeImageFile(400, 200)
         el.setFile(file)
@@ -581,10 +581,10 @@ test('crop="circle" locks to 1:1 and marks the frame for circular chrome',
     })
 
 test('a circle-locked crop yields a square Blob, not a masked one', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-crop class="circle-blob-test" crop="circle"
             style="display:block;width:200px;"></image-crop>
-    `
+    `)
     const el = await waitFor('image-crop.circle-blob-test') as ImageCrop
     const file = await makeImageFile(400, 200)
     el.setFile(file)
@@ -598,10 +598,10 @@ test('a circle-locked crop yields a square Blob, not a masked one', async t => {
 
 test('an invalid crop value falls back to free-form cropping, without ' +
     'throwing', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-crop class="invalid-crop-test" crop="sideways"
             style="display:block;width:200px;"></image-crop>
-    `
+    `)
     const el = await waitFor('image-crop.invalid-crop-test') as ImageCrop
     const file = await makeImageFile(200, 100)
     el.setFile(file)
@@ -617,10 +617,10 @@ test('an invalid crop value falls back to free-form cropping, without ' +
 
 test('a corner drag under a lock scales the rect proportionally, ' +
     'anchoring the opposite corner', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-crop class="locked-drag-test" crop="1/1"
             style="display:block;width:200px;"></image-crop>
-    `
+    `)
     const el = await waitFor('image-crop.locked-drag-test') as ImageCrop
     const file = await makeImageFile(200, 100)
     el.setFile(file)
@@ -644,10 +644,10 @@ test('a corner drag under a lock scales the rect proportionally, ' +
 
 test('shift+arrow keys scale the locked rect proportionally, unlike ' +
     'the free-form case where only one axis changes', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-crop class="locked-key-test" crop="1/1"
             style="display:block;width:200px;"></image-crop>
-    `
+    `)
     const el = await waitFor('image-crop.locked-key-test') as ImageCrop
     const file = await makeImageFile(200, 100)
     el.setFile(file)
@@ -666,10 +666,10 @@ test('shift+arrow keys scale the locked rect proportionally, unlike ' +
 })
 
 test('plain arrow keys still move (not resize) a locked crop rect', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-crop class="locked-key-move-test" crop="1/1"
             style="display:block;width:200px;"></image-crop>
-    `
+    `)
     const el = await waitFor('image-crop.locked-key-move-test') as ImageCrop
     const file = await makeImageFile(200, 100)
     el.setFile(file)
@@ -688,10 +688,10 @@ test('plain arrow keys still move (not resize) a locked crop rect', async t => {
 
 test('changing the crop attribute after an image has loaded re-fits ' +
     'the rect to the new constraint', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-crop class="refit-test"
             style="display:block;width:200px;"></image-crop>
-    `
+    `)
     const el = await waitFor('image-crop.refit-test') as ImageCrop
     const file = await makeImageFile(400, 200)
     el.setFile(file)

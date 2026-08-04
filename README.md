@@ -193,6 +193,29 @@ is the same as setting the attribute in HTML.
   picked but never cropped is centered and squared in the preview by
   `object-fit: cover`, so it reads as a circle too, while the file
   itself keeps its original shape.
+* `nocrop` -- Boolean. Removes the Edit button from the preview
+  overlay. While it is set the button is hidden by the stylesheet and
+  `image-input:edit` never fires, so a page that offers no cropping
+  shows no dead affordance. Use it when you cancel `image-input:edit`
+  and supply nothing in its place, or when an image should not be
+  recroppable once picked.
+
+  It suppresses the trigger and nothing else. The ALT badge, Remove,
+  picking, dropping, the preview, form participation and `setImage()`
+  all behave exactly as they do without it -- you can still replace
+  the image programmatically while offering the user no way to ask
+  for it. It is honored whether it is in the served markup or toggled
+  at runtime, and it takes effect immediately.
+
+  `nocrop` and `crop` are unrelated and never appear together.
+  `nocrop` is about whether `image-input` offers a trigger; `crop` is
+  about the shape the crop rect enforces once a cropper exists.
+
+  Note the button is hidden by a rule in this package's stylesheet
+  (`image-input[nocrop] .edit`), not omitted from the markup. If you
+  ship your own stylesheet instead of ours, hide it yourself -- the
+  handler guard keeps it inert either way, but cannot make it
+  disappear.
 
 ```html
 <image-input
@@ -218,7 +241,7 @@ They bubble, so you can listen on the element or an ancestor.
   (see [Built-in dialogs](#built-in-dialogs) below) opens right after
   this event fires. Call `preventDefault()` on it to suppress that
   dialog and open your own crop UI instead, then call `setImage(blob)`
-  with the result.
+  with the result. Never fires while the `nocrop` attribute is set.
 * `image-input:alt` -- The ALT badge was clicked. `detail` is
   `{ file:File, alt:string }`. Cancelable: by default, the built-in
   alt-text dialog opens right after this event fires. Call
@@ -294,7 +317,10 @@ wiring of your own is required.
 No new event types exist for this. Both dialogs sit on top of the
 events already documented above: `image-input:edit` and
 `image-input:alt` open them (unless canceled), and saving fires the
-existing `image-input:change` / `image-input:alt-change`.
+existing `image-input:change` / `image-input:alt-change`. The
+`nocrop` attribute stops `image-input:edit` at the source, so the
+crop dialog is unreachable while it is set; the alt dialog is
+unaffected.
 
 Neither dialog's markup has an `id` -- `image-input` is a light-DOM
 component, so an `id` in its own markup would collide with every
@@ -452,6 +478,12 @@ const client = new ImageInputClient(
 honors `preventDefault()` on `:edit` and `:alt` the same way the
 custom element does, and exposes `setImage(blob)`, `clear()` and
 `destroy()`.
+
+`nocrop` works on this path too. Write it on the `<image-input>` host
+-- the stylesheet rule and the client's guard both read it from
+there, so `res.send('<image-input nocrop>' + html() + '</image-input>')`
+hides the Edit button and keeps it inert, hydrated or not. It is not
+an `html()` option: the markup is the same either way.
 
 `html()` takes `accept`, `name`, `required`, `alt` and `label`, plus
 `dialogs: false` to leave the built-in dialogs out when you supply

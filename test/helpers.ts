@@ -1,24 +1,49 @@
 import type { ImageCrop } from '../src/crop.js'
+import { imageDataUrl } from './fixture.js'
+
+let fixture:Promise<HTMLImageElement>|null = null
 
 /**
- * Render a solid-color rectangle to a canvas and resolve it as a real,
- * decodable image File. Used wherever a test needs an `<image-crop>`
- * (or `<image-input>`'s lazily created one) to have a genuinely loaded
- * image -- `naturalWidth`/`naturalHeight` and `getBlob()`'s canvas
- * draw both depend on that, and a hand-built `File` of arbitrary bytes
- * does not decode.
+ * Decode the base64 fixture once. Every sized image in the suite is
+ * drawn from this one decode.
  */
-export function makeImageFile (
+function loadFixture ():Promise<HTMLImageElement> {
+    if (fixture) return fixture
+
+    fixture = new Promise((resolve, reject) => {
+        const img = new Image()
+        img.addEventListener('load', () => resolve(img), { once: true })
+        img.addEventListener('error', () => {
+            reject(new Error('the base64 fixture image failed to decode'))
+        }, { once: true })
+        img.src = imageDataUrl()
+    })
+
+    return fixture
+}
+
+/**
+ * Draw the fixture image at exactly `width` x `height` and resolve it
+ * as a real, decodable image File. Used wherever a test needs an
+ * `<image-crop>` (or `<image-input>`'s lazily created one) to have a
+ * genuinely loaded image at a known size -- `naturalWidth`/
+ * `naturalHeight` and `getBlob()`'s canvas draw both depend on that,
+ * and a hand-built `File` of arbitrary bytes does not decode.
+ *
+ * The aspect ratio is deliberately not preserved: callers pick the
+ * dimensions they assert on.
+ */
+export async function makeImageFile (
     width:number,
-    height:number,
-    color = '#ff0000'
+    height:number
 ):Promise<File> {
+    const img = await loadFixture()
+
     const canvas = document.createElement('canvas')
     canvas.width = width
     canvas.height = height
     const ctx = canvas.getContext('2d') as CanvasRenderingContext2D
-    ctx.fillStyle = color
-    ctx.fillRect(0, 0, width, height)
+    ctx.drawImage(img, 0, 0, width, height)
 
     return new Promise((resolve) => {
         canvas.toBlob(blob => {

@@ -81,7 +81,10 @@ combinations are unrepresentable.
 `crop` is not a plain enum and cannot be validated by reading the
 attribute alone. It also spends the good name `crop` on shape
 specifically, which forecloses using the same attribute later for an
-unrelated crop concern such as disabling the feature.
+unrelated crop concern. That cost has since been paid: suppressing the
+Edit button needed a separate `nocrop` boolean rather than a `crop`
+value, because `crop` was taken and sat on the wrong element. See
+[FDR-003](FDR-003-editing-handoff.md).
 
 ### 2. The constraint lives on the crop element only
 

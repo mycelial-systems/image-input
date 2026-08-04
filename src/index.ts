@@ -33,13 +33,14 @@ export class ImageInput extends WebComponent {
         'accept', 'name', 'alt', 'label', 'crop'
     ]
 
-    static reflectedBooleanAttributes = ['required']
+    static reflectedBooleanAttributes = ['required', 'nocrop']
     declare accept:string|null
     declare name:string|null
     declare alt:string|null
     declare label:string|null
     declare crop:string|null
     declare required:boolean
+    declare nocrop:boolean
 
     static DEFAULT_LABEL = LABEL
 
@@ -217,6 +218,11 @@ export class ImageInput extends WebComponent {
 
     handleEdit = (event:Event) => {
         event.preventDefault()
+        // `nocrop` means this element offers no edit trigger, so there
+        // is nothing to announce. The stylesheet already hides the
+        // button; this covers what CSS cannot -- a scripted click, or
+        // a page that never loaded our stylesheet (FDR-003).
+        if (this.nocrop) return
         if (!this.#file) return
         const notCanceled = this.emit('edit', {
             detail: { file: this.#file }

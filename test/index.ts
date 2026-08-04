@@ -1,5 +1,6 @@
 import { test } from '@substrate-system/tapzero'
 import { waitFor } from '@substrate-system/dom'
+import './style.js'
 import { ImageInput } from '../src/index.js'
 import type { ImageCrop } from '../src/crop.js'
 import { html } from '../src/html.js'
@@ -8,16 +9,17 @@ import {
     waitForCropRect,
     waitForImageLoad
 } from './helpers.js'
+import { imageBlob, imageFile } from './fixture.js'
 import './crop.js'
 import './crop-math.js'
 import './html.js'
 import './client.js'
 
 test('renders a .box div instead of .wrapper', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <${ImageInput.TAG} class="box-test" accept="image/png" name="photo" required>
         </${ImageInput.TAG}>
-    `
+    `)
     const el = await waitFor('image-input.box-test') as ImageInput
 
     t.equal(el.querySelector('.wrapper'), null,
@@ -38,10 +40,10 @@ test('renders a .box div instead of .wrapper', async t => {
 
 test('the native input keeps its attributes and stays in the picker',
     async t => {
-        document.body.innerHTML += `
+        document.body.insertAdjacentHTML('beforeend', `
             <image-input class="input-attrs-test" accept="image/png"
                 name="photo" required></image-input>
-        `
+        `)
         const el = await waitFor('image-input.input-attrs-test') as ImageInput
 
         const picker = el.querySelector('.picker')
@@ -61,9 +63,9 @@ test('the native input keeps its attributes and stays in the picker',
 
 test('the input is not hidden with display:none or the hidden attribute',
     async t => {
-        document.body.innerHTML += `
+        document.body.insertAdjacentHTML('beforeend', `
             <image-input class="input-visible-test"></image-input>
-        `
+        `)
         const el = await waitFor(
             'image-input.input-visible-test'
         ) as ImageInput
@@ -81,13 +83,13 @@ test('the input is not hidden with display:none or the hidden attribute',
 
 test('.preview.has-image still drives preview visibility inside .box',
     async t => {
-        document.body.innerHTML += `
+        document.body.insertAdjacentHTML('beforeend', `
             <image-input class="box-preview-test"></image-input>
-        `
+        `)
         const el = await waitFor(
             'image-input.box-preview-test'
         ) as ImageInput
-        const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+        const file = imageFile('photo.png', 'image/png')
 
         selectFile(el, file)
 
@@ -98,9 +100,9 @@ test('.preview.has-image still drives preview visibility inside .box',
 
 test('the picker has no tabindex or role, relying on native label ' +
     'and input semantics', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
             <image-input class="picker-semantics-test"></image-input>
-        `
+        `)
     const el = await waitFor(
         'image-input.picker-semantics-test'
     ) as ImageInput
@@ -114,9 +116,9 @@ test('the picker has no tabindex or role, relying on native label ' +
 
 test('clicking the picker label opens the input, with no JS ' +
     'click-forwarding needed', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
             <image-input class="picker-click-test"></image-input>
-        `
+        `)
     const el = await waitFor(
         'image-input.picker-click-test'
     ) as ImageInput
@@ -136,9 +138,9 @@ test('clicking the picker label opens the input, with no JS ' +
 
 test('the empty picker has in-flow prompt content that gives the ' +
     'box its height', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="prompt-content-test"></image-input>
-    `
+    `)
     const el = await waitFor(
         'image-input.prompt-content-test'
     ) as ImageInput
@@ -159,13 +161,13 @@ test('the empty picker has in-flow prompt content that gives the ' +
 })
 
 test('#setFile adds has-image to .box, #clear removes it', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="box-has-image-test"></image-input>
-    `
+    `)
     const el = await waitFor(
         'image-input.box-has-image-test'
     ) as ImageInput
-    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    const file = imageFile('photo.png', 'image/png')
 
     const box = el.querySelector('.box') as HTMLElement
     t.equal(box.classList.contains('has-image'), false,
@@ -185,12 +187,12 @@ test('#setFile adds has-image to .box, #clear removes it', async t => {
 
 test('dragenter on the box adds the drag class, dragleave removes it',
     async t => {
-        document.body.innerHTML += `
+        document.body.insertAdjacentHTML('beforeend', `
             <image-input class="drag-class-test"></image-input>
-        `
+        `)
         const el = await waitFor('image-input.drag-class-test') as ImageInput
         const box = el.querySelector('.box') as HTMLElement
-        const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+        const file = imageFile('photo.png', 'image/png')
 
         const dt = new DataTransfer()
         dt.items.add(file)
@@ -216,12 +218,12 @@ test('dragenter on the box adds the drag class, dragleave removes it',
     })
 
 test('dropping an image renders the preview and emits change', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="drop-select-test"></image-input>
-    `
+    `)
     const el = await waitFor('image-input.drop-select-test') as ImageInput
     const box = el.querySelector('.box') as HTMLElement
-    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    const file = imageFile('photo.png', 'image/png')
 
     let changeDetail:{ file:File|Blob, alt:string }|null = null
     el.addEventListener('image-input:change', ((ev:CustomEvent) => {
@@ -251,9 +253,9 @@ test('dropping an image renders the preview and emits change', async t => {
 })
 
 test('dropping an image populates input.files with one file', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="drop-sync-files-test"></image-input>
-    `
+    `)
     const el = await waitFor(
         'image-input.drop-sync-files-test'
     ) as ImageInput
@@ -261,7 +263,7 @@ test('dropping an image populates input.files with one file', async t => {
     const input = el.querySelector(
         'input[type="file"]'
     ) as HTMLInputElement
-    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    const file = imageFile('photo.png', 'image/png')
 
     const dt = new DataTransfer()
     dt.items.add(file)
@@ -281,9 +283,9 @@ test('dropping an image populates input.files with one file', async t => {
 
 test('a dropped file satisfies required with no picker interaction',
     async t => {
-        document.body.innerHTML += `
+        document.body.insertAdjacentHTML('beforeend', `
             <image-input class="drop-required-test" required></image-input>
-        `
+        `)
         const el = await waitFor(
             'image-input.drop-required-test'
         ) as ImageInput
@@ -291,7 +293,7 @@ test('a dropped file satisfies required with no picker interaction',
         const input = el.querySelector(
             'input[type="file"]'
         ) as HTMLInputElement
-        const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+        const file = imageFile('photo.png', 'image/png')
 
         t.equal(input.checkValidity(), false,
             'the required input should be invalid before any file')
@@ -311,9 +313,9 @@ test('a dropped file satisfies required with no picker interaction',
     })
 
 test('#clear resets input.files as well as input.value', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="drop-clear-files-test"></image-input>
-    `
+    `)
     const el = await waitFor(
         'image-input.drop-clear-files-test'
     ) as ImageInput
@@ -321,7 +323,7 @@ test('#clear resets input.files as well as input.value', async t => {
     const input = el.querySelector(
         'input[type="file"]'
     ) as HTMLInputElement
-    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    const file = imageFile('photo.png', 'image/png')
 
     const dt = new DataTransfer()
     dt.items.add(file)
@@ -343,17 +345,15 @@ test('#clear resets input.files as well as input.value', async t => {
 })
 
 test('a drop with several files uses the first image/* one', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="drop-multi-test"></image-input>
-    `
+    `)
     const el = await waitFor('image-input.drop-multi-test') as ImageInput
     const box = el.querySelector('.box') as HTMLElement
     const textFile = new File(['abc'], 'readme.txt', {
         type: 'text/plain'
     })
-    const imageFile = new File(['abc'], 'photo.png', {
-        type: 'image/png'
-    })
+    const picture = imageFile('photo.png', 'image/png')
 
     let changeDetail:{ file:File|Blob, alt:string }|null = null
     el.addEventListener('image-input:change', ((ev:CustomEvent) => {
@@ -362,7 +362,7 @@ test('a drop with several files uses the first image/* one', async t => {
 
     const dt = new DataTransfer()
     dt.items.add(textFile)
-    dt.items.add(imageFile)
+    dt.items.add(picture)
 
     box.dispatchEvent(new DragEvent('drop', {
         dataTransfer: dt,
@@ -371,15 +371,15 @@ test('a drop with several files uses the first image/* one', async t => {
     }))
     await new Promise(resolve => setTimeout(resolve, 0))
 
-    t.equal((changeDetail as any)?.file, imageFile,
+    t.equal((changeDetail as any)?.file, picture,
         'should select the first image/* file and ignore the rest')
 })
 
 test('dropping a non-image file emits image-input:error and leaves ' +
     'the preview hidden', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="drop-error-test"></image-input>
-    `
+    `)
     const el = await waitFor('image-input.drop-error-test') as ImageInput
     const box = el.querySelector('.box') as HTMLElement
     const textFile = new File(['abc'], 'readme.txt', {
@@ -413,9 +413,9 @@ test('dropping a non-image file emits image-input:error and leaves ' +
 })
 
 test('picking a non-image file emits image-input:error', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="pick-error-test"></image-input>
-    `
+    `)
     const el = await waitFor('image-input.pick-error-test') as ImageInput
     const textFile = new File(['abc'], 'readme.txt', {
         type: 'text/plain'
@@ -441,13 +441,13 @@ test('picking a non-image file emits image-input:error', async t => {
 
 test('clicking the ALT, edit or remove buttons does not open the ' +
     'file picker', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
             <image-input class="overlay-no-open-test"></image-input>
-        `
+        `)
     const el = await waitFor(
         'image-input.overlay-no-open-test'
     ) as ImageInput
-    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    const file = imageFile('photo.png', 'image/png')
     selectFile(el, file)
 
     const input = el.querySelector(
@@ -473,10 +473,10 @@ test('clicking the ALT, edit or remove buttons does not open the ' +
 })
 
 test('example test', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="test">
         </image-input>
-    `
+    `)
 
     const el = await waitFor('image-input')
 
@@ -492,11 +492,11 @@ function selectFile (el:ImageInput, file:File):void {
 }
 
 test('preview with overlay controls', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="overlay-test"></image-input>
-    `
+    `)
     const el = await waitFor('image-input.overlay-test') as ImageInput
-    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    const file = imageFile('photo.png', 'image/png')
 
     selectFile(el, file)
 
@@ -523,11 +523,11 @@ test('preview with overlay controls', async t => {
 })
 
 test('alt property toggles the badge state', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="alt-test"></image-input>
-    `
+    `)
     const el = await waitFor('image-input.alt-test') as ImageInput
-    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    const file = imageFile('photo.png', 'image/png')
     selectFile(el, file)
 
     const badge = el.querySelector('.alt-badge')
@@ -545,11 +545,11 @@ test('alt property toggles the badge state', async t => {
 })
 
 test('remove clears state and emits an event', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="remove-test"></image-input>
-    `
+    `)
     const el = await waitFor('image-input.remove-test') as ImageInput
-    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    const file = imageFile('photo.png', 'image/png')
     selectFile(el, file)
     el.alt = 'a description'
 
@@ -579,11 +579,11 @@ test('remove clears state and emits an event', async t => {
 })
 
 test('edit button emits image-input:edit with the file', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="edit-test"></image-input>
-    `
+    `)
     const el = await waitFor('image-input.edit-test') as ImageInput
-    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    const file = imageFile('photo.png', 'image/png')
     selectFile(el, file)
 
     let detail:unknown = 'not called'
@@ -602,11 +602,11 @@ test('edit button emits image-input:edit with the file', async t => {
 })
 
 test('ALT badge emits image-input:alt with the file and alt text', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="alt-event-test"></image-input>
-    `
+    `)
     const el = await waitFor('image-input.alt-event-test') as ImageInput
-    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    const file = imageFile('photo.png', 'image/png')
     selectFile(el, file)
 
     let detail:{ file:File, alt:string }|undefined
@@ -630,9 +630,9 @@ test('ALT badge emits image-input:alt with the file and alt text', async t => {
 })
 
 test('setting alt emits image-input:alt-change', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="alt-change-test"></image-input>
-    `
+    `)
     const el = await waitFor('image-input.alt-change-test') as ImageInput
 
     let detail:{ alt:string }|undefined
@@ -648,13 +648,13 @@ test('setting alt emits image-input:alt-change', async t => {
 
 test('clearing alt emits image-input:alt-change with an empty string',
     async t => {
-        document.body.innerHTML += `
+        document.body.insertAdjacentHTML('beforeend', `
             <image-input class="alt-change-clear-test"></image-input>
-        `
+        `)
         const el = await waitFor(
             'image-input.alt-change-clear-test'
         ) as ImageInput
-        const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+        const file = imageFile('photo.png', 'image/png')
         selectFile(el, file)
         el.alt = 'a description'
 
@@ -671,11 +671,11 @@ test('clearing alt emits image-input:alt-change with an empty string',
     })
 
 test('change event payload has the expected shape', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="change-shape-test"></image-input>
-    `
+    `)
     const el = await waitFor('image-input.change-shape-test') as ImageInput
-    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    const file = imageFile('photo.png', 'image/png')
 
     let detail:unknown
     el.addEventListener('image-input:change', (ev:Event) => {
@@ -690,11 +690,11 @@ test('change event payload has the expected shape', async t => {
 })
 
 test('change event detail includes the current alt text', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="change-alt-test"></image-input>
-    `
+    `)
     const el = await waitFor('image-input.change-alt-test') as ImageInput
-    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    const file = imageFile('photo.png', 'image/png')
 
     let detail:{ file:File, alt:string }|undefined
     el.addEventListener('image-input:change', (ev:Event) => {
@@ -709,7 +709,7 @@ test('change event detail includes the current alt text', async t => {
         'should emit an empty alt string when none has been set yet')
 
     el.alt = 'a description'
-    const secondFile = new File(['def'], 'photo2.png', { type: 'image/png' })
+    const secondFile = imageFile('photo2.png', 'image/png')
     selectFile(el, secondFile)
 
     t.equal(detail?.alt, 'a description',
@@ -717,17 +717,17 @@ test('change event detail includes the current alt text', async t => {
 })
 
 test('setImage replaces the preview with the given blob', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="set-image-test"></image-input>
-    `
+    `)
     const el = await waitFor('image-input.set-image-test') as ImageInput
-    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    const file = imageFile('photo.png', 'image/png')
     selectFile(el, file)
 
     const imgBefore = el.querySelector('img') as HTMLImageElement
     const srcBefore = imgBefore.getAttribute('src')
 
-    const blob = new Blob(['cropped'], { type: 'image/jpeg' })
+    const blob = imageBlob()
 
     let detail:{ file:File, alt:string }|undefined
     el.addEventListener('image-input:change', (ev:Event) => {
@@ -758,11 +758,11 @@ test('setImage replaces the preview with the given blob', async t => {
 })
 
 test('clear() is public and does not emit remove', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="public-clear-test"></image-input>
-    `
+    `)
     const el = await waitFor('image-input.public-clear-test') as ImageInput
-    selectFile(el, new File(['abc'], 'photo.png', { type: 'image/png' }))
+    selectFile(el, imageFile('photo.png', 'image/png'))
     el.alt = 'a description'
 
     let removeCount = 0
@@ -785,11 +785,11 @@ test('clear() is public and does not emit remove', async t => {
 })
 
 test('the static form works without a this binding', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="static-clear-test"></image-input>
-    `
+    `)
     const el = await waitFor('image-input.static-clear-test') as ImageInput
-    selectFile(el, new File(['abc'], 'photo.png', { type: 'image/png' }))
+    selectFile(el, imageFile('photo.png', 'image/png'))
 
     const clear = ImageInput.clear
     clear(el)
@@ -799,18 +799,18 @@ test('the static form works without a this binding', async t => {
         'ImageInput.clear(el) should clear the element')
 
     const setImage = ImageInput.setImage
-    setImage(el, new Blob(['cropped'], { type: 'image/jpeg' }))
+    setImage(el, imageBlob())
 
     t.equal(box?.classList.contains('has-image'), true,
         'ImageInput.setImage(el, blob) should set the preview')
 })
 
 test('setImage revokes the previous preview object URL', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="set-image-revoke-test"></image-input>
-    `
+    `)
     const el = await waitFor('image-input.set-image-revoke-test') as ImageInput
-    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    const file = imageFile('photo.png', 'image/png')
     selectFile(el, file)
 
     const revoked:string[] = []
@@ -823,7 +823,7 @@ test('setImage revokes the previous preview object URL', async t => {
     const imgBefore = el.querySelector('img') as HTMLImageElement
     const srcBefore = imgBefore.getAttribute('src') as string
 
-    const blob = new Blob(['cropped'], { type: 'image/jpeg' })
+    const blob = imageBlob()
     el.setImage(blob)
 
     URL.revokeObjectURL = original
@@ -833,14 +833,14 @@ test('setImage revokes the previous preview object URL', async t => {
 })
 
 test('setImage promotes a Blob to a File and syncs input.files', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="set-image-file-test"></image-input>
-    `
+    `)
     const el = await waitFor('image-input.set-image-file-test') as ImageInput
-    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    const file = imageFile('photo.png', 'image/png')
     selectFile(el, file)
 
-    const blob = new Blob(['cropped'], { type: 'image/jpeg' })
+    const blob = imageBlob()
     el.setImage(blob)
 
     const input = el.querySelector('input[type="file"]') as HTMLInputElement
@@ -857,21 +857,21 @@ test('setImage promotes a Blob to a File and syncs input.files', async t => {
         detail = (ev as CustomEvent).detail
     })
 
-    const secondBlob = new Blob(['cropped again'], { type: 'image/jpeg' })
+    const secondBlob = imageBlob()
     el.setImage(secondBlob)
     t.ok(detail?.file instanceof File,
         'image-input:change detail.file should be a File after setImage')
 })
 
 test('setImage falls back to a default name and extension', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="set-image-fallback-test"></image-input>
-    `
+    `)
     const el = await waitFor(
         'image-input.set-image-fallback-test'
     ) as ImageInput
 
-    const blob = new Blob(['bytes'], { type: 'image/unknown' })
+    const blob = imageBlob('image/unknown')
     el.setImage(blob)
 
     const input = el.querySelector('input[type="file"]') as HTMLInputElement
@@ -881,11 +881,11 @@ test('setImage falls back to a default name and extension', async t => {
 })
 
 test('setImage accepts an explicit filename', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="set-image-name-test"></image-input>
-    `
+    `)
     const el = await waitFor('image-input.set-image-name-test') as ImageInput
-    const blob = new Blob(['bytes'], { type: 'image/jpeg' })
+    const blob = imageBlob()
     el.setImage(blob, 'cover.jpg')
 
     const input = el.querySelector('input[type="file"]') as HTMLInputElement
@@ -895,13 +895,13 @@ test('setImage accepts an explicit filename', async t => {
 
 test('clicking the edit button lazily creates an image-crop and ' +
     'opens the crop dialog', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="crop-dialog-open-test"></image-input>
-    `
+    `)
     const el = await waitFor(
         'image-input.crop-dialog-open-test'
     ) as ImageInput
-    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    const file = imageFile('photo.png', 'image/png')
     selectFile(el, file)
 
     const editBtn = el.querySelector('.edit') as HTMLButtonElement
@@ -932,13 +932,13 @@ test('clicking the edit button lazily creates an image-crop and ' +
 
 test('clicking edit forwards the crop attribute onto the lazily ' +
     'created image-crop', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="crop-forward-test" crop="circle"></image-input>
-    `
+    `)
     const el = await waitFor(
         'image-input.crop-forward-test'
     ) as ImageInput
-    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    const file = imageFile('photo.png', 'image/png')
     selectFile(el, file)
 
     const editBtn = el.querySelector('.edit') as HTMLButtonElement
@@ -951,13 +951,13 @@ test('clicking edit forwards the crop attribute onto the lazily ' +
 
 test('reopening the crop dialog reuses the existing image-crop, ' +
     'without appending a duplicate', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="crop-dialog-reuse-test"></image-input>
-    `
+    `)
     const el = await waitFor(
         'image-input.crop-dialog-reuse-test'
     ) as ImageInput
-    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    const file = imageFile('photo.png', 'image/png')
     selectFile(el, file)
 
     const editBtn = el.querySelector('.edit') as HTMLButtonElement
@@ -979,9 +979,9 @@ test('reopening the crop dialog reuses the existing image-crop, ' +
 
 test('clicking .crop-save calls getBlob, applies the crop via ' +
     'setImage, and closes the dialog', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="crop-save-test"></image-input>
-    `
+    `)
     const el = await waitFor('image-input.crop-save-test') as ImageInput
     const file = await makeImageFile(200, 100)
     selectFile(el, file)
@@ -1026,9 +1026,9 @@ test('clicking .crop-save calls getBlob, applies the crop via ' +
 
 test('reopening the crop dialog on a different image does not carry ' +
     'over the previous image\'s crop rect', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="crop-stale-rect-test"></image-input>
-    `
+    `)
     const el = await waitFor(
         'image-input.crop-stale-rect-test'
     ) as ImageInput
@@ -1073,9 +1073,9 @@ test('reopening the crop dialog on a different image does not carry ' +
 
 test('saving the crop before the image has loaded leaves the current ' +
     'image alone and keeps the dialog open', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="crop-save-too-early-test"></image-input>
-    `
+    `)
     const el = await waitFor(
         'image-input.crop-save-too-early-test'
     ) as ImageInput
@@ -1111,11 +1111,11 @@ test('saving the crop before the image has loaded leaves the current ' +
 
 test('clicking .crop-cancel closes the dialog and leaves the current ' +
     'image and file unchanged', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="crop-cancel-test"></image-input>
-    `
+    `)
     const el = await waitFor('image-input.crop-cancel-test') as ImageInput
-    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    const file = imageFile('photo.png', 'image/png')
     selectFile(el, file)
 
     const editBtn = el.querySelector('.edit') as HTMLButtonElement
@@ -1148,13 +1148,13 @@ test('clicking .crop-cancel closes the dialog and leaves the current ' +
 
 test('canceling image-input:edit stops the crop dialog opening and ' +
     'creates no image-crop element', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="edit-cancelable-test"></image-input>
-    `
+    `)
     const el = await waitFor(
         'image-input.edit-cancelable-test'
     ) as ImageInput
-    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    const file = imageFile('photo.png', 'image/png')
     selectFile(el, file)
 
     el.addEventListener('image-input:edit', (ev:Event) => {
@@ -1172,15 +1172,156 @@ test('canceling image-input:edit stops the crop dialog opening and ' +
         'no image-crop should be created when edit is canceled')
 })
 
+test('nocrop hides the edit button and leaves the rest of the ' +
+    'overlay alone', async t => {
+    document.body.insertAdjacentHTML('beforeend', `
+        <image-input class="nocrop-hidden-test" nocrop></image-input>
+    `)
+    const el = await waitFor('image-input.nocrop-hidden-test') as ImageInput
+    selectFile(el, imageFile('photo.png', 'image/png'))
+
+    t.equal(el.nocrop, true,
+        'the attribute should be reflected as a property')
+
+    const editBtn = el.querySelector('.edit') as HTMLButtonElement
+    t.equal(getComputedStyle(editBtn).display, 'none',
+        'the stylesheet should hide the edit button while nocrop is set')
+
+    const altBadge = el.querySelector('.alt-badge') as HTMLElement
+    const removeBtn = el.querySelector('.remove') as HTMLElement
+    t.notEqual(getComputedStyle(altBadge).display, 'none',
+        'the ALT badge should stay visible')
+    t.notEqual(getComputedStyle(removeBtn).display, 'none',
+        'the remove button should stay visible')
+})
+
+test('nocrop makes the edit trigger inert, with no event and no ' +
+    'crop dialog', async t => {
+    document.body.insertAdjacentHTML('beforeend', `
+        <image-input class="nocrop-inert-test" nocrop></image-input>
+    `)
+    const el = await waitFor('image-input.nocrop-inert-test') as ImageInput
+    selectFile(el, imageFile('photo.png', 'image/png'))
+
+    let editCount = 0
+    el.addEventListener('image-input:edit', () => { editCount++ })
+
+    const editBtn = el.querySelector('.edit') as HTMLButtonElement
+    const cropDialog = el.querySelector('.crop-dialog') as HTMLDialogElement
+    editBtn.click()
+
+    t.equal(editCount, 0,
+        'image-input:edit should not fire while nocrop is set, even ' +
+        'for a scripted click the stylesheet cannot stop')
+    t.equal(cropDialog.open, false,
+        'the crop dialog should stay closed')
+    t.equal(el.querySelector('image-crop'), null,
+        'no image-crop should be created')
+})
+
+test('nocrop is honored when toggled at runtime, in both directions, ' +
+    'with no re-render', async t => {
+    document.body.insertAdjacentHTML('beforeend', `
+        <image-input class="nocrop-toggle-test"></image-input>
+    `)
+    const el = await waitFor('image-input.nocrop-toggle-test') as ImageInput
+    selectFile(el, imageFile('photo.png', 'image/png'))
+
+    let editCount = 0
+    el.addEventListener('image-input:edit', () => { editCount++ })
+
+    const editBtn = el.querySelector('.edit') as HTMLButtonElement
+    t.notEqual(getComputedStyle(editBtn).display, 'none',
+        'the edit button should be visible with no nocrop attribute')
+
+    el.nocrop = true
+
+    t.equal(el.hasAttribute('nocrop'), true,
+        'setting the property should write the attribute')
+    t.equal(getComputedStyle(editBtn).display, 'none',
+        'setting nocrop should hide the edit button immediately')
+    t.equal(el.querySelector('.edit'), editBtn,
+        'setting nocrop should not re-render the markup')
+
+    editBtn.click()
+    t.equal(editCount, 0, 'the trigger should be inert while set')
+
+    el.nocrop = false
+
+    t.equal(el.hasAttribute('nocrop'), false,
+        'clearing the property should remove the attribute')
+    t.notEqual(getComputedStyle(editBtn).display, 'none',
+        'clearing nocrop should show the edit button again')
+    t.equal(el.querySelector('.edit'), editBtn,
+        'clearing nocrop should not re-render the markup either')
+
+    editBtn.click()
+    t.equal(editCount, 1, 'the trigger should work again once cleared')
+})
+
+test('nocrop suppresses the trigger and nothing else', async t => {
+    document.body.insertAdjacentHTML('beforeend', `
+        <image-input class="nocrop-scope-test" nocrop></image-input>
+    `)
+    const el = await waitFor('image-input.nocrop-scope-test') as ImageInput
+    const file = imageFile('photo.png', 'image/png')
+    selectFile(el, file)
+
+    const preview = el.querySelector('.preview') as HTMLElement
+    t.ok(preview.classList.contains('has-image'),
+        'picking a file should still render the preview')
+
+    let altDetail:{ file:File, alt:string }|undefined
+    el.addEventListener('image-input:alt', (ev:Event) => {
+        altDetail = (ev as CustomEvent).detail
+    })
+    ;(el.querySelector('.alt-badge') as HTMLButtonElement).click()
+    t.equal(altDetail?.file, file,
+        'the ALT badge should still emit image-input:alt')
+
+    let changeDetail:{ file:File, alt:string }|undefined
+    el.addEventListener('image-input:change', (ev:Event) => {
+        changeDetail = (ev as CustomEvent).detail
+    })
+    el.setImage(imageBlob())
+    t.ok(changeDetail?.file instanceof File,
+        'setImage should still replace the image and emit change')
+
+    const input = el.querySelector('input[type="file"]') as HTMLInputElement
+    t.equal(input.files?.length, 1,
+        'setImage should still sync input.files')
+
+    ;(el.querySelector('.remove') as HTMLButtonElement).click()
+    t.equal(preview.classList.contains('has-image'), false,
+        'remove should still clear the preview')
+})
+
+test('the rendered markup is identical with and without nocrop',
+    async t => {
+        document.body.insertAdjacentHTML('beforeend', `
+            <image-input class="nocrop-markup-test" nocrop></image-input>
+        `)
+        const el = await waitFor(
+            'image-input.nocrop-markup-test'
+        ) as ImageInput
+
+        const fromHtml = document.createElement('div')
+        fromHtml.innerHTML = html({ text: ImageInput.TEXT })
+
+        t.equal(el.innerHTML, fromHtml.innerHTML,
+            'nocrop should change no markup -- it is hidden by the ' +
+            'stylesheet, not omitted from the template')
+    })
+
 test('clicking the ALT badge opens the alt dialog, seeded with the ' +
     'current alt text', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="alt-dialog-open-test"></image-input>
-    `
+    `)
     const el = await waitFor(
         'image-input.alt-dialog-open-test'
     ) as ImageInput
-    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    const file = imageFile('photo.png', 'image/png')
     selectFile(el, file)
     el.alt = 'a description'
 
@@ -1203,11 +1344,11 @@ test('clicking the ALT badge opens the alt dialog, seeded with the ' +
 
 test('clicking .alt-save applies the textarea value and closes the ' +
     'dialog', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="alt-save-test"></image-input>
-    `
+    `)
     const el = await waitFor('image-input.alt-save-test') as ImageInput
-    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    const file = imageFile('photo.png', 'image/png')
     selectFile(el, file)
 
     const altBadge = el.querySelector('.alt-badge') as HTMLButtonElement
@@ -1246,13 +1387,13 @@ test('clicking .alt-save applies the textarea value and closes the ' +
 
 test('clicking .alt-cancel closes the dialog and leaves alt unchanged',
     async t => {
-        document.body.innerHTML += `
+        document.body.insertAdjacentHTML('beforeend', `
             <image-input class="alt-cancel-test"></image-input>
-        `
+        `)
         const el = await waitFor(
             'image-input.alt-cancel-test'
         ) as ImageInput
-        const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+        const file = imageFile('photo.png', 'image/png')
         selectFile(el, file)
         el.alt = 'original description'
 
@@ -1285,13 +1426,13 @@ test('clicking .alt-cancel closes the dialog and leaves alt unchanged',
     })
 
 test('canceling image-input:alt stops the alt dialog opening', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="alt-cancelable-test"></image-input>
-    `
+    `)
     const el = await waitFor(
         'image-input.alt-cancelable-test'
     ) as ImageInput
-    const file = new File(['abc'], 'photo.png', { type: 'image/png' })
+    const file = imageFile('photo.png', 'image/png')
     selectFile(el, file)
 
     el.addEventListener('image-input:alt', (ev:Event) => {
@@ -1309,9 +1450,9 @@ test('canceling image-input:alt stops the alt dialog opening', async t => {
 
 test('render() emits the alt and crop dialogs as siblings of .box, ' +
     'closed by default', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="dialogs-render-test"></image-input>
-    `
+    `)
     const el = await waitFor(
         'image-input.dialogs-render-test'
     ) as ImageInput
@@ -1345,9 +1486,9 @@ test('render() emits the alt and crop dialogs as siblings of .box, ' +
 
 test('the alt dialog contains a heading, a label-wrapped textarea, ' +
     'and a menu with save/cancel buttons', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="alt-dialog-structure-test"></image-input>
-    `
+    `)
     const el = await waitFor(
         'image-input.alt-dialog-structure-test'
     ) as ImageInput
@@ -1375,9 +1516,9 @@ test('the alt dialog contains a heading, a label-wrapped textarea, ' +
 
 test('the crop dialog contains a heading, an empty .crop-slot, and a ' +
     'menu with save/cancel buttons', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="crop-dialog-structure-test"></image-input>
-    `
+    `)
     const el = await waitFor(
         'image-input.crop-dialog-structure-test'
     ) as ImageInput
@@ -1400,9 +1541,9 @@ test('the crop dialog contains a heading, an empty .crop-slot, and a ' +
 
 test('dialog markup has no ids, no for attributes, no ' +
     'aria-labelledby, and every button stays type="button"', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="dialog-a11y-test"></image-input>
-    `
+    `)
     const el = await waitFor('image-input.dialog-a11y-test') as ImageInput
     const altDialog = el.querySelector('.alt-dialog') as HTMLDialogElement
     const cropDialog = el.querySelector('.crop-dialog') as HTMLDialogElement
@@ -1436,10 +1577,10 @@ test('dialog markup has no ids, no for attributes, no ' +
 
 test('two image-input elements each render their own dialogs with no ' +
     'duplicate ids', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="dupe-a"></image-input>
         <image-input class="dupe-b"></image-input>
-    `
+    `)
     const a = await waitFor('image-input.dupe-a') as ImageInput
     const b = await waitFor('image-input.dupe-b') as ImageInput
 
@@ -1466,9 +1607,9 @@ test('two image-input elements each render their own dialogs with no ' +
 
 test('the input has a default aria-label matching the default prompt',
     async t => {
-        document.body.innerHTML += `
+        document.body.insertAdjacentHTML('beforeend', `
             <image-input class="label-default-test"></image-input>
-        `
+        `)
         const el = await waitFor(
             'image-input.label-default-test'
         ) as ImageInput
@@ -1482,9 +1623,9 @@ test('the input has a default aria-label matching the default prompt',
 
 test('setting the label attribute updates the prompt text and the ' +
     'input aria-label', async t => {
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="label-set-test"></image-input>
-    `
+    `)
     const el = await waitFor('image-input.label-set-test') as ImageInput
     const input = el.querySelector(
         'input[type="file"]'
@@ -1512,10 +1653,10 @@ test('render() and html() produce the same markup', async t => {
     ImageInput.TEXT = { ...originalText, cropHeading: 'Custom crop heading' }
 
     try {
-        document.body.innerHTML += `
+        document.body.insertAdjacentHTML('beforeend', `
             <image-input class="parity-test" accept="image/png"
                 name="photo" required></image-input>
-        `
+        `)
         const el = await waitFor('image-input.parity-test') as ImageInput
 
         const fromHtml = document.createElement('div')
@@ -1550,11 +1691,11 @@ test('render() and html() produce the same markup with alt and ' +
     // interpolations -- the alt-badge's has-alt class, the hasAlt
     // aria-label ternary, and the label fallback. Set alt and label
     // so the lock covers those branches too, not just the trunk.
-    document.body.innerHTML += `
+    document.body.insertAdjacentHTML('beforeend', `
         <image-input class="parity-alt-label-test" accept="image/png"
             name="photo" required alt="a cat" label="Drop here"
         ></image-input>
-    `
+    `)
     const el = await waitFor(
         'image-input.parity-alt-label-test'
     ) as ImageInput

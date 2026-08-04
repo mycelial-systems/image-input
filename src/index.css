@@ -158,6 +158,26 @@ image-input {
     }
 
     /**
+     * `nocrop` says this element offers no editing trigger, so the
+     * Edit button goes away. `display: none` rather than `visibility`
+     * or `opacity`: it drops the button from the tab order and the
+     * accessibility tree as well as from the page, so the suppression
+     * is complete rather than visual.
+     *
+     * The attribute sits on the host, which a page author writes in
+     * both the server-rendered and the custom-element path, so this
+     * one rule covers both -- and because the markup is identical
+     * either way (`html()` has no `nocrop` option), toggling the
+     * attribute at runtime needs no re-render and no listener
+     * re-wiring. The matching guard in the edit handler covers what
+     * CSS cannot: a scripted click, or a page that never loaded this
+     * stylesheet. See FDR-003.
+     */
+    &[nocrop] .edit {
+        display: none;
+    }
+
+    /**
      * `crop="circle"` is crop-UI chrome, not a pixel mask -- `getBlob()`
      * hands back an ordinary square with its corners intact (FDR-001,
      * decision 3), and rounding it is the display's job. This preview is

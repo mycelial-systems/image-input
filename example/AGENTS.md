@@ -4,7 +4,8 @@
 
 `example/index.ts` is a small `preact` app (via `htm/preact`) that
 renders one `<image-input>` per entry in its `EXAMPLES` array -- one
-per `crop` value the component accepts -- each with its own live state
+per `crop` value the component accepts, plus one for `nocrop` -- each
+with its own live state
 panel (`example/panel.ts`, `example/state.ts`) and Save/Clear buttons
 (`example/controls.ts`), driven by `@preact/signals`. Six rules govern
 how it renders and talks to the component. Breaking any of them either reintroduces a real bug or
@@ -28,6 +29,16 @@ rather than left to be rediscovered.
    `reflectedStringAttributes`, so preact takes the property path, and
    a falsy value would be a second way to express "no constraint" that
    `parseCropAttribute` would have to absorb.
+
+   `nocrop` is safe for the same reason and is spread the same way
+   (`const nocropAttr = nocrop ? { nocrop: true } : {}`). It is a
+   reflected *boolean*, so the property setter is
+   `toggleAttribute(attr, Boolean(v))` -- passing `false` would reach
+   it and remove the attribute, which works but gives the page two
+   spellings of "absent" for no gain. Note the two never appear on the
+   same element: `nocrop` is about whether the component offers a
+   trigger, `crop` about the shape a cropper enforces once one exists
+   (FDR-003 decision 5).
 
 2. **Import the component before calling `render()`.** `import
    '../src/index.js'` runs `ImageInput.define()` at module scope, and
