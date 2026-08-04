@@ -1,7 +1,7 @@
 # FDR-003: Editing handoff
 
 **Status:** Planned
-**Last reviewed:** 2026-07-29
+**Last reviewed:** 2026-08-03
 
 The behavior below is the target described by
 [ADR-002](../adr/ADR-002-events-not-dialogs.md). The shipped component
@@ -20,8 +20,8 @@ and its consumer, and every editing feature crosses it.
 ## Behavior
 
 * The preview overlay carries the two triggers: an Edit button and an
-  ALT badge. They are rendered whenever an image is present, exactly as
-  before.
+  ALT badge. Both are rendered whenever an image is present, unless the
+  Edit button is suppressed by `nocrop` (below).
 * Clicking Edit emits `image-input:edit` carrying the current `File`.
   Nothing else happens -- no dialog opens, no `<image-crop>` is
   created, no markup changes.
@@ -43,6 +43,23 @@ and its consumer, and every editing feature crosses it.
 * An application that listens to nothing still gets a working control:
   picking, dropping, previewing, removing, form participation and
   validation are all unaffected. Only editing is inert.
+* `nocrop` is a boolean attribute on `<image-input>`. While it is
+  present the Edit button is not shown and `image-input:edit` never
+  fires, so an application that supplies no crop UI can render a
+  preview with no dead affordance instead of a button that appears
+  broken.
+* `nocrop` suppresses the trigger and nothing else. The ALT badge,
+  Remove, picking, dropping, the preview, form participation and
+  `setImage()` all behave as they do without it -- an application can
+  still replace the image programmatically while offering the user no
+  way to ask for it.
+* The attribute is honored whether it is written into the served
+  markup or toggled at runtime, and takes effect immediately with no
+  re-render.
+* `nocrop` and `crop` never appear on the same element and do not
+  interact: `nocrop` is about whether `<image-input>` offers a trigger,
+  `crop` is about the shape a cropper enforces once the application has
+  created one.
 * `<image-crop>` is a separate exported element the application places
   itself. It is the crop UI -- rect, constraint, drag and keyboard
   interaction, and `getBlob()`. See
@@ -75,7 +92,10 @@ opinion in it: it is a button on an image.
 **Tradeoff:** The component now renders affordances whose behavior it
 does not supply, so an application that ignores the events ships two
 buttons that appear broken. That failure is silent and looks like a bug
-in the package.
+in the package. `nocrop` (decision 5) gives the application a way out
+for the Edit button, but it is opt-in: the default is still a visible
+trigger for behavior that may not exist, and the ALT badge has no
+equivalent.
 
 ### 2. Notifications, not cancelable pre-events
 
@@ -130,6 +150,56 @@ call `getBlob()`, hand the blob to `setImage()` -- is code every
 consumer writes and can get wrong. The README and the example have to
 carry a version worth copying.
 
+### 5. Suppression is a boolean `nocrop` on the host
+
+**Decision:** Hiding the Edit button is a boolean `nocrop` attribute on
+`<image-input>`. The two more natural spellings, `crop="none"` and a
+`crop` attribute on the host, are both unavailable.
+
+**Why:** `crop` is spent. It names the crop *shape*, and it lives on
+`<image-crop>` rather than the host ([FDR-001](FDR-001-constrained-crop.md)
+decisions 1 and 2, whose stated tradeoff was precisely this: the name is
+foreclosed for any other crop concern). It is also the wrong element to
+ask on. The question is whether `<image-input>` offers the trigger, not
+how a cropper behaves once one exists, and only the host knows the
+former. A separate boolean answers it in the markup a page author
+writes, and matches how the platform spells its own negative booleans --
+`novalidate`, `nomodule`, `formnovalidate` are all unhyphenated
+([ADR-001](../adr/ADR-001-use-platform-primitives.md)).
+
+**Tradeoff:** Negative booleans are harder to reason about than positive
+ones. There is no way to spell "cropping enabled" explicitly, so a
+consumer templating the attribute has to omit it rather than set it to
+false, which is awkward in most template languages. The name also claims
+more than it delivers: it removes the trigger, it does not make the
+image uncroppable, since `setImage()` still accepts a blob from anywhere.
+
+### 6. Hidden by stylesheet, inert by guard, unchanged in markup
+
+**Decision:** The package stylesheet hides the button with a rule keyed
+to `image-input[nocrop]`, and the edit handler returns early while the
+attribute is set. The rendered markup is identical either way, and
+`html()` gains no option.
+
+**Why:** The attribute sits on the host, which the consumer writes in
+both the server-rendered and the upgraded-element path, so a stylesheet
+rule covers both with nothing to plumb through `html()` and nothing that
+can disagree with the attribute it would duplicate. `display: none` also
+drops the button from the tab order and the accessibility tree, so the
+hiding is complete rather than visual, and toggling the attribute at
+runtime needs no re-render and no listener re-wiring. The handler guard
+covers what CSS cannot: a scripted click, or a page that never loaded
+the stylesheet. With it, `image-input:edit` cannot fire while `nocrop`
+is set, which is the part of this that is a contract.
+
+**Tradeoff:** The button is still in the DOM, so anyone reading the
+markup sees an element that is not there for the user, and a consumer
+shipping their own stylesheet instead of ours gets a visible button that
+does nothing -- the guard makes it inert but cannot make it disappear.
+Suppression is also spread across two files that have to stay in
+agreement, with only the guard covered by anything a test can assert
+without loading real CSS.
+
 ## Related
 
 * **ADRs:** [ADR-002](../adr/ADR-002-events-not-dialogs.md) is the
@@ -139,7 +209,8 @@ carry a version worth copying.
   is expected to be a native `<dialog>`.
 * **FDRs:** [FDR-001](FDR-001-constrained-crop.md),
   [FDR-002](FDR-002-crop-rect-direct-manipulation.md) -- the crop
-  element this feature hands off to.
+  element this feature hands off to. FDR-001 is also why suppression
+  needed a name of its own rather than a `crop` value.
 
 ## Open Questions
 
@@ -147,10 +218,12 @@ carry a version worth copying.
   separately, for consumers who want the old drop-in behavior and have
   no design system to conflict with. It would restore the two code paths
   ADR-002 removed, but only for consumers who ask for it by name.
-* Whether the Edit button and ALT badge should be suppressible, so an
-  application that does not implement editing can render a preview with
-  no dead affordances. A CSS opt-out is possible today; an attribute
-  would be clearer.
+* Whether the ALT badge should be suppressible too, by a companion
+  `noalt`. `nocrop` settles the Edit button, but the alt case is
+  weaker: alt text is an accessibility obligation rather than an
+  optional editor, so an application that renders no alt UI is choosing
+  to ship images without alt text, and an attribute that makes that
+  choice tidy is not obviously worth providing.
 * Whether `image-input:alt` should carry the file at all. The
   application almost always needs only the current alt text, and the
   file is there for symmetry with `image-input:edit`.
