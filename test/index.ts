@@ -1172,6 +1172,147 @@ test('canceling image-input:edit stops the crop dialog opening and ' +
         'no image-crop should be created when edit is canceled')
 })
 
+test('nocrop hides the edit button and leaves the rest of the ' +
+    'overlay alone', async t => {
+    document.body.insertAdjacentHTML('beforeend', `
+        <image-input class="nocrop-hidden-test" nocrop></image-input>
+    `)
+    const el = await waitFor('image-input.nocrop-hidden-test') as ImageInput
+    selectFile(el, imageFile('photo.png', 'image/png'))
+
+    t.equal(el.nocrop, true,
+        'the attribute should be reflected as a property')
+
+    const editBtn = el.querySelector('.edit') as HTMLButtonElement
+    t.equal(getComputedStyle(editBtn).display, 'none',
+        'the stylesheet should hide the edit button while nocrop is set')
+
+    const altBadge = el.querySelector('.alt-badge') as HTMLElement
+    const removeBtn = el.querySelector('.remove') as HTMLElement
+    t.notEqual(getComputedStyle(altBadge).display, 'none',
+        'the ALT badge should stay visible')
+    t.notEqual(getComputedStyle(removeBtn).display, 'none',
+        'the remove button should stay visible')
+})
+
+test('nocrop makes the edit trigger inert, with no event and no ' +
+    'crop dialog', async t => {
+    document.body.insertAdjacentHTML('beforeend', `
+        <image-input class="nocrop-inert-test" nocrop></image-input>
+    `)
+    const el = await waitFor('image-input.nocrop-inert-test') as ImageInput
+    selectFile(el, imageFile('photo.png', 'image/png'))
+
+    let editCount = 0
+    el.addEventListener('image-input:edit', () => { editCount++ })
+
+    const editBtn = el.querySelector('.edit') as HTMLButtonElement
+    const cropDialog = el.querySelector('.crop-dialog') as HTMLDialogElement
+    editBtn.click()
+
+    t.equal(editCount, 0,
+        'image-input:edit should not fire while nocrop is set, even ' +
+        'for a scripted click the stylesheet cannot stop')
+    t.equal(cropDialog.open, false,
+        'the crop dialog should stay closed')
+    t.equal(el.querySelector('image-crop'), null,
+        'no image-crop should be created')
+})
+
+test('nocrop is honored when toggled at runtime, in both directions, ' +
+    'with no re-render', async t => {
+    document.body.insertAdjacentHTML('beforeend', `
+        <image-input class="nocrop-toggle-test"></image-input>
+    `)
+    const el = await waitFor('image-input.nocrop-toggle-test') as ImageInput
+    selectFile(el, imageFile('photo.png', 'image/png'))
+
+    let editCount = 0
+    el.addEventListener('image-input:edit', () => { editCount++ })
+
+    const editBtn = el.querySelector('.edit') as HTMLButtonElement
+    t.notEqual(getComputedStyle(editBtn).display, 'none',
+        'the edit button should be visible with no nocrop attribute')
+
+    el.nocrop = true
+
+    t.equal(el.hasAttribute('nocrop'), true,
+        'setting the property should write the attribute')
+    t.equal(getComputedStyle(editBtn).display, 'none',
+        'setting nocrop should hide the edit button immediately')
+    t.equal(el.querySelector('.edit'), editBtn,
+        'setting nocrop should not re-render the markup')
+
+    editBtn.click()
+    t.equal(editCount, 0, 'the trigger should be inert while set')
+
+    el.nocrop = false
+
+    t.equal(el.hasAttribute('nocrop'), false,
+        'clearing the property should remove the attribute')
+    t.notEqual(getComputedStyle(editBtn).display, 'none',
+        'clearing nocrop should show the edit button again')
+    t.equal(el.querySelector('.edit'), editBtn,
+        'clearing nocrop should not re-render the markup either')
+
+    editBtn.click()
+    t.equal(editCount, 1, 'the trigger should work again once cleared')
+})
+
+test('nocrop suppresses the trigger and nothing else', async t => {
+    document.body.insertAdjacentHTML('beforeend', `
+        <image-input class="nocrop-scope-test" nocrop></image-input>
+    `)
+    const el = await waitFor('image-input.nocrop-scope-test') as ImageInput
+    const file = imageFile('photo.png', 'image/png')
+    selectFile(el, file)
+
+    const preview = el.querySelector('.preview') as HTMLElement
+    t.ok(preview.classList.contains('has-image'),
+        'picking a file should still render the preview')
+
+    let altDetail:{ file:File, alt:string }|undefined
+    el.addEventListener('image-input:alt', (ev:Event) => {
+        altDetail = (ev as CustomEvent).detail
+    })
+    ;(el.querySelector('.alt-badge') as HTMLButtonElement).click()
+    t.equal(altDetail?.file, file,
+        'the ALT badge should still emit image-input:alt')
+
+    let changeDetail:{ file:File, alt:string }|undefined
+    el.addEventListener('image-input:change', (ev:Event) => {
+        changeDetail = (ev as CustomEvent).detail
+    })
+    el.setImage(imageBlob())
+    t.ok(changeDetail?.file instanceof File,
+        'setImage should still replace the image and emit change')
+
+    const input = el.querySelector('input[type="file"]') as HTMLInputElement
+    t.equal(input.files?.length, 1,
+        'setImage should still sync input.files')
+
+    ;(el.querySelector('.remove') as HTMLButtonElement).click()
+    t.equal(preview.classList.contains('has-image'), false,
+        'remove should still clear the preview')
+})
+
+test('the rendered markup is identical with and without nocrop',
+    async t => {
+        document.body.insertAdjacentHTML('beforeend', `
+            <image-input class="nocrop-markup-test" nocrop></image-input>
+        `)
+        const el = await waitFor(
+            'image-input.nocrop-markup-test'
+        ) as ImageInput
+
+        const fromHtml = document.createElement('div')
+        fromHtml.innerHTML = html({ text: ImageInput.TEXT })
+
+        t.equal(el.innerHTML, fromHtml.innerHTML,
+            'nocrop should change no markup -- it is hidden by the ' +
+            'stylesheet, not omitted from the template')
+    })
+
 test('clicking the ALT badge opens the alt dialog, seeded with the ' +
     'current alt text', async t => {
     document.body.insertAdjacentHTML('beforeend', `

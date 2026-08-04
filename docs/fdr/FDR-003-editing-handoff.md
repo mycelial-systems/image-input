@@ -1,12 +1,22 @@
 # FDR-003: Editing handoff
 
-**Status:** Planned
-**Last reviewed:** 2026-08-03
+**Status:** Planned, except `nocrop` (decisions 5 and 6), which is
+implemented
+**Last reviewed:** 2026-08-04
 
 The behavior below is the target described by
 [ADR-002](../adr/ADR-002-events-not-dialogs.md). The shipped component
 still renders its own dialogs; this record describes what replaces
 them.
+
+`nocrop` is the one part of this record that has shipped. It hides the
+Edit button and stops `image-input:edit` firing, on both the
+custom-element and the server-rendered path, exactly as described
+below. Everything it interacts with is still the pre-ADR-002 behavior:
+the built-in crop dialog is what the trigger opens when the attribute
+is absent, and `image-input:edit` is still cancelable (decision 2 has
+not been applied). `nocrop` suppresses the event, so it suppresses
+that dialog too.
 
 ## Overview
 

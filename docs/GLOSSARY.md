@@ -54,7 +54,8 @@ handoff*.
 
 **Controls** (`.controls`) -- The edit (`.edit`) and remove
 (`.remove`) buttons in the Overlay. Edit emits `image-input:edit` and
-is likewise only a trigger.
+is likewise only a trigger. Edit is the one surface here that can be
+suppressed; see *`nocrop`*.
 
 **Crop Frame** (`.image-crop-frame`) -- `image-crop`'s positioned
 container, sized to the image's fitted display size. Everything else
@@ -82,8 +83,19 @@ premise behind
 
 **Reflected attribute** -- An attribute that is also a property, so
 `el.alt = 'a photo'` and `alt="a photo"` are the same operation.
-`accept`, `name`, `alt` and `label` are reflected strings; `required`
-is a reflected boolean.
+`accept`, `name`, `alt`, `label` and `crop` are reflected strings;
+`required` and `nocrop` are reflected booleans.
+
+**`nocrop`** -- The boolean attribute on `image-input` that removes the
+edit button from the Overlay. While it is set the button is hidden by
+the package stylesheet and `image-input:edit` never fires, so a page
+that offers no crop UI shows no dead affordance. It suppresses the
+trigger and nothing else: the ALT Badge, remove, picking, dropping,
+form participation and `setImage()` are all unaffected, so the image
+can still be replaced programmatically. Unrelated to `crop`, which
+names the shape a cropper enforces once one exists and lives on
+`image-crop`. See
+[FDR-003](fdr/FDR-003-editing-handoff.md) decisions 5 and 6.
 
 **Namespaced event** -- Every event this package emits is prefixed with
 its tag name and a colon: `image-input:change`, `:edit`, `:alt`,

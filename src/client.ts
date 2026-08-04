@@ -150,6 +150,11 @@ export class ImageInputClient {
 
     #handleEdit = (event:Event) => {
         event.preventDefault()
+        // `nocrop` on the host means the page offers no edit trigger,
+        // so there is nothing to announce. Read live rather than
+        // caching it -- the attribute is meant to be togglable at
+        // runtime (FDR-003).
+        if (this.host.hasAttribute('nocrop')) return
         if (!this.#file) return
         const notCanceled = this.#emit('edit', { file: this.#file })
         if (!notCanceled) return

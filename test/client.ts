@@ -242,6 +242,34 @@ test('destroy() removes the lazily created image-crop from the DOM',
             'image-crop should be removed from the DOM after destroy()')
     })
 
+test('nocrop on the host makes the edit button inert in the static ' +
+    'markup path too', async t => {
+    const { host } = mount('client-nocrop-test')
+    host.setAttribute('nocrop', '')
+    selectFile(host, imageFile('photo.png', 'image/png'))
+
+    let editCount = 0
+    host.addEventListener('image-input:edit', () => { editCount++ })
+
+    ;(host.querySelector('.edit') as HTMLElement).click()
+
+    const dialog = host.querySelector(
+        '.crop-dialog'
+    ) as HTMLDialogElement
+    t.equal(editCount, 0,
+        'image-input:edit should not fire while the host has nocrop')
+    t.equal(dialog.open, false,
+        'the crop dialog should stay closed')
+    t.equal(host.querySelector('image-crop'), null,
+        'no image-crop should be created')
+
+    host.removeAttribute('nocrop')
+    ;(host.querySelector('.edit') as HTMLElement).click()
+
+    t.equal(editCount, 1,
+        'removing the attribute should make the trigger work again')
+})
+
 test('saving the crop replaces the image and closes the dialog',
     async t => {
         const { host } = mount('client-crop-save-test')
