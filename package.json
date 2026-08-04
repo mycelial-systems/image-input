@@ -69,7 +69,7 @@
     "stylelint-config-standard": "^40.0.0",
     "tap-spec": "^5.0.0",
     "typedoc": "^0.28.20",
-    "typescript": "^5.9.3",
+    "typescript": "^7.0.2",
     "vite": "^8.1.5"
   },
   "license": "SEE LICENSE IN LICENSE",
