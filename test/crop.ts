@@ -713,3 +713,18 @@ test('changing the crop attribute after an image has loaded re-fits ' +
     t.ok(frameAfter.classList.contains('locked'),
         'should now be marked locked')
 })
+
+test('a src containing a quote cannot inject attributes into the ' +
+    'rendered markup', async t => {
+    const el = document.createElement('image-crop') as ImageCrop
+    el.className = 'src-escape-test'
+    el.setAttribute('src', '" data-injected="yes')
+    document.body.appendChild(el)
+
+    const imgs = el.querySelectorAll('img')
+    t.equal(imgs.length, 1, 'should render exactly one img')
+    t.equal(imgs[0].getAttribute('data-injected'), null,
+        'should not let the src value introduce an attribute')
+    t.equal(el.querySelectorAll('.crop-rect').length, 1,
+        'the rest of the template should still be intact')
+})

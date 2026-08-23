@@ -4,24 +4,12 @@ import {
     DEFAULT_TEXT,
     type DialogText
 } from './dialogs.js'
+import { escapeAttr } from './escape.js'
 
 /**
  * Prompt text for an empty box, and the file input's `aria-label`.
  */
 export const DEFAULT_LABEL = 'Drop an image, or click to choose one'
-
-/**
- * Escape a string for safe interpolation inside a double-quoted HTML
- * attribute. `&` must run first, or the entities this introduces
- * would themselves get escaped.
- */
-function escapeAttr (value:string):string {
-    return value
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-}
 
 export interface ImageInputHtmlOptions {
     accept?:string|null;

@@ -1,5 +1,6 @@
 import { WebComponent } from '@substrate-system/web-component'
 import { createDebug } from '@substrate-system/debug'
+import { escapeAttr } from './escape.js'
 import {
     fitWithin,
     toDisplayRect,
@@ -506,7 +507,7 @@ export class ImageCrop extends WebComponent {
     }
 
     render () {
-        const src = this.src ?? ''
+        const src = escapeAttr(this.src ?? '')
         const handles = HANDLES.map(dir => (
             `<span class="handle handle-${dir}" aria-hidden="true"></span>`
         )).join('')
