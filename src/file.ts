@@ -46,3 +46,32 @@ export function toFile (
         type: file.type
     })
 }
+
+/**
+ * The MIME types `canvas.toBlob` is actually able to encode.
+ *
+ * Anything outside this set is silently encoded as PNG while the
+ * caller believes they asked for something else, so a blob's `type`
+ * would disagree with its bytes. `EXT` above is a different list on
+ * purpose: it maps types this package might *receive* to file
+ * extensions, which includes types the canvas cannot write.
+ */
+export const CANVAS_TYPES = new Set([
+    'image/png',
+    'image/jpeg',
+    'image/webp'
+])
+
+/**
+ * The type a canvas should be encoded to, given the source image's
+ * own type.
+ *
+ * Re-encoding a PNG as JPEG flattens its transparency onto black and
+ * mislabels the result, so prefer the source type. Fall back to
+ * `image/jpeg` -- the historical default, and a type the canvas can
+ * always write -- for a source the canvas cannot encode, and for an
+ * image that arrived with no file at all (a bare `src` attribute).
+ */
+export function encodableType (type?:string|null):string {
+    return (type && CANVAS_TYPES.has(type)) ? type : 'image/jpeg'
+}

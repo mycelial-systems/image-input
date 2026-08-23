@@ -14,6 +14,7 @@ import './crop.js'
 import './crop-math.js'
 import './html.js'
 import './client.js'
+import './file.js'
 
 test('renders a .box div instead of .wrapper', async t => {
     document.body.insertAdjacentHTML('beforeend', `
