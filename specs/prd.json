@@ -148,8 +148,8 @@
         "Typecheck passes"
       ],
       "priority": 8,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done in 209d49f. index.css split into input.css + crop.css, _vars-crop.css extracted. Move-only verified byte-identical by two independent rebuilds."
     },
     {
       "id": "US-009",
