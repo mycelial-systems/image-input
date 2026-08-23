@@ -28,8 +28,14 @@
   },
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./crop": {
+      "types": "./dist/crop.d.ts",
+      "import": "./dist/crop.js",
+      "require": "./dist/crop.cjs"
     },
     "./css": "./dist/index.css",
     "./css/min": "./dist/index.min.css",
