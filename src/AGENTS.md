@@ -236,3 +236,16 @@
   `ImageInputClient` use. Both must guarantee the file they hold is a
   `File`: `ImageCrop.setFile()` requires one, and consumers read
   `detail.file.name`. Don't copy the logic into either caller.
+- `canvas.toBlob` silently encodes PNG for any type it cannot write,
+  and reports the type you asked for. Only `image/png`, `image/jpeg`
+  and `image/webp` are safe to pass through. `encodableType` in
+  `src/file.ts` is the gate, and `getBlob`'s default goes through it;
+  do not "simplify" it to `this.#file?.type ?? 'image/jpeg'`, which
+  hands back PNG bytes labelled `image/heic`.
+- `escapeAttr` lives in `src/escape.ts`, not `src/html.ts`, because
+  `crop.ts` needs it and `crop.ts` is a standalone entry point
+  (`@substrate-system/image-input/crop`). `html.ts` imports
+  `dialogs.ts`, so importing the helper from there would pull the
+  whole `<image-input>` markup into every crop-only bundle. Keep
+  `crop.ts` free of imports from `html.ts`, `dialogs.ts`, `index.ts`
+  and `client.ts` for the same reason.
