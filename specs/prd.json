@@ -109,8 +109,8 @@
         "Typecheck passes"
       ],
       "priority": 6,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done in 455f3bf. index.ts value-exports ImageCrop and type-exports CropRect/GetBlobOptions/ImageCropEventMap. Review clean."
     },
     {
       "id": "US-007",
