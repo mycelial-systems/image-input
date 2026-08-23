@@ -183,8 +183,8 @@
         "Typecheck passes"
       ],
       "priority": 10,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done in b6fceea. README documents ImageCrop from root and /crop, css/crop subpaths, and both vars files. All 6 specifiers verified to resolve."
     },
     {
       "id": "US-011",
