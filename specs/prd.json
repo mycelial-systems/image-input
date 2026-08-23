@@ -92,8 +92,8 @@
         "Typecheck passes"
       ],
       "priority": 5,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done in ccef20a. Both helpers event-driven, no setTimeout/setInterval, no call site changes. Two deferred minors in ledger."
     },
     {
       "id": "US-006",
