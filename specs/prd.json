@@ -36,8 +36,8 @@
         "Typecheck passes"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done in bab6e23. CANVAS_TYPES + encodableType in src/file.ts, test/file.ts added. Review clean."
     },
     {
       "id": "US-003",
