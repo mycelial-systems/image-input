@@ -126,8 +126,8 @@
         "Typecheck passes"
       ],
       "priority": 7,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done in d783ef9. exports map: . and ./crop literal keys with types first, ./* wildcard last. Resolution verified both ESM and CJS."
     },
     {
       "id": "US-008",
