@@ -18,8 +18,8 @@
         "Typecheck passes"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done in 1b70824. escapeAttr moved to src/escape.ts; crop.ts render() escapes src. Review clean."
     },
     {
       "id": "US-002",
