@@ -55,8 +55,8 @@
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done in 980d36f. getBlob defaults to encodableType(this.#file?.type); explicit opts.type still wins. Review clean."
     },
     {
       "id": "US-004",
