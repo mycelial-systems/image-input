@@ -1057,7 +1057,13 @@ grep -o -- '--[a-z0-9-]*: *[^;]*' dist/index.css | sort \
 diff ./.tmp-css/vars-before.txt ./.tmp-css/vars-after.txt
 
 strip () {
-  awk '/^:root \{/{skip=1} skip&&/^\}/{skip=0;next} !skip' "$1"
+  awk '
+    /^:root \{/ { skip=1; next }
+    skip && /^\}/ { skip=0; drop=1; next }
+    drop && /^$/ { drop=0; next }
+    { drop=0 }
+    !skip
+  ' "$1"
 }
 strip ./.tmp-css/before.css > ./.tmp-css/rules-before.css
 strip dist/index.css > ./.tmp-css/rules-after.css

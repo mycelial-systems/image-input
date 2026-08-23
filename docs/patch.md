@@ -1,5 +1,9 @@
 # Upstream patch notes: @substrate-system packages
 
+**Status, 2026-08-23:** items 1 through 6 are fixed in this repo. See
+`docs/plans/2026-08-23-upstream-patches.md`. Items 7 through 10 belong
+to `@substrate-system/drag-drop` and are still open there.
+
 Found while implementing the composer drag-and-drop design
 (`docs/design-plans/2026-08-22-composer-drag-drop.md`) on 2026-08-22.
 Every item was read out of the INSTALLED `node_modules` build, not from
