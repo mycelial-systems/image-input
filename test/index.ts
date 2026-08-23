@@ -2,6 +2,7 @@ import { test } from '@substrate-system/tapzero'
 import { waitFor } from '@substrate-system/dom'
 import './style.js'
 import { ImageInput } from '../src/index.js'
+import { ImageCrop as RootImageCrop } from '../src/index.js'
 import type { ImageCrop } from '../src/crop.js'
 import { html } from '../src/html.js'
 import {
@@ -1719,6 +1720,13 @@ test('render() and html() produce the same markup with alt and ' +
     t.equal(el.innerHTML, fromHtml.innerHTML,
         'the element and html() should emit identical markup ' +
         'when alt and label are set')
+})
+
+test('ImageCrop is reachable from the package root', t => {
+    t.equal(typeof RootImageCrop, 'function',
+        'the root module should export the ImageCrop class')
+    t.equal(RootImageCrop.TAG, 'image-crop',
+        'and it should be the real one')
 })
 
 test('all done', () => {
