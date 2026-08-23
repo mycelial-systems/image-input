@@ -201,8 +201,8 @@
         "Typecheck passes"
       ],
       "priority": 11,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done in 8930fac. README documents both crop events, listener-ordering advice, and a Methods section for setFile/crop/getBlob. Implementer died before self-review; content verified against source by reviewer instead."
     },
     {
       "id": "US-012",
