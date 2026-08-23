@@ -166,8 +166,8 @@
         "Typecheck passes"
       ],
       "priority": 9,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done in 142d9d2. build-css:crop scripts + ./css/crop exports. dist/crop.css 2697b vs index.css 10498b, zero image-input."
     },
     {
       "id": "US-010",
