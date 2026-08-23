@@ -48,6 +48,14 @@ npm i -S @substrate-system/image-input
 import { ImageInput } from '@substrate-system/image-input'
 ```
 
+`<image-crop>`, the cropper, is exported from the root too, and from
+its own subpath:
+
+```js
+import { ImageCrop } from '@substrate-system/image-input'
+import { ImageCrop } from '@substrate-system/image-input/crop'
+```
+
 ### Common JS
 ```js
 require('@substrate-system/image-input')
@@ -66,6 +74,18 @@ Or minified:
 import '@substrate-system/image-input/css/min'
 ```
 
+If you use `<image-crop>` on its own, import just its styles and skip
+the `<image-input>` box, preview, overlay and dialog rules:
+
+```js
+import '@substrate-system/image-input/css/crop'
+```
+
+Or minified:
+```js
+import '@substrate-system/image-input/css/crop/min'
+```
+
 ### CSS variables
 
 `image-input` sets no width, height, min-height or aspect-ratio on
@@ -79,8 +99,9 @@ image-input .box {
 }
 ```
 
-Everything else is a CSS custom property, defined in `_vars.css` and
-overridable from your own stylesheet:
+Everything else is a CSS custom property, overridable from your own
+stylesheet: the `--image-input-*` ones in `_vars.css`, and the
+`--image-crop-*` ones in `_vars-crop.css`.
 
 * `--image-input-border-width`, `--image-input-border-style`,
   `--image-input-border-color` -- the box's border.
