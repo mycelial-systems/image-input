@@ -1014,6 +1014,11 @@ test('clicking .crop-save calls getBlob, applies the crop via ' +
     t.ok(detail.file instanceof File,
         'should emit image-input:change with a File built from the ' +
         'crop blob')
+    t.equal(detail.file.type, 'image/png',
+        'the cropped file should keep the source image type rather ' +
+        'than being re-encoded as jpeg')
+    t.ok(detail.file.name.endsWith('.png'),
+        'deriveName should follow the blob type')
 
     const imgAfter = el.querySelector('img') as HTMLImageElement
     t.ok(imgAfter.getAttribute('src'), 'should set a new preview src')

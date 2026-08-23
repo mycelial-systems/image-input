@@ -1,6 +1,7 @@
 import { WebComponent } from '@substrate-system/web-component'
 import { createDebug } from '@substrate-system/debug'
 import { escapeAttr } from './escape.js'
+import { encodableType } from './file.js'
 import {
     fitWithin,
     toDisplayRect,
@@ -198,6 +199,13 @@ export class ImageCrop extends WebComponent {
      * Render the current crop region to an offscreen canvas at the
      * image's natural resolution and resolve it as a Blob.
      *
+     * With no `type`, the blob keeps the source file's own type when
+     * the canvas can encode it, and falls back to `image/jpeg`
+     * otherwise (see `encodableType` in `./file.ts`). Defaulting to
+     * JPEG unconditionally would flatten a transparent PNG onto black
+     * and hand back a blob whose type disagreed with the file the
+     * user picked.
+     *
      * Rejects if no image has finished loading -- drawing an image
      * with no decoded data is a silent no-op, which would otherwise
      * resolve a blank blob.
@@ -211,7 +219,7 @@ export class ImageCrop extends WebComponent {
 
         const img = this.qs<HTMLImageElement>('img')
         const { x, y, width, height } = this.#crop
-        const type = opts?.type ?? 'image/jpeg'
+        const type = opts?.type ?? encodableType(this.#file?.type)
 
         const canvas = document.createElement('canvas')
         canvas.width = width

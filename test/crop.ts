@@ -410,7 +410,8 @@ test('getBlob returns a Blob of the cropped region at natural resolution',
 
         const blob = await el.getBlob()
         t.ok(blob instanceof Blob, 'should resolve a Blob')
-        t.equal(blob.type, 'image/jpeg', 'should default to image/jpeg')
+        t.equal(blob.type, 'image/png',
+            'should default to the source file\'s own type')
 
         const dims = await loadBlobDimensions(blob)
         t.equal(dims.width, 300, 'blob width should match the crop width')
