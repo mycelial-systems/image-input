@@ -236,8 +236,8 @@
         "Typecheck passes"
       ],
       "priority": 13,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done in 1af5e42. FDR-004 records the load/change rationale and the no-error-event non-goal; INDEX.md row added. Non-goal verified true against source."
     },
     {
       "id": "US-014",
