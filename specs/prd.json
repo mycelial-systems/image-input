@@ -253,8 +253,8 @@
         "Typecheck passes"
       ],
       "priority": 14,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done in d3bde61. patch.md status block dated 2026-08-23; items 1-6 fixed here, 7-10 open in drag-drop. Plan strip snippet fixed. Full gate 444/444."
     }
   ]
 }
