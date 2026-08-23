@@ -28,7 +28,7 @@ tool, and `alt` text input.
   * [Built-in dialogs](#built-in-dialogs)
   * [`image-crop`](#image-crop)
 - [API](#api)
-  * [Methods](#methods)
+  * [Methods](#methods-1)
   * [Server rendering](#server-rendering)
 - [Modules](#modules)
   * [JS](#js)
@@ -46,6 +46,14 @@ npm i -S @substrate-system/image-input
 ### ESM
 ```js
 import { ImageInput } from '@substrate-system/image-input'
+```
+
+`<image-crop>`, the cropper, is exported from the root too, and from
+its own subpath:
+
+```js
+import { ImageCrop } from '@substrate-system/image-input'
+import { ImageCrop } from '@substrate-system/image-input/crop'
 ```
 
 ### Common JS
@@ -66,6 +74,18 @@ Or minified:
 import '@substrate-system/image-input/css/min'
 ```
 
+If you use `<image-crop>` on its own, import just its styles and skip
+the `<image-input>` box, preview, overlay and dialog rules:
+
+```js
+import '@substrate-system/image-input/css/crop'
+```
+
+Or minified:
+```js
+import '@substrate-system/image-input/css/crop/min'
+```
+
 ### CSS variables
 
 `image-input` sets no width, height, min-height or aspect-ratio on
@@ -79,8 +99,9 @@ image-input .box {
 }
 ```
 
-Everything else is a CSS custom property, defined in `_vars.css` and
-overridable from your own stylesheet:
+Everything else is a CSS custom property, overridable from your own
+stylesheet: the `--image-input-*` ones in `_vars.css`, and the
+`--image-crop-*` ones in `_vars-crop.css`.
 
 * `--image-input-border-width`, `--image-input-border-style`,
   `--image-input-border-color` -- the box's border.
@@ -114,14 +135,17 @@ overridable from your own stylesheet:
 * `--image-input-dialog-crop-max-width` -- the widest the
   `<image-crop>` inside the crop dialog will render. `100%` by
   default, so it fills the dialog's content box.
+* `--image-input-dialog-duration`, `--image-input-dialog-scale-from`
+  -- the duration of the dialogs' open/close fade-and-scale, and the
+  scale they animate in from.
+
+The `--image-crop-*` variables, in `_vars-crop.css`:
+
 * `--image-crop-max-height` -- the tallest an `<image-crop>` will
   render, `65vh` by default. This is what keeps a tall portrait image
   from pushing the Cancel and Save buttons off screen. It must be a
   value that resolves to a length, because `ImageCrop` reads it back
   to size the crop frame; a percentage is treated as no cap at all.
-* `--image-input-dialog-duration`, `--image-input-dialog-scale-from`
-  -- the duration of the dialogs' open/close fade-and-scale, and the
-  scale they animate in from.
 
 
 ------------------------------
@@ -409,11 +433,46 @@ import { ImageCrop } from '@substrate-system/image-input/crop'
 
 #### Events
 
-* `image-crop:change` -- The crop rectangle changed, via pointer or
-  keyboard. `detail` is the crop rect,
-  `{ x:number, y:number, width:number, height:number }`, in natural
-  (not displayed) image pixels. Call `cropEl.getBlob()` to get the
-  cropped image as a `Blob`.
+* `image-crop:load` -- The image finished decoding and the crop rect
+  has been fitted to it. Until this fires, `cropEl.crop` reads
+  `{ x: 0, y: 0, width: 0, height: 0 }` and `getBlob()` rejects, so
+  this is the signal that the element is usable. `detail` is
+  `{ naturalWidth:number, naturalHeight:number }`. It fires once per
+  image, so loading a second image into the same element fires it
+  again.
+* `image-crop:change` -- The crop rectangle changed. `detail` is the
+  crop rect, `{ x:number, y:number, width:number, height:number }`, in
+  natural (not displayed) image pixels. This fires for a pointer drag,
+  for a keyboard move or resize, when the `crop` attribute changes,
+  and once on load with the initial rect -- so a listener on this
+  event alone sees every rect the element has ever had, starting with
+  the first.
+
+Attach these before the call that starts the load (`setFile`, or
+setting `src`). The load is asynchronous, so a listener attached in
+the same tick as that call still catches it.
+
+#### Methods
+
+* `setFile(file)` -- Load a `File` into the cropper. Revokes the
+  previous object URL, resets the natural size and the crop rect, and
+  starts an asynchronous load that ends in `image-crop:load`.
+* `crop` -- A getter, not a method: the current crop rect in natural
+  image pixels. Reads `{ x: 0, y: 0, width: 0, height: 0 }` until the
+  image has loaded.
+* `getBlob(opts?)` -- Render the crop region to a canvas at natural
+  resolution and resolve it as a `Blob`. `opts` is
+  `{ type?:string, quality?:number }`, matching `canvas.toBlob`.
+
+  With no `type`, the blob keeps the source file's own type when the
+  canvas can encode it -- `image/png`, `image/jpeg` and `image/webp`
+  -- and falls back to `image/jpeg` for anything else, including an
+  element driven by the `src` attribute with no file behind it. The
+  fallback exists because `canvas.toBlob` silently encodes PNG for a
+  type it cannot write, so passing an unencodable type through would
+  return bytes that disagree with the blob's own `type`.
+
+  Rejects if no image has finished loading.
 
 ## API
 

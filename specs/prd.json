@@ -1,0 +1,260 @@
+{
+  "project": "@substrate-system/image-input",
+  "branchName": "wip",
+  "description": "Upstream patches: fix the six image-input defects reported in docs/patch.md -- a lossy default in getBlob, a missing readiness event, an unannounced crop mutation, an unescaped attribute interpolation, and two packaging gaps. Full plan in docs/plans/2026-08-23-upstream-patches.md. Do NOT run npm version: the postversion hook publishes to npm.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Escape the src attribute in ImageCrop.render()",
+      "description": "As a consumer, I want a hostile src value to be escaped so that it cannot inject attributes into the rendered markup. Plan task 1.",
+      "acceptanceCriteria": [
+        "Create src/escape.ts exporting escapeAttr(value:string):string that replaces & then < > \" with entities",
+        "src/html.ts deletes its local escapeAttr and imports it from './escape.js'; no call site changes",
+        "src/crop.ts render() starts with const src = escapeAttr(this.src ?? '')",
+        "src/crop.ts does not import from html.ts, dialogs.ts, index.ts or client.ts",
+        "test/crop.ts has a test setting src to '\" data-injected=\"yes' before append, asserting exactly one img and getAttribute('data-injected') is null",
+        "Tests pass: npm run build-tests && npm run test-tapout",
+        "npm run lint passes",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Done in 1b70824. escapeAttr moved to src/escape.ts; crop.ts render() escapes src. Review clean."
+    },
+    {
+      "id": "US-002",
+      "title": "Add encodableType helper to src/file.ts",
+      "description": "As a developer, I need a pure helper that gates a MIME type against what canvas.toBlob can actually encode, so getBlob can default without mislabelling bytes. Plan task 2, steps 1 through 4.",
+      "acceptanceCriteria": [
+        "src/file.ts exports CANVAS_TYPES as a Set of image/png, image/jpeg, image/webp",
+        "src/file.ts exports encodableType(type?:string|null):string returning the type when CANVAS_TYPES has it, else 'image/jpeg'",
+        "src/file.ts still imports nothing",
+        "Create test/file.ts with three tests: keeps encodable types, falls back for heic/gif/avif/svg+xml, falls back for undefined/null/empty",
+        "test/index.ts imports './file.js' alongside the other test module imports",
+        "Tests pass: npm run build-tests && npm run test-tapout",
+        "npm run lint passes",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Done in bab6e23. CANVAS_TYPES + encodableType in src/file.ts, test/file.ts added. Review clean."
+    },
+    {
+      "id": "US-003",
+      "title": "getBlob defaults to the source file's type",
+      "description": "As a consumer, I want getBlob() with no type to keep my PNG a PNG so that transparency is not flattened onto black and the blob type matches its bytes. Plan task 2, steps 5 through 9.",
+      "acceptanceCriteria": [
+        "src/crop.ts imports encodableType from './file.js'",
+        "getBlob uses const type = opts?.type ?? encodableType(this.#file?.type)",
+        "getBlob's doc comment explains the default and why unconditional jpeg was wrong",
+        "test/crop.ts 'getBlob returns a Blob of the cropped region at natural resolution' asserts blob.type is 'image/png'",
+        "test/index.ts .crop-save test asserts detail.file.type is 'image/png' and detail.file.name ends with '.png'",
+        "Existing 'getBlob accepts a type option' test still passes -- an explicit type still wins",
+        "Tests pass: npm run build-tests && npm run test-tapout",
+        "npm run lint passes",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "Done in 980d36f. getBlob defaults to encodableType(this.#file?.type); explicit opts.type still wins. Review clean."
+    },
+    {
+      "id": "US-004",
+      "title": "Emit image-crop:load and image-crop:change when the image loads",
+      "description": "As a consumer, I want the cropper to announce when it becomes usable and what its initial rect is, so that I do not have to poll el.crop.width. Plan task 3.",
+      "acceptanceCriteria": [
+        "src/crop.ts exports interface ImageCropEventMap with load:CustomEvent<{naturalWidth:number,naturalHeight:number}> and change:CustomEvent<CropRect>",
+        "The declare global block augments HTMLElementEventMap with 'image-crop:load' and 'image-crop:change'",
+        "#handleImageLoad emits 'load' with the natural size, then 'change' with a copy of the crop rect, after this.#layout()",
+        "load is emitted before change",
+        "test/crop.ts imports type CropRect and adds four tests: load detail carries natural size, change detail is the full-frame initial rect, load-before-change ordering with a 1/1 constraint yielding a square rect, and both events fire again for a second image",
+        "Listeners are attached before setFile in each new test",
+        "test/index.ts still passes -- the bubbling events must not duplicate image-input:change",
+        "Tests pass: npm run build-tests && npm run test-tapout",
+        "npm run lint passes",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": "Done in b1c4a6c. ImageCropEventMap exported; #handleImageLoad emits load then change after #layout(). Review clean."
+    },
+    {
+      "id": "US-005",
+      "title": "Wait on image-crop:load in the test helpers",
+      "description": "As a maintainer, I want the test helpers to use the new event instead of a 10ms polling loop, so that every existing test exercises the event. Plan task 4.",
+      "acceptanceCriteria": [
+        "test/helpers.ts waitForImageLoad resolves synchronously if el.crop.width is set, else listens once for 'image-crop:load'",
+        "test/helpers.ts waitForCropRect resolves synchronously if el.crop.width equals width, else listens for 'image-crop:load' until crop.width matches, then removes the listener",
+        "Neither helper polls with setTimeout or setInterval",
+        "Both keep their current signatures -- no call site changes",
+        "Tests pass with no timeouts: npm run build-tests && npm run test-tapout",
+        "npm run lint passes",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": "Done in ccef20a. Both helpers event-driven, no setTimeout/setInterval, no call site changes. Two deferred minors in ledger."
+    },
+    {
+      "id": "US-006",
+      "title": "Re-export ImageCrop from the package root",
+      "description": "As a consumer, I want to import ImageCrop from '@substrate-system/image-input' so that TS2305 stops firing and I do not need to know the /crop subpath. Plan task 5, steps 1 through 4.",
+      "acceptanceCriteria": [
+        "src/index.ts adds export { ImageCrop } with a comment citing ADR-002",
+        "src/index.ts adds export type { CropRect, GetBlobOptions, ImageCropEventMap } from './crop.js'",
+        "test/index.ts imports { ImageCrop as RootImageCrop } from '../src/index.js'",
+        "A new test asserts typeof RootImageCrop is 'function' and RootImageCrop.TAG is 'image-crop'",
+        "Tests pass: npm run build-tests && npm run test-tapout",
+        "npm run lint passes",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": "Done in 455f3bf. index.ts value-exports ImageCrop and type-exports CropRect/GetBlobOptions/ImageCropEventMap. Review clean."
+    },
+    {
+      "id": "US-007",
+      "title": "Add explicit exports entries for the root and ./crop",
+      "description": "As a consumer on any resolver, I want the exports map to name the root and ./crop explicitly with a types condition, so that resolution does not depend on the wildcard. Plan task 5, steps 5 through 7.",
+      "acceptanceCriteria": [
+        "package.json exports '.' has types, import, require in that order, types first",
+        "package.json exports adds './crop' with types ./dist/crop.d.ts, import ./dist/crop.js, require ./dist/crop.cjs",
+        "The './*' wildcard stays as the fallback, after the literal keys",
+        "npm run build produces dist/crop.js, dist/crop.cjs, dist/crop.d.ts and dist/index.d.ts",
+        "import.meta.resolve('@substrate-system/image-input/crop') and require.resolve of the same both resolve",
+        "npm run lint passes",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": true,
+      "notes": "Done in d783ef9. exports map: . and ./crop literal keys with types first, ./* wildcard last. Resolution verified both ESM and CJS."
+    },
+    {
+      "id": "US-008",
+      "title": "Split index.css into input.css and crop.css",
+      "description": "As a maintainer, I need the stylesheet split along the image-input / image-crop boundary without changing a single shipped byte, so that a crop-only subpath becomes possible. Plan task 6, steps 1 through 6.",
+      "acceptanceCriteria": [
+        "Capture a baseline of dist/index.css into scratch before editing",
+        "Create src/_vars-crop.css with the eight --image-crop-* properties, values unchanged",
+        "Remove exactly those eight lines from src/_vars.css; every --image-input-* property stays, nothing else is reordered or reformatted",
+        "Create src/input.css by cutting src/index.css lines 3 to 329, prefixed with an @import of ./_vars.css",
+        "Create src/crop.css by cutting src/index.css lines 331 to 492, prefixed with an @import of ./_vars-crop.css",
+        "Cut the rules rather than retyping them, so every explanatory comment travels with its rule",
+        "src/crop.css matches no image-input selector; src/input.css matches no image-crop selector (the .crop-slot comment stays)",
+        "src/index.css becomes an @import of ./input.css then ./crop.css, in that order, with a comment explaining the order",
+        "After npm run build-css, the sorted custom-property list of dist/index.css is identical to the baseline",
+        "After npm run build-css, dist/index.css with its :root blocks stripped is byte-identical to the baseline stripped the same way",
+        "The scratch baseline directory is deleted and never committed",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": true,
+      "notes": "Done in 209d49f. index.css split into input.css + crop.css, _vars-crop.css extracted. Move-only verified byte-identical by two independent rebuilds."
+    },
+    {
+      "id": "US-009",
+      "title": "Build and export a crop-only stylesheet",
+      "description": "As a consumer using only image-crop, I want to import just the cropper styles so that I do not ship the box, preview, overlay and dialog rules. Plan task 6, steps 7 through 10.",
+      "acceptanceCriteria": [
+        "package.json adds build-css:crop and build-css:crop:min scripts, bundling src/crop.css to dist/crop.css and dist/crop.min.css with the same lightningcss targets as the existing css scripts",
+        "The build script runs both new css scripts",
+        "package.json exports adds './css/crop' and './css/crop/min' after './css/min'",
+        "npm run build produces dist/index.css, dist/crop.css and dist/crop.min.css",
+        "dist/crop.css contains zero occurrences of image-input and at least one of image-crop",
+        "dist/crop.css is substantially smaller than dist/index.css",
+        "Full gate passes: npm test",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": true,
+      "notes": "Done in 142d9d2. build-css:crop scripts + ./css/crop exports. dist/crop.css 2697b vs index.css 10498b, zero image-input."
+    },
+    {
+      "id": "US-010",
+      "title": "Document the new import paths in the README",
+      "description": "As a consumer reading the README, I want the ImageCrop imports and the crop CSS subpath documented so that I can find the new packaging surface. Plan task 7, step 1.",
+      "acceptanceCriteria": [
+        "The ESM section shows importing ImageCrop from both the package root and /crop",
+        "The Import CSS section documents '@substrate-system/image-input/css/crop' and the /min variant, and says what they skip",
+        "The CSS variables section names both _vars.css (--image-input-*) and _vars-crop.css (--image-crop-*)",
+        "npm run toc regenerates the table of contents",
+        "No em dashes and no arrow characters; use -- and ->",
+        "No line longer than 80 columns",
+        "Typecheck passes"
+      ],
+      "priority": 10,
+      "passes": true,
+      "notes": "Done in b6fceea. README documents ImageCrop from root and /crop, css/crop subpaths, and both vars files. All 6 specifiers verified to resolve."
+    },
+    {
+      "id": "US-011",
+      "title": "Document the image-crop events and methods in the README",
+      "description": "As a consumer, I want the load and change events and getBlob's defaulting rule documented so that I stop polling and stop being surprised by the blob type. Plan task 7, steps 2 through 4.",
+      "acceptanceCriteria": [
+        "The image-crop Events list documents image-crop:load with its detail shape and that it fires once per image",
+        "The Events list documents image-crop:change firing for pointer drag, keyboard, the crop attribute, and once on load with the initial rect",
+        "The Events section says to attach listeners before the call that starts the load",
+        "A new Methods section documents setFile, the crop getter, and getBlob including the encodable-type allowlist and the jpeg fallback",
+        "The Methods section explains why the fallback exists: canvas.toBlob silently encodes PNG for a type it cannot write",
+        "npm run toc regenerates the table of contents",
+        "No em dashes and no arrow characters; use -- and ->",
+        "Typecheck passes"
+      ],
+      "priority": 11,
+      "passes": true,
+      "notes": "Done in 8930fac. README documents both crop events, listener-ordering advice, and a Methods section for setFile/crop/getBlob. Implementer died before self-review; content verified against source by reviewer instead."
+    },
+    {
+      "id": "US-012",
+      "title": "Append the two invariants to src/AGENTS.md",
+      "description": "As a future agent working in this repo, I need the two non-obvious constraints recorded so that I do not simplify them away. Plan task 7, step 5.",
+      "acceptanceCriteria": [
+        "A note says canvas.toBlob silently encodes PNG for any type it cannot write, that only png/jpeg/webp are safe to pass through, that encodableType is the gate, and that it must not be simplified to this.#file?.type ?? 'image/jpeg'",
+        "A note says escapeAttr lives in src/escape.ts not src/html.ts, explains the standalone-entry-point reason, and states crop.ts must stay free of imports from html.ts, dialogs.ts, index.ts and client.ts",
+        "No em dashes and no arrow characters; use -- and ->",
+        "No line longer than 80 columns",
+        "Typecheck passes"
+      ],
+      "priority": 12,
+      "passes": true,
+      "notes": "Done in ee0e6c9. Both invariants appended to src/AGENTS.md, each stating an explicit prohibition. Import chain verified against source."
+    },
+    {
+      "id": "US-013",
+      "title": "Write FDR-004 for the crop lifecycle events",
+      "description": "As a maintainer, I want the reasoning behind the load and change events recorded as a feature decision record. Plan task 7, step 6.",
+      "acceptanceCriteria": [
+        "Create docs/fdr/FDR-004-crop-lifecycle-events.md following the format of FDR-002: an # FDR-004 heading, Status Implemented, Last reviewed 2026-08-23, then Overview, Behavior and Decisions sections",
+        "Records what the events are and when they fire",
+        "Records why load exists: #handleImageLoad was the only place the element became usable and announced nothing, so consumers polled el.crop.width",
+        "Records why change also fires on load: every other #crop mutation announces itself and load was the exception",
+        "Records why load is emitted before change: readiness first, then the value",
+        "Records the non-goal: no event when the image fails to decode",
+        "Cross-references ADR-002 at ../adr/ADR-002-events-not-dialogs.md",
+        "Adds the FDR-004 row to docs/fdr/INDEX.md",
+        "No em dashes and no arrow characters; use -- and ->",
+        "Typecheck passes"
+      ],
+      "priority": 13,
+      "passes": true,
+      "notes": "Done in 1af5e42. FDR-004 records the load/change rationale and the no-error-event non-goal; INDEX.md row added. Non-goal verified true against source."
+    },
+    {
+      "id": "US-014",
+      "title": "Mark the patch notes resolved",
+      "description": "As the repo that filed these patches, I want docs/patch.md to say what shipped and what is still open. Plan task 7, step 7.",
+      "acceptanceCriteria": [
+        "docs/patch.md has a status block directly under its title dated 2026-08-23",
+        "It states items 1 through 6 are fixed in this repo and points at docs/plans/2026-08-23-upstream-patches.md",
+        "It states items 7 through 10 belong to @substrate-system/drag-drop and are still open there",
+        "Full gate passes: npm test",
+        "Do not run npm version -- the postversion hook pushes and publishes",
+        "No em dashes and no arrow characters; use -- and ->",
+        "Typecheck passes"
+      ],
+      "priority": 14,
+      "passes": true,
+      "notes": "Done in d3bde61. patch.md status block dated 2026-08-23; items 1-6 fixed here, 7-10 open in drag-drop. Plan strip snippet fixed. Full gate 444/444."
+    }
+  ]
+}

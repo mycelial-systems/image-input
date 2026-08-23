@@ -55,29 +55,43 @@ export async function makeImageFile (
 }
 
 /**
- * Wait for an `<image-crop>`'s internal `<img>` to finish loading, so
- * its natural size (and therefore its crop rect and `getBlob()`
- * output) are populated.
+ * Wait until an `<image-crop>` is usable: its image has decoded and
+ * its crop rect has been fitted to the natural size.
+ *
+ * This waits on the element's own `image-crop:load` rather than the
+ * inner `<img>`'s native `load`. The two fire in that order, and it is
+ * the component's event that means the crop rect and `getBlob()` are
+ * ready, which is what every caller actually wants. The synchronous
+ * shortcut covers being called after the load has already happened.
  */
 export function waitForImageLoad (el:ImageCrop):Promise<void> {
+    if (el.crop.width) return Promise.resolve()
+
     return new Promise(resolve => {
-        const img = el.querySelector('img') as HTMLImageElement
-        if (img.complete && img.naturalWidth) return resolve()
-        img.addEventListener('load', () => resolve(), { once: true })
+        el.addEventListener('image-crop:load', () => resolve(), {
+            once: true
+        })
     })
 }
 
 /**
  * Wait until an `<image-crop>`'s crop rect reports the given natural
  * width. Unlike `waitForImageLoad`, this works for the *second* image
- * loaded into the same element, where the `<img>` may report itself
- * complete from the previous load before the new one has decoded.
+ * loaded into the same element, where the element may already be
+ * reporting the previous image's rect when this is called.
  */
-export async function waitForCropRect (
+export function waitForCropRect (
     el:ImageCrop,
     width:number
 ):Promise<void> {
-    while (el.crop.width !== width) {
-        await new Promise(resolve => setTimeout(resolve, 10))
-    }
+    if (el.crop.width === width) return Promise.resolve()
+
+    return new Promise(resolve => {
+        const onLoad = () => {
+            if (el.crop.width !== width) return
+            el.removeEventListener('image-crop:load', onLoad)
+            resolve()
+        }
+        el.addEventListener('image-crop:load', onLoad)
+    })
 }

@@ -2,6 +2,7 @@ import { test } from '@substrate-system/tapzero'
 import { waitFor } from '@substrate-system/dom'
 import './style.js'
 import { ImageInput } from '../src/index.js'
+import { ImageCrop as RootImageCrop } from '../src/index.js'
 import type { ImageCrop } from '../src/crop.js'
 import { html } from '../src/html.js'
 import {
@@ -14,6 +15,7 @@ import './crop.js'
 import './crop-math.js'
 import './html.js'
 import './client.js'
+import './file.js'
 
 test('renders a .box div instead of .wrapper', async t => {
     document.body.insertAdjacentHTML('beforeend', `
@@ -1013,6 +1015,11 @@ test('clicking .crop-save calls getBlob, applies the crop via ' +
     t.ok(detail.file instanceof File,
         'should emit image-input:change with a File built from the ' +
         'crop blob')
+    t.equal(detail.file.type, 'image/png',
+        'the cropped file should keep the source image type rather ' +
+        'than being re-encoded as jpeg')
+    t.ok(detail.file.name.endsWith('.png'),
+        'deriveName should follow the blob type')
 
     const imgAfter = el.querySelector('img') as HTMLImageElement
     t.ok(imgAfter.getAttribute('src'), 'should set a new preview src')
@@ -1713,6 +1720,13 @@ test('render() and html() produce the same markup with alt and ' +
     t.equal(el.innerHTML, fromHtml.innerHTML,
         'the element and html() should emit identical markup ' +
         'when alt and label are set')
+})
+
+test('ImageCrop is reachable from the package root', t => {
+    t.equal(typeof RootImageCrop, 'function',
+        'the root module should export the ImageCrop class')
+    t.equal(RootImageCrop.TAG, 'image-crop',
+        'and it should be the real one')
 })
 
 test('all done', () => {

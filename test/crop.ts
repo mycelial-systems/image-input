@@ -1,7 +1,7 @@
 import { test } from '@substrate-system/tapzero'
 import { waitFor } from '@substrate-system/dom'
 import '../src/crop.js'
-import type { ImageCrop } from '../src/crop.js'
+import type { CropRect, ImageCrop } from '../src/crop.js'
 import { makeImageFile, waitForImageLoad } from './helpers.js'
 
 test('example test', async t => {
@@ -410,7 +410,8 @@ test('getBlob returns a Blob of the cropped region at natural resolution',
 
         const blob = await el.getBlob()
         t.ok(blob instanceof Blob, 'should resolve a Blob')
-        t.equal(blob.type, 'image/jpeg', 'should default to image/jpeg')
+        t.equal(blob.type, 'image/png',
+            'should default to the source file\'s own type')
 
         const dims = await loadBlobDimensions(blob)
         t.equal(dims.width, 300, 'blob width should match the crop width')
@@ -712,4 +713,124 @@ test('changing the crop attribute after an image has loaded re-fits ' +
     const frameAfter = el.querySelector('.image-crop-frame') as HTMLElement
     t.ok(frameAfter.classList.contains('locked'),
         'should now be marked locked')
+})
+
+test('emits image-crop:load with the natural size when an image ' +
+    'finishes loading', async t => {
+    document.body.insertAdjacentHTML('beforeend', `
+        <image-crop class="load-event-test"
+            style="display:block;width:200px;"></image-crop>
+    `)
+    const el = await waitFor('image-crop.load-event-test') as ImageCrop
+
+    const loaded = new Promise<{
+        naturalWidth:number, naturalHeight:number
+    }>(resolve => {
+        el.addEventListener('image-crop:load', ((ev:CustomEvent) => {
+            resolve(ev.detail)
+        }) as EventListener, { once: true })
+    })
+
+    el.setFile(await makeImageFile(400, 200))
+    const detail = await loaded
+
+    t.equal(detail.naturalWidth, 400,
+        'should report the natural width')
+    t.equal(detail.naturalHeight, 200,
+        'should report the natural height')
+})
+
+test('emits image-crop:change with the initial rect when an image ' +
+    'loads', async t => {
+    document.body.insertAdjacentHTML('beforeend', `
+        <image-crop class="load-change-test"
+            style="display:block;width:200px;"></image-crop>
+    `)
+    const el = await waitFor('image-crop.load-change-test') as ImageCrop
+
+    const changed = new Promise<CropRect>(resolve => {
+        el.addEventListener('image-crop:change', ((ev:CustomEvent) => {
+            resolve(ev.detail)
+        }) as EventListener, { once: true })
+    })
+
+    el.setFile(await makeImageFile(400, 200))
+    const detail = await changed
+
+    t.deepEqual(detail, { x: 0, y: 0, width: 400, height: 200 },
+        'the first change should carry the full-frame initial rect')
+})
+
+test('announces readiness before the rect, and announces a ' +
+    'constrained initial rect too', async t => {
+    document.body.insertAdjacentHTML('beforeend', `
+        <image-crop class="load-order-test" crop="1/1"
+            style="display:block;width:200px;"></image-crop>
+    `)
+    const el = await waitFor('image-crop.load-order-test') as ImageCrop
+
+    const order:string[] = []
+    el.addEventListener('image-crop:load', () => {
+        order.push('load')
+    }, { once: true })
+
+    const changed = new Promise<CropRect>(resolve => {
+        el.addEventListener('image-crop:change', ((ev:CustomEvent) => {
+            order.push('change')
+            resolve(ev.detail)
+        }) as EventListener, { once: true })
+    })
+
+    el.setFile(await makeImageFile(400, 200))
+    const detail = await changed
+
+    t.deepEqual(order, ['load', 'change'],
+        'load should come before change')
+    t.deepEqual(detail, el.crop,
+        'the change detail should match the crop getter')
+    t.equal(detail.width, detail.height,
+        'a 1/1 constraint should announce a square initial rect')
+})
+
+test('emits load and change again for a second image', async t => {
+    document.body.insertAdjacentHTML('beforeend', `
+        <image-crop class="load-twice-test"
+            style="display:block;width:200px;"></image-crop>
+    `)
+    const el = await waitFor('image-crop.load-twice-test') as ImageCrop
+
+    const first = new Promise<CropRect>(resolve => {
+        el.addEventListener('image-crop:change', ((ev:CustomEvent) => {
+            resolve(ev.detail)
+        }) as EventListener, { once: true })
+    })
+    el.setFile(await makeImageFile(400, 200))
+    await first
+
+    const second = new Promise<CropRect>(resolve => {
+        el.addEventListener('image-crop:change', ((ev:CustomEvent) => {
+            resolve(ev.detail)
+        }) as EventListener, { once: true })
+    })
+    el.setFile(await makeImageFile(100, 50))
+    const detail = await second
+
+    t.deepEqual(detail, { x: 0, y: 0, width: 100, height: 50 },
+        'the second image should announce its own initial rect, not ' +
+        'the first image\'s')
+})
+
+test('a src containing a quote cannot inject attributes into the ' +
+    'rendered markup', async t => {
+    const el = document.createElement('image-crop') as ImageCrop
+    el.className = 'src-escape-test'
+    el.setAttribute('src', '" data-injected="yes')
+    document.body.appendChild(el)
+
+    const imgs = el.querySelectorAll('img')
+    t.equal(imgs.length, 1, 'should render exactly one img')
+    t.equal(imgs[0].getAttribute('data-injected'), null,
+        'should not let the src value introduce an attribute')
+    t.equal(el.querySelectorAll('.crop-rect').length, 1,
+        'the rest of the template should still be intact')
 })

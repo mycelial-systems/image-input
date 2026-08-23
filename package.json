@@ -13,12 +13,14 @@
     "test-tapout": "cat test/test-bundle.js | tapout --timeout 60000 | tap-spec",
     "build-css": "lightningcss --bundle --targets '>= 0.25%' src/index.css -o dist/index.css",
     "build-css:min": "lightningcss --bundle --minify --targets '>= 0.25%' src/index.css -o dist/index.min.css",
+    "build-css:crop": "lightningcss --bundle --targets '>= 0.25%' src/crop.css -o dist/crop.css",
+    "build-css:crop:min": "lightningcss --bundle --minify --targets '>= 0.25%' src/crop.css -o dist/crop.min.css",
     "build-cjs": "esbuild src/*.ts --format=cjs --keep-names --tsconfig=tsconfig.build.json --outdir=./dist --out-extension:.js=.cjs --sourcemap",
     "build-esm": "esbuild src/*.ts --format=esm --metafile=dist/meta.json --keep-names --tsconfig=tsconfig.build.json --outdir=./dist --sourcemap && tsc --emitDeclarationOnly --project tsconfig.build.json --outDir dist",
     "build-esm:min": "esbuild ./src/*.ts --format=esm --keep-names --bundle --tsconfig=tsconfig.build.json --minify --out-extension:.js=.min.js --outdir=./dist --sourcemap",
     "build-example": "mkdir -p ./public && rm -rf ./public/* && NODE_ENV=development vite --mode development --base=\"/image-input\" build",
     "build-docs": "typedoc --tsconfig tsconfig.build.json ./src/index.ts",
-    "build": "mkdir -p ./dist && rm -rf ./dist/* && npm run build-cjs && npm run build-esm && npm run build-esm:min && npm run build-css && npm run build-css:min",
+    "build": "mkdir -p ./dist && rm -rf ./dist/* && npm run build-cjs && npm run build-esm && npm run build-esm:min && npm run build-css && npm run build-css:min && npm run build-css:crop && npm run build-css:crop:min",
     "start": "vite",
     "toc": "markdown-toc --maxdepth 3 -i README.md",
     "preversion": "npm run lint && stylelint src/*.css",
@@ -28,11 +30,19 @@
   },
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
+    "./crop": {
+      "types": "./dist/crop.d.ts",
+      "import": "./dist/crop.js",
+      "require": "./dist/crop.cjs"
+    },
     "./css": "./dist/index.css",
     "./css/min": "./dist/index.min.css",
+    "./css/crop": "./dist/crop.css",
+    "./css/crop/min": "./dist/crop.min.css",
     "./*": {
       "import": [
         "./dist/*.js",

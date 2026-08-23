@@ -1,0 +1,10 @@
+:root {
+    --image-crop-dim-color: rgb(0 0 0 / 55%);
+    --image-crop-rect-border-color: #fff;
+    --image-crop-rect-border-width: 2px;
+    --image-crop-handle-size: 0.75rem;
+    --image-crop-handle-color: #fff;
+    --image-crop-handle-border-color: #1d9bf0;
+    --image-crop-focus-color: #1d9bf0;
+    --image-crop-max-height: 65vh;
+}

@@ -19,6 +19,22 @@ const debug = createDebug('image-input')
 
 export type { ImageInputEventMap }
 
+/**
+ * `<image-crop>` is a first-class element (ADR-002): the reusable
+ * part of the old crop dialog -- the rect, the constraint, the
+ * pointer and keyboard interaction, and canvas encoding -- rather
+ * than an implementation detail of `<image-input>`. The root module
+ * already imports it above for its own use, so re-exporting adds no
+ * weight, and it saves a consumer from having to know the `/crop`
+ * subpath exists.
+ */
+export { ImageCrop }
+export type {
+    CropRect,
+    GetBlobOptions,
+    ImageCropEventMap
+} from './crop.js'
+
 // for document.querySelector
 declare global {
     interface HTMLElementTagNameMap {
