@@ -21,10 +21,34 @@ import {
 } from './crop-math.js'
 const debug = createDebug('image-crop')
 
+/**
+ * The `image-crop:*` events, and their `detail` shapes.
+ *
+ * Keys are the *non*-namespaced names taken by `.on()`/`.off()`; the
+ * namespaced names (`image-crop:load`, ...) are what
+ * `addEventListener` sees, and they are augmented onto
+ * `HTMLElementEventMap` below. This mirrors `src/events.ts`, which
+ * does the same job for `<image-input>`, but lives here rather than
+ * there because `crop.ts` is a standalone entry point.
+ */
+export interface ImageCropEventMap {
+    load:CustomEvent<{ naturalWidth:number, naturalHeight:number }>
+    change:CustomEvent<CropRect>
+}
+
 // for document.querySelector
 declare global {
     interface HTMLElementTagNameMap {
         'image-crop': ImageCrop
+    }
+
+    /**
+     * These events bubble, so listening on an ancestor is a supported
+     * pattern, not just listening on the `<image-crop>` itself.
+     */
+    interface HTMLElementEventMap {
+        'image-crop:load':ImageCropEventMap['load']
+        'image-crop:change':ImageCropEventMap['change']
     }
 }
 
@@ -262,6 +286,25 @@ export class ImageCrop extends WebComponent {
                 height: this.#naturalHeight
             }
         this.#layout()
+
+        // Loading is the one place this element becomes usable, and
+        // the one `#crop` assignment that used to announce nothing.
+        // `load` is the readiness signal: before it, `crop` reads
+        // `{0,0,0,0}` and `getBlob()` rejects, so a consumer had no
+        // supported way to know when the cropper was ready.
+        // `change` keeps the invariant that every mutation of
+        // `#crop` is announced -- `handleChange_crop`,
+        // `#handlePointerMove` and `#handleKeyDown` all end this way
+        // -- so a consumer tracking the rect from `change` alone sees
+        // the initial rect and not just whatever the first drag
+        // produced.
+        this.emit('load', {
+            detail: {
+                naturalWidth: this.#naturalWidth,
+                naturalHeight: this.#naturalHeight
+            }
+        })
+        this.emit('change', { detail: { ...this.#crop } })
     }
 
     #handleResize = ():void => {
