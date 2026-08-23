@@ -75,8 +75,8 @@
         "Typecheck passes"
       ],
       "priority": 4,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done in b1c4a6c. ImageCropEventMap exported; #handleImageLoad emits load then change after #layout(). Review clean."
     },
     {
       "id": "US-005",
