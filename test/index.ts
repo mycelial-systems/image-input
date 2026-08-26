@@ -16,6 +16,7 @@ import './crop-math.js'
 import './html.js'
 import './client.js'
 import './file.js'
+import './crop-dialog.js'
 
 test('renders a .box div instead of .wrapper', async t => {
     document.body.insertAdjacentHTML('beforeend', `

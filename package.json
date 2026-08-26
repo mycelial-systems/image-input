@@ -39,6 +39,11 @@
       "import": "./dist/crop.js",
       "require": "./dist/crop.cjs"
     },
+    "./crop-dialog": {
+      "types": "./dist/crop-dialog.d.ts",
+      "import": "./dist/crop-dialog.js",
+      "require": "./dist/crop-dialog.cjs"
+    },
     "./css": "./dist/index.css",
     "./css/min": "./dist/index.min.css",
     "./css/crop": "./dist/crop.css",

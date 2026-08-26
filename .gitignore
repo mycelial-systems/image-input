@@ -6,3 +6,7 @@ test/index.css
 dist
 .env
 public
+ralph_codex.sh
+PROMPT.md
+specs/*
+docs/plans
