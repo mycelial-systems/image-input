@@ -6,14 +6,14 @@ import { escapeAttr } from './escape.js'
 import { toFile } from './file.js'
 import type { CropConstraint } from './crop-math.js'
 
-export interface CropDialogOptions {
+export type CropDialogOptions = {
     heading?:string
     save?:string
     cancel?:string
     crop?:CropConstraint|string
 }
 
-type CropSource = File|Blob|string
+export type CropSource = File|Blob|string
 
 function markup (options:Required<Omit<CropDialogOptions, 'crop'>>):string {
     return `<dialog class="crop-dialog" aria-label="${
@@ -50,7 +50,8 @@ export function cropDialog (
     document.body.appendChild(dialog)
     if (options.crop !== undefined) {
         const value = typeof options.crop === 'string' ?
-            options.crop : options.crop.kind === 'ratio' && options.crop.circle ?
+            options.crop : options.crop.kind === 'ratio' &&
+                options.crop.circle ?
                 'circle' : options.crop.kind === 'ratio' ?
                     String(options.crop.ratio) : options.crop.kind
         crop.setAttribute('crop', value)
@@ -60,7 +61,7 @@ export function cropDialog (
     else crop.setAttribute('src', source)
     dialog.showModal()
 
-    return new Promise(resolve => {
+    return new Promise((resolve, reject) => {
         let settled = false
         let saving = false
         const finish = (result:Blob|null):void => {
@@ -68,6 +69,13 @@ export function cropDialog (
             settled = true
             dialog.remove()
             resolve(result)
+        }
+        const fail = (error:unknown):void => {
+            if (settled) return
+            settled = true
+            dialog.close()
+            dialog.remove()
+            reject(error)
         }
         const cancel = (event:Event):void => {
             event.preventDefault()
@@ -84,6 +92,8 @@ export function cropDialog (
                     dialog.close()
                     finish(blob)
                 }
+            } catch (error:unknown) {
+                fail(error)
             } finally {
                 saving = false
             }

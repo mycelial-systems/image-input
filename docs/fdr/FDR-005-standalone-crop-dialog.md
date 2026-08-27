@@ -1,6 +1,6 @@
 # FDR-005: Standalone crop dialog
 
-**Status:** Planned
+**Status:** Implemented
 **Last reviewed:** 2026-08-26
 
 ## Overview

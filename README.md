@@ -474,6 +474,33 @@ the same tick as that call still catches it.
 
   Rejects if no image has finished loading.
 
+### `cropDialog`
+
+Use the standalone crop dialog when the image does not belong to an
+`image-input` element. The function accepts a `File`, `Blob`, or URL
+string and resolves with the cropped `Blob`. Canceling with Cancel,
+Escape, or the backdrop resolves with `null`.
+
+```js
+import { cropDialog } from '@substrate-system/image-input/crop-dialog'
+
+const cropped = await cropDialog(file, {
+    heading: 'Trim photo',
+    crop: 'circle'
+})
+
+if (cropped) saveImage(cropped)
+```
+
+The `heading`, `save`, and `cancel` options change the dialog copy.
+The `crop` option accepts the same values as the `image-crop` `crop`
+attribute, including `constrain`, `circle`, and ratio literals. Load
+`@substrate-system/image-input/css/crop` separately. The function does
+not inject styles.
+
+Errors from `getBlob()` reject the promise. The dialog is removed from
+the document after saving, canceling, or an error.
+
 ## API
 
 ### Methods
