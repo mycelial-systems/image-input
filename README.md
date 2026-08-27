@@ -27,6 +27,7 @@ tool, and `alt` text input.
   * [Events](#events)
   * [Built-in dialogs](#built-in-dialogs)
   * [`image-crop`](#image-crop)
+  * [`cropDialog`](#cropdialog)
 - [API](#api)
   * [Methods](#methods-1)
   * [Server rendering](#server-rendering)
