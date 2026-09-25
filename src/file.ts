@@ -1,11 +1,12 @@
 /**
- * Blob-to-File promotion, shared by `ImageInput` and
- * `ImageInputClient`.
+ * Shared rules for `ImageInput` and `ImageInputClient`: Blob-to-File
+ * promotion, stored-source naming and file type rules, and required
+ * attribute propagation.
  *
  * Both need the same guarantee -- that the file they hold, and the
  * file they hand to consumers on `image-input:change`, is always a
  * `File` and never a bare `Blob`. `ImageCrop.setFile()` requires a
- * `File`, and consumers read `detail.file.name`. Keeping the rule in
+ * `File`, and consumers read `detail.file.name`. Keeping the rules in
  * one module is deliberate: the markup used to be duplicated between
  * `html.ts` and `index.ts` and the two drifted apart.
  */
