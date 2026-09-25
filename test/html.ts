@@ -166,3 +166,125 @@ test('html() reflects alt onto the img and the badge', async t => {
     t.equal(emptyBadge.classList.contains('has-alt'), false,
         'should leave the badge unmarked with no alt text')
 })
+
+test('html({ src }) adds has-image class and src attribute', async t => {
+    const host = parse(html({ src: '/a/b.png' }))
+
+    const box = host.querySelector('.box') as HTMLElement
+    t.ok(box?.classList.contains('has-image'),
+        '.box should have has-image class')
+
+    const preview = host.querySelector('.preview') as HTMLElement
+    t.ok(preview?.classList.contains('has-image'),
+        '.preview should have has-image class')
+
+    const img = host.querySelector('img') as HTMLImageElement
+    t.equal(img.getAttribute('src'), '/a/b.png',
+        'img src should equal the input')
+})
+
+test('html({ src }) escapes & and " in URL', async t => {
+    const url = '/x?a=1&b="2"'
+    const host = parse(html({ src: url }))
+    const img = host.querySelector('img') as HTMLImageElement
+
+    t.equal(img.getAttribute('src'), url,
+        'img src should preserve & and " in URL')
+})
+
+test(
+    'html({ src: "" }) has no has-image class and no src attribute',
+    async t => {
+        const host = parse(html({ src: '' }))
+
+        const box = host.querySelector('.box') as HTMLElement
+        t.ok(box, '.box should exist')
+        t.equal(box.classList.contains('has-image'), false,
+            '.box should not have has-image class')
+
+        const preview = host.querySelector(
+            '.preview'
+        ) as HTMLElement
+        t.ok(preview, '.preview should exist')
+        t.equal(preview.classList.contains('has-image'), false,
+            '.preview should not have has-image class')
+
+        const img = host.querySelector('img') as HTMLImageElement
+        t.ok(!img.hasAttribute('src'),
+            'img should have no src attribute')
+    }
+)
+
+test('html() with no src has no has-image or src', async t => {
+    const host = parse(html())
+
+    const box = host.querySelector('.box') as HTMLElement
+    t.ok(box, '.box should exist')
+    t.equal(box.classList.contains('has-image'), false,
+        '.box should not have has-image class')
+
+    const preview = host.querySelector('.preview') as HTMLElement
+    t.ok(preview, '.preview should exist')
+    t.equal(preview.classList.contains('has-image'), false,
+        '.preview should not have has-image class')
+
+    const img = host.querySelector('img') as HTMLImageElement
+    t.ok(!img.hasAttribute('src'),
+        'img should have no src attribute')
+})
+
+test('html({ crossorigin, src }) sets crossOrigin', async t => {
+    const host = parse(html({
+        crossorigin: 'anonymous',
+        src: '/a.png'
+    }))
+    const img = host.querySelector('img') as HTMLImageElement
+
+    t.equal(img.crossOrigin, 'anonymous',
+        'img crossOrigin should be anonymous')
+})
+
+test(
+    'html({ required: true, src }) has data-required and no required',
+    async t => {
+        const host = parse(html({
+            required: true,
+            src: '/a.png'
+        }))
+        const input = host.querySelector(
+            'input[type="file"]'
+        ) as HTMLInputElement
+
+        t.ok(input.hasAttribute('data-required'),
+            'input should have data-required')
+        t.equal(input.hasAttribute('required'), false,
+            'input should not have required attribute')
+    }
+)
+
+test(
+    'html({ required: true }) has both data-required and required',
+    async t => {
+        const host = parse(html({ required: true }))
+        const input = host.querySelector(
+            'input[type="file"]'
+        ) as HTMLInputElement
+
+        t.ok(input.hasAttribute('data-required'),
+            'input should have data-required')
+        t.ok(input.hasAttribute('required'),
+            'input should have required attribute')
+    }
+)
+
+test('html() has neither data-required nor required', async t => {
+    const host = parse(html())
+    const input = host.querySelector(
+        'input[type="file"]'
+    ) as HTMLInputElement
+
+    t.ok(!input.hasAttribute('data-required'),
+        'input should not have data-required')
+    t.ok(!input.hasAttribute('required'),
+        'input should not have required attribute')
+})

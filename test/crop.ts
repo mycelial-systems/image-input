@@ -834,3 +834,77 @@ test('a src containing a quote cannot inject attributes into the ' +
     t.equal(el.querySelectorAll('.crop-rect').length, 1,
         'the rest of the template should still be intact')
 })
+
+test('AC6.1 set after connect: crossorigin attribute set on inner img',
+    async t => {
+        document.body.insertAdjacentHTML('beforeend', `
+            <image-crop class="crossorigin-set-test"
+                crossorigin="anonymous"
+                style="display:block;width:200px;"></image-crop>
+        `)
+        const el = await waitFor('image-crop.crossorigin-set-test') as ImageCrop
+        el.src = '/fixtures/photo.png'
+        await waitForImageLoad(el)
+
+        const img = el.querySelector('img') as HTMLImageElement
+        t.equal(img.crossOrigin, 'anonymous',
+            'the inner img should have crossOrigin set to anonymous')
+    })
+
+test('AC6.1 after render: crossorigin reflected before appending', async t => {
+    const el = document.createElement('image-crop') as ImageCrop
+    el.className = 'crossorigin-render-test'
+    el.setAttribute('crossorigin', 'use-credentials')
+    el.style.display = 'block'
+    el.style.width = '200px'
+    document.body.appendChild(el)
+
+    await waitFor('image-crop.crossorigin-render-test')
+    const file = await makeImageFile(100, 100)
+    el.setFile(file)
+    await waitForImageLoad(el)
+
+    const img = el.querySelector('img') as HTMLImageElement
+    t.equal(img.crossOrigin, 'use-credentials',
+        'the inner img should have crossOrigin set after render')
+
+    el.crossorigin = null
+    t.equal(img.crossOrigin, null,
+        'removing the attribute should clear the crossorigin attribute')
+})
+
+test('AC6.2: switching from file to URL resets crop and rejects getBlob ' +
+    'until load', async t => {
+    document.body.insertAdjacentHTML('beforeend', `
+        <image-crop class="reset-test"
+            style="display:block;width:200px;"></image-crop>
+    `)
+    const el = await waitFor('image-crop.reset-test') as ImageCrop
+
+    // 1. setFile and wait for load
+    el.setFile(await makeImageFile(200, 100))
+    await waitForImageLoad(el)
+    t.ok(el.crop.width > 0, 'after setFile and load, crop should have width')
+
+    // 2. Set src to a URL
+    el.src = '/fixtures/photo.png'
+    t.deepEqual(el.crop, { x: 0, y: 0, width: 0, height: 0 },
+        'setting src to a URL should reset crop to empty')
+
+    // 3. getBlob should reject
+    let rejected = false
+    try {
+        await el.getBlob()
+    } catch (_err) {
+        rejected = true
+    }
+    t.ok(rejected, 'getBlob should reject while loading a URL')
+
+    // 4. Wait for load and check that crop is populated again
+    await waitForImageLoad(el)
+    t.ok(el.crop.width > 0,
+        'after URL load, crop should have width again')
+    const blob = await el.getBlob()
+    t.ok(blob instanceof Blob,
+        'getBlob should resolve after URL load')
+})

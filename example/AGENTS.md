@@ -5,10 +5,10 @@
 `example/index.ts` is a small `preact` app (via `htm/preact`) that
 renders one `<image-input>` per entry in its `EXAMPLES` array -- one
 per `crop` value the component accepts, plus one for `nocrop` -- each
-with its own live state
-panel (`example/panel.ts`, `example/state.ts`) and Save/Clear buttons
-(`example/controls.ts`), driven by `@preact/signals`. Six rules govern
-how it renders and talks to the component. Breaking any of them either reintroduces a real bug or
+with its own live state panel (`example/panel.ts`, `example/state.ts`)
+and Save/Clear/Stored image buttons (`example/controls.ts`), driven by
+`@preact/signals`. Six rules govern how it renders and talks to the
+component. Breaking any of them either reintroduces a real bug or
 silently defeats the point of the demo, so they are recorded here
 rather than left to be rediscovered.
 
@@ -111,15 +111,16 @@ rather than left to be rediscovered.
    `Panel`'s `computed`s are built in a `useMemo` keyed on the signals
    object, so a re-render does not allocate a fresh set each pass.
 
-6. **`Controls` shows both halves of the API, and is its own
-   component for that reason.** Save is enabled only when
-   `signals.altText` is non-empty -- the page never asks the element
-   for its state, it only listens, so the button enables itself off
-   `image-input:alt-change` and disables itself again off the
-   `alt-change` that `clear()` and the remove button emit. Clear calls
-   `ref.current.clear()`, a method on the element. Keep the two
-   demonstrating different halves; collapsing them into one style
-   defeats the point of having both.
+6. **`Controls` shows three buttons demonstrating different API
+   approaches.** Save is enabled only when `signals.altText` is
+   non-empty -- the page never asks the element for its state, it only
+   listens, so the button enables itself off `image-input:alt-change`
+   and disables itself again off the `alt-change` that `clear()` and the
+   remove button emit. Clear calls `ref.current.clear()`, a method on
+   the element. Stored image sets `src` through the ref imperatively,
+   never as a vdom prop (rule 1), and also resets the element's `alt`.
+   Keep the three buttons demonstrating their different approaches -- do
+   not collapse them into one style.
 
    `disabled` is an attribute, not text, so binding it means *reading*
    `altText.value` during render, which subscribes the reading

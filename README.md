@@ -200,8 +200,9 @@ is the same as setting the attribute in HTML.
   inside a `<form>`.
 * `alt` -- Alt text for the preview image. Changing it emits an
   `image-input:alt-change` event and updates the ALT badge state.
-* `required` -- Boolean. Marks the internal file input as required
-  for form validation.
+* `required` -- Boolean. Marks the inner file input as required for
+  form validation. Satisfied by a picked file or a stored `src`. See
+  [Stored images](#stored-images) below.
 * `label` -- Prompt text shown in the empty box, and used as the file
   input's `aria-label`. Defaults to `Drop an image, or click to
   choose one`.
@@ -241,6 +242,14 @@ is the same as setting the attribute in HTML.
   ship your own stylesheet instead of ours, hide it yourself -- the
   handler guard keeps it inert either way, but cannot make it
   disappear.
+* `src` -- A stored image URL. The component shows it as-is, never
+  fetches it, never puts it in the file input, and never announces it
+  with `change`. Setting a non-empty `src` drops a held file, and `''`
+  means none. See [Stored images](#stored-images) below.
+* `crossorigin` -- Forwarded to the preview `<img>` and the cropper's
+  `<img>`. Use it (e.g. `anonymous`) when a cross-origin stored image
+  must be croppable. See [Stored images](#stored-images) below for
+  details.
 
 ```html
 <image-input
@@ -257,27 +266,35 @@ is the same as setting the attribute in HTML.
 All events are namespaced with the tag name, e.g. `image-input:change`.
 They bubble, so you can listen on the element or an ancestor.
 
-* `image-input:change` -- A file was selected, or `setImage(blob)` was
-  called. `detail` is `{ file:File, alt:string }`.
+* `image-input:change` -- A file was selected, dropped, cropped, or
+  `setImage(blob)` was called. `detail` is `{ file:File, alt:string,
+  source:string }`, where `source` is one of `'pick'`, `'drop'`,
+  `'crop'`, or `'api'`.
 * `image-input:remove` -- The remove button was clicked. The preview
   and file have already been cleared. No `detail`.
-* `image-input:edit` -- The edit button was clicked. `detail` is
-  `{ file:File }`. Cancelable: by default, the built-in crop dialog
-  (see [Built-in dialogs](#built-in-dialogs) below) opens right after
-  this event fires. Call `preventDefault()` on it to suppress that
-  dialog and open your own crop UI instead, then call `setImage(blob)`
-  with the result. Never fires while the `nocrop` attribute is set.
+* `image-input:edit` -- The edit button was clicked or `edit()` was
+  called. `detail` is `{ file:File|null, src:string|null }`, where
+  `file` is null for a stored image and `src` is null for a picked
+  file. Cancelable: by default, the built-in crop dialog (see
+  [Built-in dialogs](#built-in-dialogs) below) opens right after this
+  event fires. Call `preventDefault()` on
+  it to suppress that dialog and open your own crop UI instead, then
+  call `setImage(blob)` with the result. Never fires while the `nocrop`
+  attribute is set.
 * `image-input:alt` -- The ALT badge was clicked. `detail` is
-  `{ file:File, alt:string }`. Cancelable: by default, the built-in
-  alt-text dialog opens right after this event fires. Call
-  `preventDefault()` on it to suppress that dialog and open your own
-  alt text editor instead, then set the `alt` property with the
-  result.
+  `{ file:File|null, src:string|null, alt:string }`, where `file` is
+  null for a stored image and `src` is null for a picked file.
+  Cancelable: by default, the built-in alt-text dialog opens right
+  after this event fires. Call `preventDefault()` on it to suppress
+  that dialog and open your own alt text editor instead, then set the
+  `alt` property with the result.
 * `image-input:alt-change` -- The `alt` attribute or property changed.
-  `detail` is `{ alt:string }`.
-* `image-input:error` -- A picked or dropped file was not an image.
-  `detail` is `{ reason:'not-an-image' }`. The component shows no
-  message of its own; use this event to report the error yourself.
+  `detail` is `{ alt:string }`. Not emitted for an `alt` present at
+  parse time before the element connects.
+* `image-input:error` -- A picked or dropped file was not an image, or
+  a crop failed. `detail` is `{ reason:string }`, where `reason` is one
+  of `'not-an-image'` or `'crop-failed'`. The component shows no message
+  of its own; use this event to report the error yourself.
 
 #### Typescript
 
@@ -291,8 +308,9 @@ import { ImageInput } from '@substrate-system/image-input'
 const input = document.querySelector('image-input')!
 
 input.on('change', ev => {
-    ev.detail.file.name  // File
-    ev.detail.alt        // string
+    ev.detail.file.name    // File
+    ev.detail.alt          // string
+    ev.detail.source       // 'pick'|'drop'|'crop'|'api'
 })
 ```
 
@@ -302,15 +320,19 @@ itself:
 
 ```ts
 document.body.addEventListener('image-input:error', ev => {
-    ev.detail.reason  // 'not-an-image'
+    ev.detail.reason  // 'not-an-image'|'crop-failed'
 })
 ```
 
 The map itself is exported as `ImageInputEventMap` if you want to name
-a handler's parameter type:
+a handler's parameter type. The `ChangeSource` and `ErrorReason` types
+are also exported for use in your own code:
 
 ```ts
-import type { ImageInputEventMap } from '@substrate-system/image-input'
+import type {
+    ImageInputEventMap,
+    ChangeSource
+} from '@substrate-system/image-input'
 
 function handleChange (ev:ImageInputEventMap['change']) {
     console.log(ev.detail.file.name)
@@ -320,6 +342,75 @@ function handleChange (ev:ImageInputEventMap['change']) {
 Note the `addEventListener` typing works by augmenting the global
 `HTMLElementEventMap`, so the six `image-input:*` keys become visible
 on every `HTMLElement` in a project that imports this package.
+
+### Stored images
+
+A stored image is one that already lives at a URL, not a file the user
+picked or dropped. Set it with the `src` attribute or the `src`
+property:
+
+```html
+<image-input src="/img/cover.png"></image-input>
+```
+
+The component shows it as-is. It never fetches the URL, never puts it
+in the file input, and never announces it with `change`. The preview
+shows the URL instead of a held file.
+
+A stored `src` satisfies `required` on the host. After Remove or
+`clear()`, the inner input becomes `required` again if the host had
+the attribute.
+
+Picking or dropping a file drops the `src` attribute and shows the
+file instead. Setting a non-empty `src` while a file is held drops the
+file silently -- a page tracking the file must reset its own state
+rather than waiting for a `change` event that never comes. An empty or
+removed `src` means none.
+
+When you crop a stored image, the cropped blob's file name comes from
+the URL's last path segment (e.g. `post-header` from
+`/assets/post/post-header.png?v=2`), and the extension matches the
+blob's actual type after encoding. A URL with no extension crops to
+JPEG. Query and fragment are ignored.
+
+An `edit()` on a stored image opens the crop dialog with the URL. Save
+emits `change` with `source:'crop'` and a `File`, and removes `src`.
+Cancel resolves the `edit()` promise with `null` and leaves `src` in
+place.
+
+Clicking ALT on a stored image opens the alt-text dialog. Save emits
+`alt-change` (only after the element connects -- see `alt-change` under
+Events) and no `change`.
+
+When a page re-renders (e.g. in Preact), assigning `el.src` on every
+render loses a picked file, since `src` changes to a stored image each
+time. Assign it only when you mean to replace the image -- typically
+outside the render path. The element's `src` property is safe to read
+and write through a `ref`.
+
+**CORS:** If your image server requires CORS headers, set
+`crossorigin` on the host. The component forwards it to the preview
+`<img>` and the cropper's `<img>`, so they share one CORS cache entry.
+A CORS-mode load fails without the right headers; without `crossorigin`
+on the host, cropping a cross-origin image fails with `error`
+`crop-failed` (a tainted canvas). The server should send
+`Access-Control-Allow-Origin` with `Vary: Origin`, or `ACAO: *`.
+
+**Form submission:** A plain `<form>` submit with no JavaScript sends
+the picked, dropped, cropped or `setImage()` file if there is one. A
+stored `src` does not enter the form: the server already has the image.
+Removing a stored image is not signaled in a no-JS submit.
+
+**Recipe:** To open the crop dialog right after the user picks a file,
+listen for `change` and call `edit()`:
+
+```ts
+el.addEventListener('image-input:change', (ev) => {
+    if (ev.detail.source === 'pick') {
+        el.edit()
+    }
+})
+```
 
 ### Built-in dialogs
 
@@ -336,8 +427,9 @@ wiring of your own is required.
   and a `.crop-save` button. The `<image-crop>` element is created
   the first time the crop dialog is opened, and reused after that --
   it is not present in the initial markup. Saving calls
-  `cropEl.getBlob()` and passes the result to `input.setImage(blob)`,
-  which emits `image-input:change`.
+  `cropEl.getBlob()` and emits `image-input:change` with
+  `source:'crop'`. For a stored image, the cropped file is named from
+  the URL and `src` is removed.
 
 No new event types exist for this. Both dialogs sit on top of the
 events already documented above: `image-input:edit` and
@@ -400,7 +492,12 @@ import { ImageCrop } from '@substrate-system/image-input/crop'
 #### Attributes
 
 * `src` -- URL of the image to crop. Reflected as a property. You can
-  also pass a `File` directly with `cropEl.setFile(file)`.
+  also pass a `File` directly with `cropEl.setFile(file)`. Switching
+  to a different `src` resets the crop rect until the new image loads.
+* `crossorigin` -- Applied to the inner `<img>` when `src` is set, so
+  cross-origin images can be cropped without a tainted canvas. Use
+  `crossorigin="anonymous"` or `crossorigin="use-credentials"` when
+  the image server requires CORS headers.
 * `crop` -- Locks the crop rect to a fixed aspect ratio, instead of
   the default free-form rect that starts at the whole image with all
   eight resize handles. **Not** reflected as a property --
@@ -495,9 +592,15 @@ if (cropped) saveImage(cropped)
 
 The `heading`, `save`, and `cancel` options change the dialog copy.
 The `crop` option accepts the same values as the `image-crop` `crop`
-attribute, including `constrain`, `circle`, and ratio literals. Load
-`@substrate-system/image-input/css/crop` separately. The function does
-not inject styles.
+attribute, including `constrain`, `circle`, and ratio literals. The
+`crossorigin` option (e.g. `crossorigin: 'anonymous'`) is forwarded to
+the inner `<image-crop>`. Load `@substrate-system/image-input/css/crop`
+separately. The function does not inject styles.
+
+When a URL source is provided, the cropped blob's type is guessed from
+the URL's extension. PNG, JPEG and WebP URLs keep their type; any
+other extension or missing extension crops to JPEG. Query and fragment
+are ignored.
 
 Errors from `getBlob()` reject the promise. The dialog is removed from
 the document after saving, canceling, or an error.
@@ -521,14 +624,22 @@ document.querySelectorAll('image-input').forEach(ImageInput.clear)
   crop UI. The blob is promoted to a `File` (named after the current
   file, with an extension matching the blob's type, unless you pass
   `name`), written into the internal `<input>` so a surrounding form
-  sees it, and emitted as `image-input:change`.
-* `clear()` / `ImageInput.clear(el)` -- Clear the selected file and put
-  the box back in its empty state: the preview is hidden, the object URL
-  is revoked, the internal `<input>` is reset, and `alt` is set to
-  `null` (which emits `image-input:alt-change` with an empty string).
-  This does *not* emit `image-input:remove` -- that event means the user
-  clicked the remove button, so a page that clears the input itself
-  already knows it happened.
+  sees it, and emitted as `image-input:change` with `source:'api'`.
+* `edit()` / `ImageInput.edit(el)` -- Open the crop dialog. Emits
+  `image-input:edit` with `{file, src}` (file is null for a stored
+  image, src is null for a picked file). Resolves with the cropped
+  `File` after Save, once `change` with `source:'crop'` has been
+  emitted, or with `null` on Cancel, with no image, under `nocrop`,
+  or when a listener cancels `edit`. While the dialog is open,
+  returns the same promise.
+* `clear()` / `ImageInput.clear(el)` -- Clear the selected file and
+  stored source, and put the box back in its empty state: the preview
+  is hidden, the object URL is revoked, the internal `<input>` is
+  reset, and `alt` is set to `null` (which emits
+  `image-input:alt-change` with an empty string). This does *not* emit
+  `image-input:remove` -- that event means the user clicked the remove
+  button, so a page that clears the input itself already knows it
+  happened.
 
 ### Server rendering
 
@@ -560,11 +671,11 @@ const client = new ImageInputClient(
 )
 ```
 
-`ImageInputClient` emits `image-input:change`, `image-input:remove`,
-`image-input:edit`, `image-input:alt` and `image-input:alt-change`,
-honors `preventDefault()` on `:edit` and `:alt` the same way the
-custom element does, and exposes `setImage(blob)`, `clear()` and
-`destroy()`.
+`ImageInputClient` emits the same events as the custom element,
+including `image-input:error` for non-image files and `crop-failed`,
+and exposes `setImage(blob)`, `setSrc(url)`, `edit()`, `clear()` and
+`destroy()`. The `edit()` method returns `Promise<File|null>` with the
+same semantics as the element's `edit()`.
 
 `nocrop` works on this path too. Write it on the `<image-input>` host
 -- the stylesheet rule and the client's guard both read it from
@@ -572,11 +683,11 @@ there, so `res.send('<image-input nocrop>' + html() + '</image-input>')`
 hides the Edit button and keeps it inert, hydrated or not. It is not
 an `html()` option: the markup is the same either way.
 
-`html()` takes `accept`, `name`, `required`, `alt` and `label`, plus
-`dialogs: false` to leave the built-in dialogs out when you supply
-your own editing UI. Pass `text` (the same shape as `ImageInput.TEXT`)
-to set the built-in dialogs' copy on this path, without importing the
-custom element:
+`html()` takes `accept`, `name`, `required`, `alt`, `label`, `src` and
+`crossorigin`, plus `dialogs: false` to leave the built-in dialogs out
+when you supply your own editing UI. Pass `text` (the same shape as
+`ImageInput.TEXT`) to set the built-in dialogs' copy on this path,
+without importing the custom element:
 
 ```js
 import { DEFAULT_TEXT } from '@substrate-system/image-input/dialogs'
@@ -584,22 +695,20 @@ import { DEFAULT_TEXT } from '@substrate-system/image-input/dialogs'
 html({ name: 'avatar', text: { ...DEFAULT_TEXT, cropHeading: 'Crop' } })
 ```
 
-Some differences from the custom element:
+When `required` is set, `html()` writes `data-required` on the input
+and `required` only when there is no stored `src`. The client reads
+`data-required` to apply the same rule on transitions: a stored image
+satisfies the requirement.
 
-* `ImageInputClient` does not write the picked file back into
-  `input.files`, so a cropped image does not submit with a
-  surrounding form on this path. Use the custom element where form
-  submission matters.
+One difference from the custom element:
+
 * There is no drop target on this path. Dropping a file onto the box
   falls through to the browser's default behavior (typically
   navigating to the file) instead of showing a preview -- only the
   file picker works. The custom element's drag-and-drop wiring is not
   part of `ImageInputClient`.
-* `ImageInputClient` never emits `image-input:error`. Picking a
-  non-image file is silently ignored rather than reported; there is
-  no drop path to report errors from either.
 
-Use the custom element where any of these matter.
+Use the custom element where this matters.
 
 ## Modules
 

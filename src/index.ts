@@ -9,15 +9,27 @@ import {
 } from './dialogs.js'
 import { html, DEFAULT_LABEL as LABEL } from './html.js'
 import { ImageCrop } from './crop.js'
-import { EXT, toFile } from './file.js'
+import {
+    EXT,
+    toFile,
+    storedSrc,
+    inputRequired,
+    encodableType,
+    guessType,
+    cropName
+} from './file.js'
 // The type-only import is enough to pull `events.d.ts` into a
 // consumer's program, which is what activates its `declare global`
 // augmentation of `HTMLElementEventMap`. No runtime import needed --
 // events.ts emits no JS.
-import type { ImageInputEventMap } from './events.js'
+import type {
+    ImageInputEventMap,
+    ChangeSource,
+    ErrorReason
+} from './events.js'
 const debug = createDebug('image-input')
 
-export type { ImageInputEventMap }
+export type { ImageInputEventMap, ChangeSource, ErrorReason }
 
 /**
  * `<image-crop>` is a first-class element (ADR-002): the reusable
@@ -46,7 +58,7 @@ export class ImageInput extends WebComponent {
     static TAG = 'image-input'
     TAG = ImageInput.TAG
     static reflectedStringAttributes = [
-        'accept', 'name', 'alt', 'label', 'crop'
+        'accept', 'name', 'alt', 'label', 'crop', 'src', 'crossorigin'
     ]
 
     static reflectedBooleanAttributes = ['required', 'nocrop']
@@ -55,6 +67,8 @@ export class ImageInput extends WebComponent {
     declare alt:string|null
     declare label:string|null
     declare crop:string|null
+    declare src:string|null
+    declare crossorigin:string|null
     declare required:boolean
     declare nocrop:boolean
 
@@ -77,6 +91,20 @@ export class ImageInput extends WebComponent {
     #previewUrl:string|null = null
     #cleanupDrop:(() => void)|null = null
     #cropInFlight = false
+    #connectedOnce = false
+
+    /**
+     * The open crop session, if any. `type` and `src` are fixed when the
+     * dialog opens, so a `src` change while it is open cannot mix one
+     * image's type with another's name.
+     */
+    #edit:{
+        promise:Promise<File|null>
+        resolve:(file:File|null) => void
+        onClose:() => void
+        src:string|null
+        type:string|undefined
+    }|null = null
 
     /**
      * Listen for a (non-namespaced) `image-input` event, with the
@@ -132,6 +160,7 @@ export class ImageInput extends WebComponent {
         debug('connected')
         super.connectedCallback()
         this.setupEventListeners()
+        this.#connectedOnce = true
     }
 
     disconnectedCallback () {
@@ -150,6 +179,7 @@ export class ImageInput extends WebComponent {
             ?.removeEventListener('click', this.handleCropCancel)
         this.#cleanupDrop?.()
         this.#revokePreviewUrl()
+        this.#settleEdit(null)
     }
 
     setupEventListeners () {
@@ -183,8 +213,8 @@ export class ImageInput extends WebComponent {
         }
     }
 
-    handleChange_required (_old:string|null, newValue:string|null) {
-        this.qs('input')?.toggleAttribute('required', newValue !== null)
+    handleChange_required () {
+        this.#syncView()
     }
 
     handleChange_label (_old:string|null, newValue:string|null) {
@@ -194,6 +224,20 @@ export class ImageInput extends WebComponent {
         if (promptText) promptText.textContent = text
 
         this.qs('input')?.setAttribute('aria-label', text)
+    }
+
+    /**
+     * A non-empty `src` replaces any held file, silently: a stored
+     * image is never announced with `change`. An empty or removed `src`
+     * leaves a held file alone.
+     */
+    handleChange_src (_old:string|null, newValue:string|null) {
+        if (storedSrc(newValue) !== null) this.#dropFile()
+        this.#syncView()
+    }
+
+    handleChange_crossorigin () {
+        this.#syncView()
     }
 
     handleChange_alt (_old:string|null, newValue:string|null) {
@@ -208,7 +252,11 @@ export class ImageInput extends WebComponent {
                 (hasAlt ? 'Edit alt text' : 'Add alt text'))
         }
 
-        this.emit('alt-change', { detail: { alt: newValue ?? '' } })
+        // An alt present at parse time (or set before the element is
+        // connected) is initial state, not a change.
+        if (this.#connectedOnce) {
+            this.emit('alt-change', { detail: { alt: newValue ?? '' } })
+        }
     }
 
     handleFileSelect = (event:Event) => {
@@ -219,8 +267,7 @@ export class ImageInput extends WebComponent {
 
         if (file.type.startsWith('image/')) {
             debug('Image file selected:', file.name)
-            this.#setFile(file)
-            this.emit('change', { detail: { file, alt: this.alt ?? '' } })
+            this.#setFile(file, 'pick')
         } else {
             this.emit('error', { detail: { reason: 'not-an-image' } })
         }
@@ -234,39 +281,18 @@ export class ImageInput extends WebComponent {
 
     handleEdit = (event:Event) => {
         event.preventDefault()
-        // `nocrop` means this element offers no edit trigger, so there
-        // is nothing to announce. The stylesheet already hides the
-        // button; this covers what CSS cannot -- a scripted click, or
-        // a page that never loaded our stylesheet (FDR-003).
-        if (this.nocrop) return
-        if (!this.#file) return
-        const notCanceled = this.emit('edit', {
-            detail: { file: this.#file }
-        })
-        if (!notCanceled) return
-
-        const dialog = this.qs<HTMLDialogElement>('.crop-dialog')
-        const cropEl = this.#getOrCreateCropEl()
-        // `ImageCrop` does not reflect `crop` as a property (it already
-        // has a `.crop` getter for the current rect) -- forward the
-        // attribute directly, every open, in case it changed since the
-        // last one.
-        if (cropEl) {
-            if (this.crop == null) {
-                cropEl.removeAttribute('crop')
-            } else {
-                cropEl.setAttribute('crop', this.crop)
-            }
-        }
-        cropEl?.setFile(this.#file)
-        if (dialog) openDialog(dialog)
+        this.edit()
     }
 
     handleAlt = (event:Event) => {
         event.preventDefault()
-        if (!this.#file) return
+        if (!this.#hasImage()) return
         const notCanceled = this.emit('alt', {
-            detail: { file: this.#file, alt: this.alt ?? '' }
+            detail: {
+                file: this.#file,
+                src: this.#file ? null : this.#storedSrc(),
+                alt: this.alt ?? ''
+            }
         })
         if (!notCanceled) return
 
@@ -297,32 +323,42 @@ export class ImageInput extends WebComponent {
         if (!cropEl) return
         // A second Save click, or an Esc press, while getBlob() is
         // still running would otherwise apply the crop twice, or apply
-        // it to a dialog the user has already dismissed.
+        // it to a dialog the user has already dismissed. If Save is
+        // clicked in a different session, this guard silently drops it.
         if (this.#cropInFlight) return
         this.#cropInFlight = true
 
+        const pending = this.#edit
         let blob:Blob
         try {
-            blob = await cropEl.getBlob()
+            blob = await cropEl.getBlob({ type: pending?.type })
         } catch (err) {
-            // The image is not decoded yet, or the canvas refused to
-            // produce a blob. Leave the dialog open and the current
-            // image untouched.
+            // Not decoded yet, or a tainted canvas (a cross-origin image
+            // loaded without CORS). Leave the dialog open, the image
+            // untouched, and edit() pending.
             debug('crop save failed', err)
+            this.emit('error', { detail: { reason: 'crop-failed' } })
             return
         } finally {
             this.#cropInFlight = false
         }
 
-        // The dialog closing during the await means the user canceled.
-        if (dialog && !dialog.open) return
+        // The dialog closing during the await means the user canceled. A
+        // changed session means that one was canceled and a new edit()
+        // opened meanwhile -- this blob belongs to neither.
+        if (this.#edit !== pending || (dialog && !dialog.open)) return
 
-        this.setImage(blob)
+        const name = pending?.src ?
+            cropName(pending.src, blob.type) :
+            undefined
+        const file = this.#setFile(blob, 'crop', name)
+        this.#settleEdit(file)
         if (dialog) closeDialog(dialog)
     }
 
     handleCropCancel = (event:Event) => {
         event.preventDefault()
+        this.#settleEdit(null)
         const dialog = this.qs<HTMLDialogElement>('.crop-dialog')
         if (dialog) closeDialog(dialog)
     }
@@ -336,8 +372,7 @@ export class ImageInput extends WebComponent {
         }
 
         debug('Image file dropped:', file.name)
-        this.#setFile(file)
-        this.emit('change', { detail: { file, alt: this.alt ?? '' } })
+        this.#setFile(file, 'drop')
     }
 
     /**
@@ -348,8 +383,7 @@ export class ImageInput extends WebComponent {
      * See the note above {@link ImageInput.clear}.
      */
     static setImage (el:ImageInput, blob:Blob, name?:string):void {
-        const file = el.#setFile(blob, name)
-        el.emit('change', { detail: { file, alt: el.alt ?? '' } })
+        el.#setFile(blob, 'api', name)
     }
 
     setImage (blob:Blob, name?:string):void {
@@ -357,10 +391,11 @@ export class ImageInput extends WebComponent {
     }
 
     /**
-     * Clear the selected file and reset the preview back to its empty
-     * state. Does not emit `image-input:remove` -- that event means the
-     * user clicked the remove button. Setting `alt` to `null` here does
-     * emit `image-input:alt-change` with an empty string.
+     * Clear the selected file and remove the stored source, resetting
+     * the preview back to its empty state. Does not emit
+     * `image-input:remove` -- that event means the user clicked the
+     * remove button. Setting `alt` to `null` here does emit
+     * `image-input:alt-change` with an empty string.
      *
      * Every method meant to be called from outside the component is
      * written as a static taking the instance first, with a one-line
@@ -372,21 +407,92 @@ export class ImageInput extends WebComponent {
      * inside the class body.
      */
     static clear (el:ImageInput):void {
-        el.#revokePreviewUrl()
-        el.#file = null
-
-        const input = el.qs('input')
-        if (input) input.value = ''
-
-        el.qs('img')?.removeAttribute('src')
-        el.qs('.preview')?.classList.remove('has-image')
-        el.qs('.box')?.classList.remove('has-image')
-
+        el.#dropFile()
+        el.removeAttribute('src')
+        el.#syncView()
         el.alt = null
     }
 
     clear ():void {
         ImageInput.clear(this)
+    }
+
+    /**
+     * Open the crop step. Resolves with the cropped File after Save
+     * (after `change` with `source:'crop'` has been emitted), or with
+     * null when the dialog closes without saving. Resolves null at once
+     * under `nocrop`, with no image, or when a listener cancels `edit`.
+     * While the dialog is open, returns the pending promise.
+     */
+    static edit (el:ImageInput):Promise<File|null> {
+        const dialog = el.qs<HTMLDialogElement>('.crop-dialog')
+        if (el.#edit) {
+            // Reuse the session only while its dialog is open. `close` is
+            // queued as a task, so code that closes the dialog and calls
+            // edit() in the same tick must end the old session here and
+            // open a new one.
+            if (dialog?.open) return el.#edit.promise
+            el.#settleEdit(null)
+        }
+        // Even though CSS hides .edit when nocrop is set, scripted clicks and
+        // pages without our stylesheet can invoke this, so the guard is
+        // essential (FDR-003).
+        if (el.nocrop || !el.#hasImage()) return Promise.resolve(null)
+
+        const file = el.#file
+        const src = file ? null : el.#storedSrc()
+        const notCanceled = el.emit('edit', { detail: { file, src } })
+        if (!notCanceled) return Promise.resolve(null)
+
+        const cropEl = el.#getOrCreateCropEl()
+        if (!dialog || !cropEl) return Promise.resolve(null)
+
+        if (el.crop == null) {
+            cropEl.removeAttribute('crop')
+        } else {
+            cropEl.setAttribute('crop', el.crop)
+        }
+        if (file) {
+            cropEl.setFile(file)
+        } else if (src !== null) {
+            // crossorigin before src, so the cropper's load and the
+            // preview's load use one CORS mode
+            cropEl.crossorigin = el.crossorigin
+            cropEl.src = src
+        }
+
+        let resolve:(file:File|null) => void = () => {}
+        const promise = new Promise<File|null>(_resolve => {
+            resolve = _resolve
+        })
+        const onClose = () => {
+            // a close queued by an earlier session can land after this
+            // one reopened the dialog
+            if (dialog.open) return
+            el.#settleEdit(null)
+        }
+        el.#edit = {
+            promise,
+            resolve,
+            onClose,
+            src,
+            type: src === null ? undefined : encodableType(guessType(src))
+        }
+        dialog.addEventListener('close', onClose)
+        openDialog(dialog)
+        return promise
+    }
+
+    edit ():Promise<File|null> {
+        return ImageInput.edit(this)
+    }
+
+    #settleEdit (file:File|null):void {
+        const pending = this.#edit
+        if (!pending) return
+        this.#edit = null
+        this.qs('.crop-dialog')?.removeEventListener('close', pending.onClose)
+        pending.resolve(file)
     }
 
     /**
@@ -407,19 +513,25 @@ export class ImageInput extends WebComponent {
         return cropEl
     }
 
-    #setFile (file:File|Blob, name?:string):File {
+    #setFile (
+        file:File|Blob,
+        source:ChangeSource,
+        name?:string
+    ):File {
         const asFile = toFile(file, name, this.#file?.name)
 
         this.#syncInputFiles(asFile)
         this.#revokePreviewUrl()
         this.#file = asFile
         this.#previewUrl = URL.createObjectURL(asFile)
+        // The file replaces a stored image. #file is already set, so
+        // handleChange_src keeps it.
+        this.removeAttribute('src')
+        this.#syncView()
 
-        const img = this.qs('img')
-        if (img) img.src = this.#previewUrl
-        this.qs('.preview')?.classList.add('has-image')
-        this.qs('.box')?.classList.add('has-image')
-
+        this.emit('change', {
+            detail: { file: asFile, alt: this.alt ?? '', source }
+        })
         return asFile
     }
 
@@ -444,6 +556,61 @@ export class ImageInput extends WebComponent {
         }
     }
 
+    /** The stored URL being shown, or null. '' counts as none. */
+    #storedSrc ():string|null {
+        return storedSrc(this.src)
+    }
+
+    #hasImage ():boolean {
+        return !!this.#file || this.#storedSrc() !== null
+    }
+
+    /** Forget the held file without touching `src`. */
+    #dropFile ():void {
+        this.#revokePreviewUrl()
+        this.#file = null
+        const input = this.qs<HTMLInputElement>('input')
+        if (input) input.value = ''
+    }
+
+    /**
+     * Re-derive everything visible from state: the preview img
+     * (crossorigin first, so both loads share one CORS mode), the
+     * has-image classes, and the input's `required`. Every transition
+     * ends here. A no-op before the first render.
+     */
+    #syncView ():void {
+        const src = this.#previewUrl ?? this.#storedSrc()
+        const img = this.qs<HTMLImageElement>('.preview img')
+        if (img) {
+            if (this.crossorigin == null) {
+                img.removeAttribute('crossorigin')
+            } else {
+                img.setAttribute('crossorigin', this.crossorigin)
+            }
+            if (src === null) {
+                img.removeAttribute('src')
+            } else if (img.getAttribute('src') !== src) {
+                img.setAttribute('src', src)
+            }
+        }
+
+        const hasImage = src !== null
+        this.qs('.preview')?.classList.toggle('has-image', hasImage)
+        this.qs('.box')?.classList.toggle('has-image', hasImage)
+
+        const input = this.qs<HTMLInputElement>('input')
+        if (input) {
+            // keep the markup agreeing with html(): intent in
+            // data-required, the effective rule in required
+            input.toggleAttribute('data-required', this.required)
+            input.required = inputRequired(
+                this.required,
+                this.#storedSrc() !== null
+            )
+        }
+    }
+
     render () {
         this.innerHTML = html({
             accept: this.accept,
@@ -451,7 +618,9 @@ export class ImageInput extends WebComponent {
             required: this.required,
             alt: this.alt,
             label: this.label ?? ImageInput.DEFAULT_LABEL,
-            text: ImageInput.TEXT
+            text: ImageInput.TEXT,
+            src: this.#storedSrc(),
+            crossorigin: this.crossorigin
         })
     }
 }

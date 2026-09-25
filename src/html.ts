@@ -5,6 +5,7 @@ import {
     type DialogText
 } from './dialogs.js'
 import { escapeAttr } from './escape.js'
+import { storedSrc, inputRequired } from './file.js'
 
 /**
  * Prompt text for an empty box, and the file input's `aria-label`.
@@ -24,6 +25,10 @@ export interface ImageInputHtmlOptions {
      * cancels `image-input:edit` / `image-input:alt`.
      */
     dialogs?:boolean;
+    /** A stored image URL to show. An empty string means none. */
+    src?:string|null;
+    /** Written on the preview `<img>`. */
+    crossorigin?:string|null;
 }
 
 /**
@@ -40,19 +45,31 @@ export function html (opts:ImageInputHtmlOptions = {}):string {
     const name = opts.name ?
         ` name="${escapeAttr(opts.name)}"` :
         ''
-    const required = opts.required ? ' required' : ''
     const alt = escapeAttr(opts.alt ?? '')
     const hasAlt = !!opts.alt
     const label = escapeAttr(opts.label ?? DEFAULT_LABEL)
     const text = opts.text ?? DEFAULT_TEXT
     const wantsDialogs = opts.dialogs ?? true
 
+    const src = storedSrc(opts.src)
+    const hasImage = src !== null
+    const wantsRequired = !!opts.required
+    const required =
+        (wantsRequired ? ' data-required' : '') +
+        (inputRequired(wantsRequired, hasImage) ? ' required' : '')
+    const imgAttrs =
+        (opts.crossorigin == null ?
+            '' :
+            ` crossorigin="${escapeAttr(opts.crossorigin)}"`) +
+        (hasImage ? ` src="${escapeAttr(src)}"` : '')
+    const imageClass = hasImage ? ' has-image' : ''
+
     const dialogs = wantsDialogs ?
         `${altDialogMarkup(text)}
         ${cropDialogMarkup(text)}` :
         ''
 
-    return `<div class="box">
+    return `<div class="box${imageClass}">
             <label class="picker">
                 <input
                     type="file"
@@ -70,8 +87,8 @@ export function html (opts:ImageInputHtmlOptions = {}):string {
                     <span class="prompt-text">${label}</span>
                 </span>
             </label>
-            <div class="preview">
-                <img alt="${alt}" />
+            <div class="preview${imageClass}">
+                <img alt="${alt}"${imgAttrs} />
                 <div class="overlay">
                     <button
                         type="button"
