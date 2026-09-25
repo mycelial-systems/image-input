@@ -144,7 +144,9 @@ export function cropName (
     blobType:string,
     base?:string
 ):string {
-    const segment = lastSegment(src, base)
+    let segment = lastSegment(src, base)
+    // Strip trailing dots so /x/abc. doesn't produce abc..png
+    segment = segment.replace(/\.+$/, '')
     const stem = segment.replace(/\.[^.]+$/, '')
     return deriveName(blobType, stem ? segment : null)
 }
