@@ -2876,8 +2876,8 @@ test('AC3.4: calling edit() twice while dialog is open returns the ' +
 test('AC3.5: clicking the edit button has the same effect as calling ' +
     'edit()', async t => {
     document.body.insertAdjacentHTML('beforeend', `
-            <image-input class="click-edit-test"></image-input>
-        `)
+        <image-input class="click-edit-test"></image-input>
+    `)
     const el = await waitFor('image-input.click-edit-test') as ImageInput
     const file = await makeImageFile(200, 100)
     selectFile(el, file)
@@ -2949,8 +2949,8 @@ test('AC4.1: when getBlob() rejects, error is emitted with ' +
     'reason crop-failed, dialog stays open, image unchanged, no ' +
     'change emitted', async t => {
     document.body.insertAdjacentHTML('beforeend', `
-            <image-input class="crop-failed-test"></image-input>
-        `)
+        <image-input class="crop-failed-test"></image-input>
+    `)
     const el = await waitFor(
         'image-input.crop-failed-test'
     ) as ImageInput
@@ -3010,8 +3010,8 @@ test('AC4.1: when getBlob() rejects, error is emitted with ' +
 test('AC4.2: failed save does not settle edit() promise, ' +
     'later cancel resolves it null', async t => {
     document.body.insertAdjacentHTML('beforeend', `
-            <image-input class="failed-then-cancel-test"></image-input>
-        `)
+        <image-input class="failed-then-cancel-test"></image-input>
+    `)
     const el = await waitFor(
         'image-input.failed-then-cancel-test'
     ) as ImageInput
