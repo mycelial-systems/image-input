@@ -25,9 +25,10 @@ it into the file input.
   stored image. `html()` always writes the intent as `data-required`
   and the actual `required` only when needed.
 * Alt text and removal work on a stored image. `edit()` crops it.
-* A crop always fails for a cross-origin URL unless the server sends
-  `Access-Control-Allow-Origin` (with `Vary: Origin`), otherwise the
-  canvas becomes tainted and `toBlob` throws `crop-failed`.
+* A crop needs `crossorigin` on the host plus `Access-Control-Allow-Origin`
+  from the server (with `Vary: Origin`, or `*`). Without both, the
+  canvas becomes tainted, `toBlob` throws (SecurityError), and the
+  component emits `error` with `crop-failed`.
 * When cropping, the new file's name comes from the stored URL's path
   (e.g. `abc.png` from `/assets/post/abc.png`), and its MIME type is
   guessed from the extension (`.png` -> `image/png`, `.jpg` ->
@@ -37,16 +38,35 @@ it into the file input.
 * A `src` switch resets the crop dialog's state until the new image
   loads.
 * The `edit()` method (instance and static) opens the crop dialog for
-  both files and stored images, and resolves with the cropped `File`
-  after save, or `null` on cancel.
+  both files and stored images. It resolves with the cropped `File`
+  after save, or `null` on cancel, under `nocrop`, with no image, or
+  when `edit` is canceled. While the dialog is open, it returns the
+  same pending promise.
 * A failed crop emits `error` with `reason: 'crop-failed'`.
 * `change.source` tells a pick (`'pick'`), drop (`'drop'`), crop
   (`'crop'`) or API call (`'api'`) apart.
-* An `alt` attribute present at parse time emits no `alt-change` until
-  after `connectedCallback` runs.
+* An `alt` attribute present at parse time never emits `alt-change`; only
+  alt text set from code after connect does.
 * `ImageInputClient` gains parity: `setSrc()` to set a stored URL,
   `edit()` to crop, error events for `not-an-image` and
-  `crop-failed`, and `required` intent read from `data-required`.
+  `crop-failed`, `required` intent read from `data-required`, and
+  syncs picked/dropped/cropped files into `input.files` via `#setFile`
+  so a surrounding form sees the file, keeping a `required` input valid
+  after a crop.
+
+### State transitions
+
+| Transition | Held file | `src` | Preview | `required` | Event |
+|--|--|--|--|--|--|
+| Set non-empty src | Dropped | Set | Src image | Adjusted by rule | None |
+| Empty/remove src | Unchanged | Cleared | Empty | Restored to intent | None |
+| Pick file | Set | Cleared | File preview | Adjusted | `change` |
+| Drop file | Set | Cleared | File preview | Adjusted | `change` |
+| `setImage(blob)` | Set | Cleared | Blob preview | Adjusted | `change` |
+| `edit()` save on file | Set | Unchanged | File preview | Adjusted | `change` |
+| `edit()` save on src | Set | Cleared | Blob preview | Adjusted | `change` |
+| Remove button click | Dropped | Unchanged if from src | Empty | Restored if was src | `remove` |
+| `clear()` | Dropped | Cleared | Empty | Restored to intent | None |
 
 ## Design Decisions
 
@@ -67,10 +87,10 @@ Consumers that care should keep extensions on their URLs.
 **Decision:** The inner `<input type="file">` holds only picked,
 dropped or cropped files -- never a stored URL.
 
-**Why:** A file input's `.files` is a `FileList`, which is read-only
-and cannot be assigned a URL; it only holds File objects. A consumer
-that submits a form should send nothing for a stored image (the server
-keeps what it has), or the consumer should crop it first via `edit()`.
+**Why:** Putting a URL in the input would mean fetching it from the
+server; the server already has the image at that URL. A consumer that
+submits a form should send nothing for a stored image (the server keeps
+what it has), or crop it first via `edit()` to produce a new File.
 
 ### 3. Shared pure helpers instead of delegation
 
@@ -121,7 +141,10 @@ or a successful Save (resolves the `File`).
 `crop-failed` must be aware that `edit()` is still pending and will
 not resolve until the user cancels or succeeds elsewhere. An earlier
 cancel of the crop dialog, from a different session, does not settle
-a later `edit()` promise.
+a later `edit()` promise. The `#cropInFlight` guard is per-host, not
+per session, so a Save click in a new session while an earlier
+session's `getBlob()` is pending is silently dropped; this prevents
+double-applying a crop.
 
 ### 7. `data-required` intent plus `inputRequired` rule
 
@@ -143,23 +166,26 @@ held file.
 **Why:** A consumer's vdom framework (Preact, React) may diff against
 the previous prop value and skip setting an unchanged `src`. A
 consumer that assigns `el.src` on every render will lose a pick
-because the attribute setter runs every time. Documenting this as
-expected behavior avoids two mechanisms for "empty" (`src=""` or
-`src="about:blank"` or unsetting, vs. leaving it alone).
+because the attribute setter runs every time. This predictable behavior
+means a consumer can rely on the attribute setter to synchronize state
+without worrying about framework diffing.
 
 ### 9. Reopening `edit()` on same URL keeps crop rect
 
 **Decision:** Canceling the crop dialog on a stored URL, then calling
-`edit()` again on that same URL, uses the previous session's crop
-rect. Setting a new `src` resets the rect.
+`edit()` again on that same URL, uses the previous session's crop rect.
+Setting a new `src` resets the rect. A `setFile` session always resets.
 
 **Why:** If a user crops, cancels, and crops again on the same image,
 keeping their previous rect selection is helpful. Switching to a
 different image requires resetting; `ImageCrop` skips an unchanged
-`src`, so the image is not reloaded, but the rect is cleared.
+`src`, so the image is not reloaded and the rect is kept. Different
+URLs or file-based sessions reset everything.
 
 ## Related
 
+* **Design plan:**
+  [2026-09-24-src-attribute](../design-plans/2026-09-24-src-attribute.md)
 * **ADRs:** [ADR-002](../adr/ADR-002-events-not-dialogs.md) -- editing
   happens through events and `edit()`, not built-in dialogs. This
   feature adds the awaitable `edit()` method for both files and stored
