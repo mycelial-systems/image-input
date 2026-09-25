@@ -9,13 +9,6 @@
  * `addEventListener` sees, and they are augmented onto
  * `HTMLElementEventMap` below.
  */
-
-/** What produced the file in an `image-input:change`. */
-export type ChangeSource = 'pick'|'drop'|'crop'|'api'
-
-/** Why an `image-input:error` fired. */
-export type ErrorReason = 'not-an-image'|'crop-failed'
-
 export interface ImageInputEventMap {
     change:CustomEvent<{ file:File, alt:string, source:ChangeSource }>
     'alt-change':CustomEvent<{ alt:string }>
@@ -24,6 +17,12 @@ export interface ImageInputEventMap {
     edit:CustomEvent<{ file:File|null, src:string|null }>
     alt:CustomEvent<{ file:File|null, src:string|null, alt:string }>
 }
+
+/** What produced the file in an `image-input:change`. */
+export type ChangeSource = 'pick'|'drop'|'crop'|'api'
+
+/** Why an `image-input:error` fired. */
+export type ErrorReason = 'not-an-image'|'crop-failed'
 
 /**
  * These events bubble, so listening on an ancestor -- a form, or

@@ -198,13 +198,15 @@ test(
         const host = parse(html({ src: '' }))
 
         const box = host.querySelector('.box') as HTMLElement
-        t.ok(!box?.classList.contains('has-image'),
+        t.ok(box, '.box should exist')
+        t.equal(box.classList.contains('has-image'), false,
             '.box should not have has-image class')
 
         const preview = host.querySelector(
             '.preview'
         ) as HTMLElement
-        t.ok(!preview?.classList.contains('has-image'),
+        t.ok(preview, '.preview should exist')
+        t.equal(preview.classList.contains('has-image'), false,
             '.preview should not have has-image class')
 
         const img = host.querySelector('img') as HTMLImageElement
@@ -217,8 +219,14 @@ test('html() with no src has no has-image or src', async t => {
     const host = parse(html())
 
     const box = host.querySelector('.box') as HTMLElement
-    t.ok(!box?.classList.contains('has-image'),
+    t.ok(box, '.box should exist')
+    t.equal(box.classList.contains('has-image'), false,
         '.box should not have has-image class')
+
+    const preview = host.querySelector('.preview') as HTMLElement
+    t.ok(preview, '.preview should exist')
+    t.equal(preview.classList.contains('has-image'), false,
+        '.preview should not have has-image class')
 
     const img = host.querySelector('img') as HTMLImageElement
     t.ok(!img.hasAttribute('src'),
