@@ -12,3 +12,4 @@ instead.
 | [FDR-003](FDR-003-editing-handoff.md) | Editing handoff | Planned, `nocrop` implemented | 2026-08-04 |
 | [FDR-004](FDR-004-crop-lifecycle-events.md) | Crop lifecycle events | Implemented | 2026-08-23 |
 | [FDR-005](FDR-005-standalone-crop-dialog.md) | Standalone crop dialog | Implemented | 2026-08-26 |
+| [FDR-006](FDR-006-stored-image-source.md) | Stored image source | Implemented | 2026-09-25 |
