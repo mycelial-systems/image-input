@@ -1724,6 +1724,36 @@ test('render() and html() produce the same markup with alt and ' +
         'when alt and label are set')
 })
 
+test('render() and html() produce the same markup with src, ' +
+    'crossorigin, and alt', async t => {
+    // The alt-label test above exercises the alt and label branches.
+    // But the src, crossorigin, has-image, and data-required branches
+    // have not yet been covered. Set src and crossorigin to exercise
+    // those paths, not just the trunk and branches from the first two
+    // tests.
+    document.body.insertAdjacentHTML('beforeend', `
+        <image-input class="parity-src-test" required
+            crossorigin="anonymous" src="/fixtures/photo.png?a=1&amp;b=&quot;"
+            alt="x"></image-input>
+    `)
+    const el = await waitFor(
+        'image-input.parity-src-test'
+    ) as ImageInput
+
+    const fromHtml = document.createElement('div')
+    fromHtml.innerHTML = html({
+        required: true,
+        crossorigin: 'anonymous',
+        src: '/fixtures/photo.png?a=1&b="',
+        alt: 'x',
+        text: ImageInput.TEXT
+    })
+
+    t.equal(el.innerHTML, fromHtml.innerHTML,
+        'the element and html() should emit identical markup ' +
+        'when src and crossorigin are set')
+})
+
 // Tests for stored source (Phase 4)
 const URL1 = '/fixtures/photo.png'
 
