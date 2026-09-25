@@ -100,10 +100,9 @@ test('setImage promotes a Blob to a File on the client', async t => {
     const { host, client } = mount('client-promote-test')
     selectFile(host, imageFile('photo.png', 'image/png'))
 
-    let seen:File|null = null
+    let seen = null as File|null
     host.addEventListener('image-input:change', ev => {
-        seen = (ev as CustomEvent<
-            ImageInputEventMap['change']['detail']>).detail.file
+        seen = ev.detail.file
     })
 
     client.setImage(imageBlob())
@@ -143,10 +142,9 @@ test('saving alt text updates the image and emits alt-change',
         const { host } = mount('client-alt-save-test')
         selectFile(host, imageFile('photo.png', 'image/png'))
 
-        let emitted:string|null = null
+        let emitted = null as string|null
         host.addEventListener('image-input:alt-change', ev => {
-            emitted = (ev as CustomEvent<
-                ImageInputEventMap['alt-change']['detail']>).detail.alt
+            emitted = ev.detail.alt
         })
 
         const badge = host.querySelector('.alt-badge') as HTMLElement
@@ -310,8 +308,7 @@ test('saving the crop replaces the image and closes the dialog',
         // which the event could fire before we are listening.
         const changed = new Promise<File>(resolve => {
             host.addEventListener('image-input:change', ev => {
-                resolve((ev as CustomEvent<
-                    ImageInputEventMap['change']['detail']>).detail.file)
+                resolve(ev.detail.file)
             }, { once: true })
         })
 
@@ -356,11 +353,9 @@ test('AC7.3: mounting with src shows the image and ALT opens dialog ' +
     t.equal(preview.classList.contains('has-image'), true,
         'the preview should have has-image')
 
-    let altDetail:
-        ImageInputEventMap['alt']['detail']|null = null
+    let altDetail = null as ImageInputEventMap['alt']['detail']|null
     host.addEventListener('image-input:alt', ev => {
-        altDetail = (ev as CustomEvent<
-            ImageInputEventMap['alt']['detail']>).detail
+        altDetail = ev.detail
     })
 
     ;(host.querySelector('.alt-badge') as HTMLElement).click()
@@ -443,11 +438,9 @@ test('AC7.5: edit() on a picked file resolves the cropped File after ' +
     const file = await makeImageFile(200, 100)
     selectFile(host, file)
 
-    let changeDetail:
-        ImageInputEventMap['change']['detail']|null = null
+    let changeDetail = null as ImageInputEventMap['change']['detail']|null
     host.addEventListener('image-input:change', ev => {
-        changeDetail = (ev as CustomEvent<
-            ImageInputEventMap['change']['detail']>).detail
+        changeDetail = ev.detail
     })
 
     const p = client.edit()
@@ -473,11 +466,9 @@ test('AC7.5: edit() on stored src emits edit with correct detail and ' +
     const { host, client } = mount('client-edit-src-test',
         { src: '/fixtures/photo.png' })
 
-    let editDetail:
-        ImageInputEventMap['edit']['detail']|null = null
+    let editDetail = null as ImageInputEventMap['edit']['detail']|null
     host.addEventListener('image-input:edit', ev => {
-        editDetail = (ev as CustomEvent<
-            ImageInputEventMap['edit']['detail']>).detail
+        editDetail = ev.detail
     })
 
     const p = client.edit()
@@ -491,10 +482,9 @@ test('AC7.5: edit() on stored src emits edit with correct detail and ' +
     const cropEl = host.querySelector('image-crop') as ImageCrop
     await waitForImageLoad(cropEl)
 
-    let changeFile:File|null = null
+    let changeFile = null as File|null
     host.addEventListener('image-input:change', ev => {
-        changeFile = (ev as CustomEvent<
-            ImageInputEventMap['change']['detail']>).detail.file
+        changeFile = ev.detail.file
     })
 
     ;(host.querySelector('.crop-save') as HTMLElement).click()
@@ -733,11 +723,10 @@ test('AC7.5: in-flight save across sessions', async t => {
 test('AC7.6: picking a non-image emits error', async t => {
     const { host } = mount('client-non-image-test')
 
-    let errorReason:
-        ImageInputEventMap['error']['detail']['reason']|null = null
+    type ErrorReason = ImageInputEventMap['error']['detail']['reason']
+    let errorReason = null as ErrorReason|null
     host.addEventListener('image-input:error', ev => {
-        errorReason = (ev as CustomEvent<
-            ImageInputEventMap['error']['detail']>).detail.reason
+        errorReason = ev.detail.reason
     })
 
     selectFile(host, new File(['x'], 'a.txt', { type: 'text/plain' }))
@@ -756,11 +745,10 @@ test('AC7.6: crop failure emits error and dialog stays open',
         const cropEl = host.querySelector('image-crop') as ImageCrop
         await waitForImageLoad(cropEl)
 
-        let errorReason:
-            ImageInputEventMap['error']['detail']['reason']|null = null
+        type ErrorReason = ImageInputEventMap['error']['detail']['reason']
+        let errorReason = null as ErrorReason|null
         host.addEventListener('image-input:error', ev => {
-            errorReason = (ev as CustomEvent<
-                ImageInputEventMap['error']['detail']>).detail.reason
+            errorReason = ev.detail.reason
         })
 
         const dialog = host.querySelector(
@@ -816,8 +804,7 @@ test('AC7.6: change from pick has source:pick, from setImage has ' +
 
     const sources:unknown[] = []
     host.addEventListener('image-input:change', ev => {
-        sources.push((ev as CustomEvent<
-            ImageInputEventMap['change']['detail']>).detail.source)
+        sources.push(ev.detail.source)
     })
 
     selectFile(host, imageFile('photo.png', 'image/png'))
