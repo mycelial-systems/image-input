@@ -114,15 +114,15 @@
   margin and markers get removed.
 - `ImageCrop.setFile()` zeroes `#naturalWidth`, `#naturalHeight` and
   `#crop`, not just `#handleImageLoad`. The `<img>` load event is
-  asynchronous, and `ImageInput.handleEdit` opens the crop dialog
+  asynchronous, and `ImageInput.edit()` opens the crop dialog
   synchronously right after calling `setFile()`, so without the reset
   there is a real window in which Save is clickable while the crop
   rect still describes the *previous* image. `ctx.drawImage` with an
   undecoded image is a silent no-op, so that window used to produce a
   blank blob at stale dimensions and destroy the user's image.
-  `getBlob()` rejects while `#naturalWidth` is 0, and
-  `handleCropSave` catches that, leaves the dialog open, and reports
-  through `debug()`. `handleCropSave` also holds a `#cropInFlight`
+  `getBlob()` rejects while `#naturalWidth` is 0, and the save handler
+  catches that, emits `image-input:error` with `reason:'crop-failed'`,
+  leaves the dialog open. The save handler also holds a `#cropInFlight`
   boolean across its `await`, so a double Save click, or an Esc press
   mid-crop, cannot apply the crop twice or apply it to a dismissed
   dialog.
@@ -145,7 +145,7 @@
   await a tick before asserting. `record` is `Record<string, File>`
   and covers files recursed out of a dropped *directory*; the raw
   `dataTransfer.files` does not, so scan `record`, not `files`.
-- `#setFile(file:File|Blob, source?:string, name?:string)` is the
+- `#setFile(file:File|Blob, source:ChangeSource, name?:string)` is the
   single place that normalizes every input path (pick, drop,
   `setImage()`, crop save) to a `File`, emits `image-input:change` with
   the `source` ('pick', 'drop', 'crop', or 'api'), and removes `src`.
