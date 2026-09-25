@@ -913,3 +913,44 @@ test('crossorigin applied to crop element on src-only edit()',
         const result = await raceWithTimeout(p)
         t.ok(result === null, 'should cancel edit')
     })
+
+test('IMPORTANT 4: input.files and checkValidity after crop save ' +
+    'with src image', async t => {
+    const { host, client } = mount('client-input-files-src-test',
+        { src: '/fixtures/photo.png', required: true })
+
+    const input = host.querySelector('input') as HTMLInputElement
+    t.ok(input, 'input should exist')
+
+    const p = client.edit()
+
+    const cropEl = host.querySelector('image-crop') as ImageCrop
+    await waitForImageLoad(cropEl)
+
+    ;(host.querySelector('.crop-save') as HTMLElement).click()
+
+    const result = await raceWithTimeout(p)
+    t.ok(result !== TIMEOUT, 'edit should resolve')
+
+    t.ok(input.files?.length === 1,
+        'input.files should contain one file after crop save')
+    t.ok(input.checkValidity() === true,
+        'input should be valid after file is set')
+})
+
+test('IMPORTANT 4: input.files and checkValidity after setImage ' +
+    'with required', async t => {
+    const { host, client } = mount('client-input-files-blob-test',
+        { required: true })
+
+    const input = host.querySelector('input') as HTMLInputElement
+    t.ok(input, 'input should exist')
+
+    const blob = await imageBlob('image/png')
+    client.setImage(blob)
+
+    t.ok(input.files?.length === 1,
+        'input.files should contain one file after setImage')
+    t.ok(input.checkValidity() === true,
+        'input should be valid after file is set')
+})
