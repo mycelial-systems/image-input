@@ -25,6 +25,7 @@ tool, and `alt` text input.
   * [Drop target](#drop-target)
   * [Attributes](#attributes)
   * [Events](#events)
+  * [Stored images](#stored-images)
   * [Built-in dialogs](#built-in-dialogs)
   * [`image-crop`](#image-crop)
   * [`cropDialog`](#cropdialog)
