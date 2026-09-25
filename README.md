@@ -247,9 +247,9 @@ is the same as setting the attribute in HTML.
   with `change`. Setting a non-empty `src` drops a held file, and `''`
   means none. See [Stored images](#stored-images) below.
 * `crossorigin` -- Forwarded to the preview `<img>` and the cropper's
-  `<img>`. Use it when your image server requires CORS headers -- e.g.
-  `crossorigin="anonymous"`. See [Stored images](#stored-images) below
-  for details.
+  `<img>`. Use it (e.g. `anonymous`) when a cross-origin stored image
+  must be croppable. See [Stored images](#stored-images) below for
+  details.
 
 ```html
 <image-input
@@ -358,8 +358,9 @@ the attribute.
 
 Picking or dropping a file drops the `src` attribute and shows the
 file instead. Setting a non-empty `src` while a file is held drops the
-file silently -- the page resets its own panels rather than waiting for
-a `change` event that never comes. An empty `src` (or `''`) means none.
+file silently -- a page tracking the file must reset its own state
+rather than waiting for a `change` event that never comes. An empty or
+removed `src` means none.
 
 When you crop a stored image, the cropped blob's file name comes from
 the URL's last path segment (e.g. `post-header` from
@@ -372,8 +373,9 @@ emits `change` with `source:'crop'` and a `File`, and removes `src`.
 Cancel resolves the `edit()` promise with `null` and leaves `src` in
 place.
 
-An `alt` on a stored image opens the alt-text dialog. Save emits
-`alt-change` and no `change`.
+Clicking ALT on a stored image opens the alt-text dialog. Save emits
+`alt-change` (only after the element connects -- see `alt-change` under
+Events) and no `change`.
 
 When a page re-renders (e.g. in Preact), assigning `el.src` on every
 render loses a picked file, since `src` changes to a stored image each
@@ -384,16 +386,15 @@ and write through a `ref`.
 **CORS:** If your image server requires CORS headers, set
 `crossorigin` on the host. The component forwards it to the preview
 `<img>` and the cropper's `<img>`, so they share one CORS cache entry.
-A CORS-mode load fails without the right headers; a cropper
-without `crossorigin` fails with `error` `crop-failed` (a tainted
-canvas). The server should send `Access-Control-Allow-Origin` with
+A CORS-mode load fails without the right headers; without `crossorigin`
+on the host, cropping a cross-origin image fails with `error`
+`crop-failed` (a tainted canvas). The server should send `Access-Control-Allow-Origin` with
 `Vary: Origin`, or `ACAO: *`.
 
 **Form submission:** A plain `<form>` submit with no JavaScript sends
-the picked file (or nothing if `nocrop` prevents a pick). A stored
-`src` does not enter the form: the server already has it at that URL.
-To replace it, the client must set the file through a crop or
-`setImage()`.
+the picked, dropped, cropped or `setImage()` file if there is one. A
+stored `src` does not enter the form: the server already has the image.
+Removing a stored image is not signaled in a no-JS submit.
 
 **Recipe:** To open the crop dialog right after the user picks a file,
 listen for `change` and call `edit()`:
@@ -591,8 +592,9 @@ the inner `<image-crop>`. Load `@substrate-system/image-input/css/crop`
 separately. The function does not inject styles.
 
 When a URL source is provided, the cropped blob's type is guessed from
-the URL's extension (`.png`, `.jpg`, `.webp`, `.gif`, `.avif`). A URL
-with no extension crops to JPEG. Query and fragment are ignored.
+the URL's extension. PNG, JPEG and WebP URLs keep their type; any
+other extension or missing extension crops to JPEG. Query and fragment
+are ignored.
 
 Errors from `getBlob()` reject the promise. The dialog is removed from
 the document after saving, canceling, or an error.
@@ -666,8 +668,8 @@ const client = new ImageInputClient(
 `ImageInputClient` emits the same events as the custom element,
 including `image-input:error` for non-image files and `crop-failed`,
 and exposes `setImage(blob)`, `setSrc(url)`, `edit()`, `clear()` and
-`destroy()`. The `edit()` method returns a promise and accepts the same
-options as the custom element's `edit()`.
+`destroy()`. The `edit()` method returns `Promise<File|null>` with the
+same semantics as the element's `edit()`.
 
 `nocrop` works on this path too. Write it on the `<image-input>` host
 -- the stylesheet rule and the client's guard both read it from
@@ -692,19 +694,15 @@ and `required` only when there is no stored `src`. The client reads
 `data-required` to apply the same rule on transitions: a stored image
 satisfies the requirement.
 
-Some differences from the custom element:
+One difference from the custom element:
 
-* `ImageInputClient` does not write the picked file back into
-  `input.files`, so a cropped image does not submit with a
-  surrounding form on this path. Use the custom element where form
-  submission matters.
 * There is no drop target on this path. Dropping a file onto the box
   falls through to the browser's default behavior (typically
   navigating to the file) instead of showing a preview -- only the
   file picker works. The custom element's drag-and-drop wiring is not
   part of `ImageInputClient`.
 
-Use the custom element where any of these matter.
+Use the custom element where this matters.
 
 ## Modules
 
