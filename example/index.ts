@@ -1,6 +1,7 @@
 import { render, type VNode } from 'preact'
 import { useEffect, useMemo, useRef } from 'preact/hooks'
 import { html } from 'htm/preact'
+import { batch } from '@preact/signals'
 import { ImageInput } from '../src/index.js'
 import { Panel } from './panel.js'
 import { Controls } from './controls.js'
@@ -125,13 +126,17 @@ function Example ({ crop, nocrop, heading, description }:ExampleProps) {
      * imperatively, never as a vdom prop (rule 1). A stored image is
      * never announced with `change`, and setting one drops any picked
      * file silently, so the page resets its own panel -- as `onClear`
-     * does -- rather than waiting to be told.
+     * does -- rather than waiting to be told. Also reset the element's
+     * alt to keep the panel consistent with the element's state.
      */
     const onToggleStored = () => {
         const el = ref.current
         if (!el) return
-        el.src = el.src ? null : storedUrl
-        State.reset(state)
+        batch(() => {
+            el.src = el.src ? null : storedUrl
+            el.alt = ''
+            State.reset(state)
+        })
     }
 
     const onSave = () => State.save(state)

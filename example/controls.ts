@@ -15,9 +15,8 @@ interface ControlsProps {
  * text through `image-input:alt-change`, and nothing on this page ever
  * asks the element for its state. Clear calls: it invokes the
  * component's `clear()` method (see `Example` in `index.ts`). Stored
- * image sets `src` on the element through the ref, which also calls
- * into the element but does not use a property (see rule 1 in
- * `example/AGENTS.md`).
+ * image sets `src` on the element through the ref imperatively, not
+ * as a vdom prop (see rule 1 in `example/AGENTS.md`).
  *
  * `signals.altText.value` is read here rather than in `Example` so the
  * subscription stays out of the subtree holding the `<image-input>`
@@ -25,7 +24,12 @@ interface ControlsProps {
  * instead of through a `computed`, since a bare boolean allocates
  * nothing per render.
  */
-export function Controls ({ signals, onSave, onClear, onToggleStored }:ControlsProps) {
+export function Controls ({
+    signals,
+    onSave,
+    onClear,
+    onToggleStored
+}:ControlsProps) {
     const canSave = !!signals.altText.value
 
     // Not `.controls` -- the component's own overlay already uses that
