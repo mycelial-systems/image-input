@@ -13,7 +13,10 @@ import {
     EXT,
     toFile,
     storedSrc,
-    inputRequired
+    inputRequired,
+    encodableType,
+    guessType,
+    cropName
 } from './file.js'
 // The type-only import is enough to pull `events.d.ts` into a
 // consumer's program, which is what activates its `declare global`
@@ -91,6 +94,19 @@ export class ImageInput extends WebComponent {
     #connectedOnce = false
 
     /**
+     * The open crop session, if any. `type` and `src` are fixed when the
+     * dialog opens, so a `src` change while it is open cannot mix one
+     * image's type with another's name.
+     */
+    #edit:{
+        promise:Promise<File|null>
+        resolve:(file:File|null) => void
+        onClose:() => void
+        src:string|null
+        type:string|undefined
+    }|null = null
+
+    /**
      * Listen for a (non-namespaced) `image-input` event, with the
      * `detail` typed from {@link ImageInputEventMap}.
      *
@@ -163,6 +179,7 @@ export class ImageInput extends WebComponent {
             ?.removeEventListener('click', this.handleCropCancel)
         this.#cleanupDrop?.()
         this.#revokePreviewUrl()
+        this.#settleEdit(null)
     }
 
     setupEventListeners () {
@@ -264,32 +281,7 @@ export class ImageInput extends WebComponent {
 
     handleEdit = (event:Event) => {
         event.preventDefault()
-        // `nocrop` means this element offers no edit trigger, so there
-        // is nothing to announce. The stylesheet already hides the
-        // button; this covers what CSS cannot -- a scripted click, or
-        // a page that never loaded our stylesheet (FDR-003).
-        if (this.nocrop) return
-        if (!this.#file) return
-        const notCanceled = this.emit('edit', {
-            detail: { file: this.#file }
-        })
-        if (!notCanceled) return
-
-        const dialog = this.qs<HTMLDialogElement>('.crop-dialog')
-        const cropEl = this.#getOrCreateCropEl()
-        // `ImageCrop` does not reflect `crop` as a property (it already
-        // has a `.crop` getter for the current rect) -- forward the
-        // attribute directly, every open, in case it changed since the
-        // last one.
-        if (cropEl) {
-            if (this.crop == null) {
-                cropEl.removeAttribute('crop')
-            } else {
-                cropEl.setAttribute('crop', this.crop)
-            }
-        }
-        cropEl?.setFile(this.#file)
-        if (dialog) openDialog(dialog)
+        this.edit()
     }
 
     handleAlt = (event:Event) => {
@@ -335,28 +327,37 @@ export class ImageInput extends WebComponent {
         if (this.#cropInFlight) return
         this.#cropInFlight = true
 
+        const pending = this.#edit
         let blob:Blob
         try {
-            blob = await cropEl.getBlob()
+            blob = await cropEl.getBlob({ type: pending?.type })
         } catch (err) {
-            // The image is not decoded yet, or the canvas refused to
-            // produce a blob. Leave the dialog open and the current
-            // image untouched.
+            // Not decoded yet, or a tainted canvas (a cross-origin image
+            // loaded without CORS). Leave the dialog open, the image
+            // untouched, and edit() pending.
             debug('crop save failed', err)
+            this.emit('error', { detail: { reason: 'crop-failed' } })
             return
         } finally {
             this.#cropInFlight = false
         }
 
-        // The dialog closing during the await means the user canceled.
-        if (dialog && !dialog.open) return
+        // The dialog closing during the await means the user canceled. A
+        // changed session means that one was canceled and a new edit()
+        // opened meanwhile -- this blob belongs to neither.
+        if (this.#edit !== pending || (dialog && !dialog.open)) return
 
-        this.#setFile(blob, 'crop')
+        const name = pending?.src ?
+            cropName(pending.src, blob.type) :
+            undefined
+        const file = this.#setFile(blob, 'crop', name)
+        this.#settleEdit(file)
         if (dialog) closeDialog(dialog)
     }
 
     handleCropCancel = (event:Event) => {
         event.preventDefault()
+        this.#settleEdit(null)
         const dialog = this.qs<HTMLDialogElement>('.crop-dialog')
         if (dialog) closeDialog(dialog)
     }
@@ -413,6 +414,81 @@ export class ImageInput extends WebComponent {
 
     clear ():void {
         ImageInput.clear(this)
+    }
+
+    /**
+     * Open the crop step. Resolves with the cropped File after Save
+     * (after `change` with `source:'crop'` has been emitted), or with
+     * null when the dialog closes without saving. Resolves null at once
+     * under `nocrop`, with no image, or when a listener cancels `edit`.
+     * While the dialog is open, returns the pending promise.
+     */
+    static edit (el:ImageInput):Promise<File|null> {
+        const dialog = el.qs<HTMLDialogElement>('.crop-dialog')
+        if (el.#edit) {
+            // Reuse the session only while its dialog is open. `close` is
+            // queued as a task, so code that closes the dialog and calls
+            // edit() in the same tick must end the old session here and
+            // open a new one.
+            if (dialog?.open) return el.#edit.promise
+            el.#settleEdit(null)
+        }
+        if (el.nocrop || !el.#hasImage()) return Promise.resolve(null)
+
+        const file = el.#file
+        const src = file ? null : el.#storedSrc()
+        const notCanceled = el.emit('edit', { detail: { file, src } })
+        if (!notCanceled) return Promise.resolve(null)
+
+        const cropEl = el.#getOrCreateCropEl()
+        if (!dialog || !cropEl) return Promise.resolve(null)
+
+        if (el.crop == null) {
+            cropEl.removeAttribute('crop')
+        } else {
+            cropEl.setAttribute('crop', el.crop)
+        }
+        if (file) {
+            cropEl.setFile(file)
+        } else if (src !== null) {
+            // crossorigin before src, so the cropper's load and the
+            // preview's load use one CORS mode
+            cropEl.crossorigin = el.crossorigin
+            cropEl.src = src
+        }
+
+        let resolve:(file:File|null) => void = () => {}
+        const promise = new Promise<File|null>(_resolve => {
+            resolve = _resolve
+        })
+        const onClose = () => {
+            // a close queued by an earlier session can land after this
+            // one reopened the dialog
+            if (dialog.open) return
+            el.#settleEdit(null)
+        }
+        el.#edit = {
+            promise,
+            resolve,
+            onClose,
+            src,
+            type: src === null ? undefined : encodableType(guessType(src))
+        }
+        dialog.addEventListener('close', onClose)
+        openDialog(dialog)
+        return promise
+    }
+
+    edit ():Promise<File|null> {
+        return ImageInput.edit(this)
+    }
+
+    #settleEdit (file:File|null):void {
+        const pending = this.#edit
+        if (!pending) return
+        this.#edit = null
+        this.qs('.crop-dialog')?.removeEventListener('close', pending.onClose)
+        pending.resolve(file)
     }
 
     /**

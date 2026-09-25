@@ -10,7 +10,7 @@ import {
     waitForCropRect,
     waitForImageLoad
 } from './helpers.js'
-import { imageBlob, imageFile } from './fixture.js'
+import { imageBlob, imageFile, imageDataUrl } from './fixture.js'
 import './crop.js'
 import './crop-math.js'
 import './html.js'
@@ -2377,6 +2377,610 @@ test('AC5.3: setImage emits change with source api', async t => {
 
     t.equal(changeDetail?.source, 'api',
         'change event should have source: api')
+})
+
+test('AC2.2 and plan test 12: edit() on a src-only image hands the ' +
+    'URL to image-crop, saving emits change with source crop and a ' +
+    'File named from the URL', async t => {
+    document.body.insertAdjacentHTML('beforeend', `
+    <image-input class="edit-src-ac2-2-test" src="/fixtures/photo.png">
+    </image-input>
+    `)
+    const el = await waitFor('image-input.edit-src-ac2-2-test') as ImageInput
+    const editBtn = el.querySelector('.edit') as HTMLButtonElement
+    const cropDialog = el.querySelector(
+        '.crop-dialog'
+    ) as HTMLDialogElement
+
+    editBtn.click()
+
+    const cropEl = el.querySelector('image-crop') as ImageCrop
+    t.equal(cropEl.getAttribute('src'), '/fixtures/photo.png',
+        'image-crop should have the stored src')
+
+    await waitForImageLoad(cropEl)
+
+    const changed = new Promise<ImageInputEventMap['change']['detail']>(
+        resolve => {
+            el.addEventListener('image-input:change', ((ev:CustomEvent) => {
+                resolve(ev.detail)
+            }) as EventListener, { once: true })
+        }
+    )
+
+    const saveBtn = cropDialog.querySelector(
+        '.crop-save'
+    ) as HTMLButtonElement
+    saveBtn.click()
+    const detail = await changed
+
+    t.equal(detail.source, 'crop',
+        'change should have source: crop')
+    t.equal(detail.file.name, 'photo.png',
+        'file name should come from the URL')
+    t.equal(detail.file.type, 'image/png',
+        'file type should be guessed from extension')
+    t.equal(el.hasAttribute('src'), false,
+        'src should be removed after saving')
+})
+
+test('plan test 12 fallback: editing a data URL generates a .jpg ' +
+    'from a guessed image/jpeg type', async t => {
+    document.body.insertAdjacentHTML('beforeend', `
+    <image-input class="edit-data-url-test"></image-input>
+    `)
+    const el = await waitFor(
+        'image-input.edit-data-url-test'
+    ) as ImageInput
+    const src = imageDataUrl()
+    el.src = src
+
+    const editBtn = el.querySelector('.edit') as HTMLButtonElement
+    const cropDialog = el.querySelector(
+        '.crop-dialog'
+    ) as HTMLDialogElement
+    editBtn.click()
+
+    const cropEl = el.querySelector('image-crop') as ImageCrop
+    await waitForImageLoad(cropEl)
+
+    const changed = new Promise<ImageInputEventMap['change']['detail']>(
+        resolve => {
+            el.addEventListener('image-input:change', ((ev:CustomEvent) => {
+                resolve(ev.detail)
+            }) as EventListener, { once: true })
+        }
+    )
+
+    const saveBtn = cropDialog.querySelector(
+        '.crop-save'
+    ) as HTMLButtonElement
+    saveBtn.click()
+    const detail = await changed
+
+    t.equal(detail.file.type, 'image/jpeg',
+        'data URL with no extension should default to image/jpeg')
+    t.equal(detail.file.name, 'image.jpg',
+        'file name should be image.jpg')
+})
+
+test('AC3.1: edit() on a file opens the dialog, emits edit with ' +
+    '{file, src: null}, resolves after change with the cropped File, ' +
+    'and change fires before the promise resolves', async t => {
+    document.body.insertAdjacentHTML('beforeend', `
+    <image-input class="edit-file-ac3-1"></image-input>
+    `)
+    const el = await waitFor('image-input.edit-file-ac3-1') as ImageInput
+    const file = makeImageFile(200, 100)
+    selectFile(el, await file)
+
+    const events:string[] = []
+
+    let editDetail:ImageInputEventMap['edit']['detail']|undefined
+    el.addEventListener('image-input:edit', ((ev:CustomEvent) => {
+        editDetail = ev.detail
+        events.push('edit')
+    }) as EventListener)
+
+    let changeDetail:ImageInputEventMap['change']['detail']|undefined
+    el.addEventListener('image-input:change', ((ev:CustomEvent) => {
+        changeDetail = ev.detail
+        events.push('change')
+    }) as EventListener)
+
+    const editPromise = el.edit()
+    const cropDialog = el.querySelector(
+        '.crop-dialog'
+    ) as HTMLDialogElement
+    t.equal(cropDialog.open, true, 'dialog should be open')
+
+    t.equal(editDetail?.file instanceof File, true,
+        'edit detail should have file')
+    t.equal(editDetail?.src, null,
+        'edit detail should have src: null for a file')
+
+    const cropEl = el.querySelector('image-crop') as ImageCrop
+    await waitForImageLoad(cropEl)
+
+    const saveBtn = cropDialog.querySelector(
+        '.crop-save'
+    ) as HTMLButtonElement
+    saveBtn.click()
+
+    const resolved = await editPromise
+
+    t.equal(resolved, changeDetail?.file,
+        'promise should resolve with the same File as change detail')
+    t.deepEqual(events, ['edit', 'change'],
+        'change should fire before the promise resolves')
+})
+
+test('AC3.1 src-only variant: edit detail has {file: null, src: url}',
+    async t => {
+        document.body.insertAdjacentHTML('beforeend', `
+        <image-input class="edit-src-detail-test" src="/fixtures/photo.png">
+        </image-input>
+    `)
+        const el = await waitFor(
+            'image-input.edit-src-detail-test'
+        ) as ImageInput
+
+        let editDetail:ImageInputEventMap['edit']['detail']|undefined
+        el.addEventListener('image-input:edit', ((ev:CustomEvent) => {
+            editDetail = ev.detail
+        }) as EventListener)
+
+        el.edit()
+
+        t.equal(editDetail?.file, null,
+            'file should be null for src-only')
+        t.equal(editDetail?.src, '/fixtures/photo.png',
+            'src should be the stored URL')
+    })
+
+test('AC3.2: edit() resolves null when cancel is clicked',
+    async t => {
+        document.body.insertAdjacentHTML('beforeend', `
+        <image-input class="edit-cancel-test"></image-input>
+    `)
+        const el = await waitFor(
+            'image-input.edit-cancel-test'
+        ) as ImageInput
+        const file = await makeImageFile(200, 100)
+        selectFile(el, file)
+
+        const editPromise = el.edit()
+        const cropDialog = el.querySelector(
+            '.crop-dialog'
+        ) as HTMLDialogElement
+        const cancelBtn = cropDialog.querySelector(
+            '.crop-cancel'
+        ) as HTMLButtonElement
+
+        cancelBtn.click()
+        const result = await editPromise
+
+        t.equal(result, null, 'promise should resolve null')
+        t.equal(cropDialog.open, false, 'dialog should be closed')
+    })
+
+test('AC3.2 Esc closes the dialog and resolves edit() to null',
+    async t => {
+        document.body.insertAdjacentHTML('beforeend', `
+        <image-input class="edit-esc-test"></image-input>
+    `)
+        const el = await waitFor('image-input.edit-esc-test') as ImageInput
+        const file = await makeImageFile(200, 100)
+        selectFile(el, file)
+
+        const editPromise = el.edit()
+        const cropDialog = el.querySelector(
+            '.crop-dialog'
+        ) as HTMLDialogElement
+        t.equal(cropDialog.open, true, 'sanity: dialog is open')
+
+        cropDialog.close()
+        const result = await editPromise
+
+        t.equal(result, null, 'promise should resolve null')
+        t.equal(cropDialog.open, false, 'dialog should be closed')
+    })
+
+test('AC3.2 stale close: close event from previous session does not ' +
+    'settle a new edit() session', async t => {
+    document.body.insertAdjacentHTML('beforeend', `
+        <image-input class="stale-close-test"></image-input>
+    `)
+    const el = await waitFor('image-input.stale-close-test') as ImageInput
+    const file = await makeImageFile(200, 100)
+    selectFile(el, file)
+
+    const p1 = el.edit()
+    const cropDialog = el.querySelector(
+        '.crop-dialog'
+    ) as HTMLDialogElement
+
+    const cropEl = el.querySelector('image-crop') as ImageCrop
+    await waitForImageLoad(cropEl)
+
+    const saveBtn = cropDialog.querySelector(
+        '.crop-save'
+    ) as HTMLButtonElement
+    saveBtn.click()
+
+    await p1
+
+    const p2 = el.edit()
+    t.equal(cropDialog.open, true,
+        'sanity: dialog reopened for second session')
+
+    await new Promise(_resolve => setTimeout(_resolve, 0))
+
+    t.equal(p2.constructor.name, 'Promise',
+        'p2 should still be pending after stale close task')
+    t.equal(cropDialog.open, true,
+        'dialog should still be open after stale close task')
+
+    const cancelBtn = cropDialog.querySelector(
+        '.crop-cancel'
+    ) as HTMLButtonElement
+    cancelBtn.click()
+    const result = await p2
+
+    t.equal(result, null, 'p2 should resolve null')
+})
+
+test('in-flight save across sessions: blob from previous Save does ' +
+    'not settle previous session, new session stays pending', async t => {
+    document.body.insertAdjacentHTML('beforeend', `
+        <image-input class="inflight-save-test"></image-input>
+    `)
+    const el = await waitFor(
+        'image-input.inflight-save-test'
+    ) as ImageInput
+    const file = await makeImageFile(200, 100)
+    selectFile(el, file)
+
+    const a = el.edit()
+    const cropDialog = el.querySelector(
+        '.crop-dialog'
+    ) as HTMLDialogElement
+    const cropEl = el.querySelector('image-crop') as ImageCrop
+    await waitForImageLoad(cropEl)
+
+    let deferredResolve:(blob:Blob) => void = () => {}
+    const deferred = new Promise<Blob>(resolve => {
+        deferredResolve = resolve
+    })
+
+    try {
+        cropEl.getBlob = (() => deferred) as any
+
+        const saveBtn = cropDialog.querySelector(
+            '.crop-save'
+        ) as HTMLButtonElement
+        saveBtn.click()
+
+        cropDialog.close()
+
+        const b = el.edit()
+        t.notEqual(a, b, 'new session should have a new promise')
+
+        const blob = await imageBlob('image/png')
+        deferredResolve(blob)
+
+        await new Promise(_resolve => setTimeout(_resolve, 0))
+        let aResolved = false
+        a.then(() => { aResolved = true })
+        await new Promise(_resolve => setTimeout(_resolve, 0))
+
+        t.equal(aResolved, true, 'session a should resolve')
+
+        let bResolved = false
+        b.then(() => { bResolved = true })
+        await new Promise(_resolve => setTimeout(_resolve, 0))
+
+        t.equal(bResolved, false,
+            'session b should still be pending after timeout')
+
+        const cancelBtn = cropDialog.querySelector(
+            '.crop-cancel'
+        ) as HTMLButtonElement
+        cancelBtn.click()
+        const result = await b
+
+        t.equal(result, null, 'session b should resolve null')
+    } finally {
+        Reflect.deleteProperty(cropEl, 'getBlob')
+    }
+})
+
+test('close then edit in one tick: close from previous session does ' +
+    'not prevent opening new session', async t => {
+    document.body.insertAdjacentHTML('beforeend', `
+        <image-input class="close-then-edit-test"></image-input>
+    `)
+    const el = await waitFor(
+        'image-input.close-then-edit-test'
+    ) as ImageInput
+    const file = await makeImageFile(200, 100)
+    selectFile(el, file)
+
+    const a = el.edit()
+    const cropDialog = el.querySelector(
+        '.crop-dialog'
+    ) as HTMLDialogElement
+
+    cropDialog.close()
+    const b = el.edit()
+
+    t.notEqual(a, b, 'should have two distinct promises')
+    t.equal(cropDialog.open, true, 'dialog should be open')
+
+    const cancelBtn = cropDialog.querySelector(
+        '.crop-cancel'
+    ) as HTMLButtonElement
+    cancelBtn.click()
+
+    const resultA = await a
+    const resultB = await b
+
+    t.equal(resultA, null, 'session a should resolve null')
+    t.equal(resultB, null, 'session b should resolve null')
+})
+
+test('AC3.3: edit() returns null immediately when nocrop is set',
+    async t => {
+        document.body.insertAdjacentHTML('beforeend', `
+        <image-input class="nocrop-test" nocrop></image-input>
+    `)
+        const el = await waitFor('image-input.nocrop-test') as ImageInput
+        const file = await makeImageFile(200, 100)
+        selectFile(el, file)
+
+        const result = await el.edit()
+
+        t.equal(result, null, 'should resolve null immediately')
+
+        const cropDialog = el.querySelector(
+            '.crop-dialog'
+        ) as HTMLDialogElement
+        t.equal(cropDialog.open, false, 'dialog should stay closed')
+    })
+
+test('AC3.3: edit() returns null immediately when there is no image',
+    async t => {
+        document.body.insertAdjacentHTML('beforeend', `
+        <image-input class="no-image-test"></image-input>
+    `)
+        const el = await waitFor('image-input.no-image-test') as ImageInput
+
+        const result = await el.edit()
+
+        t.equal(result, null, 'should resolve null immediately')
+
+        const cropDialog = el.querySelector(
+            '.crop-dialog'
+        ) as HTMLDialogElement
+        t.equal(cropDialog.open, false, 'dialog should stay closed')
+    })
+
+test('AC3.3: edit() returns null when a listener calls ' +
+    'preventDefault() on the edit event', async t => {
+    document.body.insertAdjacentHTML('beforeend', `
+        <image-input class="edit-prevented-test"></image-input>
+    `)
+    const el = await waitFor(
+        'image-input.edit-prevented-test'
+    ) as ImageInput
+    const file = await makeImageFile(200, 100)
+    selectFile(el, file)
+
+    el.addEventListener('image-input:edit', (ev:Event) => {
+        ev.preventDefault()
+    })
+
+    const result = await el.edit()
+
+    t.equal(result, null, 'should resolve null')
+
+    const cropDialog = el.querySelector(
+        '.crop-dialog'
+    ) as HTMLDialogElement
+    t.equal(cropDialog.open, false, 'dialog should stay closed')
+})
+
+test('AC3.4: calling edit() twice while dialog is open returns the ' +
+    'same promise', async t => {
+    document.body.insertAdjacentHTML('beforeend', `
+        <image-input class="reuse-promise-test"></image-input>
+    `)
+    const el = await waitFor(
+        'image-input.reuse-promise-test'
+    ) as ImageInput
+    const file = await makeImageFile(200, 100)
+    selectFile(el, file)
+
+    const p1 = el.edit()
+    const p2 = el.edit()
+
+    t.equal(p1, p2, 'should return the same promise')
+
+    let editEventCount = 0
+    el.addEventListener('image-input:edit', () => {
+        editEventCount++
+    })
+
+    el.edit()
+
+    t.equal(editEventCount, 0,
+        'additional edit() calls should not fire edit event')
+
+    const cropDialog = el.querySelector(
+        '.crop-dialog'
+    ) as HTMLDialogElement
+    const cancelBtn = cropDialog.querySelector(
+        '.crop-cancel'
+    ) as HTMLButtonElement
+    cancelBtn.click()
+
+    await p1
+})
+
+test('AC3.5: clicking the edit button has the same effect as calling ' +
+    'edit()', async t => {
+    document.body.insertAdjacentHTML('beforeend', `
+            <image-input class="click-edit-test"></image-input>
+        `)
+    const el = await waitFor('image-input.click-edit-test') as ImageInput
+    const file = await makeImageFile(200, 100)
+    selectFile(el, file)
+
+    let editDetail:ImageInputEventMap['edit']['detail']|undefined
+    el.addEventListener('image-input:edit', ((ev:CustomEvent) => {
+        editDetail = ev.detail
+    }) as EventListener)
+
+    const editBtn = el.querySelector('.edit') as HTMLButtonElement
+    editBtn.click()
+
+    const cropDialog = el.querySelector(
+        '.crop-dialog'
+    ) as HTMLDialogElement
+    t.equal(cropDialog.open, true, 'dialog should open')
+    t.equal(editDetail?.file instanceof File, true,
+        'should emit edit with file detail')
+
+    const cropEl = el.querySelector('image-crop') as ImageCrop
+    await waitForImageLoad(cropEl)
+
+    const changed = new Promise<ImageInputEventMap['change']['detail']>(
+        resolve => {
+            el.addEventListener('image-input:change', ((ev:CustomEvent) => {
+                resolve(ev.detail)
+            }) as EventListener, { once: true })
+        }
+    )
+
+    const saveBtn = cropDialog.querySelector(
+        '.crop-save'
+    ) as HTMLButtonElement
+    saveBtn.click()
+
+    const detail = await changed
+
+    t.equal(detail.source, 'crop',
+        'saving should emit change with source: crop')
+})
+
+test('AC4.1: when getBlob() rejects, error is emitted with ' +
+    'reason crop-failed, dialog stays open, image unchanged, no ' +
+    'change emitted', async t => {
+    document.body.insertAdjacentHTML('beforeend', `
+            <image-input class="crop-failed-test"></image-input>
+        `)
+    const el = await waitFor(
+        'image-input.crop-failed-test'
+    ) as ImageInput
+    const file = await makeImageFile(200, 100)
+    selectFile(el, file)
+
+    el.edit()
+
+    const cropDialog = el.querySelector(
+        '.crop-dialog'
+    ) as HTMLDialogElement
+    const cropEl = el.querySelector('image-crop') as ImageCrop
+    await waitForImageLoad(cropEl)
+
+    const imgBefore = el.querySelector('img') as HTMLImageElement
+    const srcBefore = imgBefore.getAttribute('src')
+
+    try {
+        cropEl.getBlob = (() => Promise.reject(
+            new Error('tainted')
+        )) as any
+
+        let errorReason:ImageInputEventMap['error']['detail']['reason']|
+            undefined
+        el.addEventListener('image-input:error', ((ev:CustomEvent) => {
+            errorReason = ev.detail.reason
+        }) as EventListener)
+
+        let changeCount = 0
+        el.addEventListener('image-input:change', () => {
+            changeCount++
+        })
+
+        const saveBtn = cropDialog.querySelector(
+            '.crop-save'
+        ) as HTMLButtonElement
+        saveBtn.click()
+
+        await new Promise(_resolve => setTimeout(_resolve, 0))
+
+        t.equal(errorReason, 'crop-failed',
+            'should emit error with reason crop-failed')
+        t.equal(cropDialog.open, true,
+            'dialog should stay open')
+        t.equal(el.querySelector('img')?.getAttribute('src'),
+            srcBefore,
+            'preview src should be unchanged')
+        t.equal(changeCount, 0, 'no change should be emitted')
+    } finally {
+        Reflect.deleteProperty(cropEl, 'getBlob')
+    }
+})
+
+test('AC4.2: failed save does not settle edit() promise, ' +
+    'later cancel resolves it null', async t => {
+    document.body.insertAdjacentHTML('beforeend', `
+            <image-input class="failed-then-cancel-test"></image-input>
+        `)
+    const el = await waitFor(
+        'image-input.failed-then-cancel-test'
+    ) as ImageInput
+    const file = await makeImageFile(200, 100)
+    selectFile(el, file)
+
+    const editPromise = el.edit()
+
+    const cropDialog = el.querySelector(
+        '.crop-dialog'
+    ) as HTMLDialogElement
+    const cropEl = el.querySelector('image-crop') as ImageCrop
+    await waitForImageLoad(cropEl)
+
+    try {
+        cropEl.getBlob = (() => Promise.reject(
+            new Error('tainted')
+        )) as any
+
+        const saveBtn = cropDialog.querySelector(
+            '.crop-save'
+        ) as HTMLButtonElement
+        saveBtn.click()
+
+        await new Promise(_resolve => setTimeout(_resolve, 0))
+
+        let editPending = true
+        editPromise.then(() => { editPending = false })
+        await new Promise(_resolve => setTimeout(_resolve, 0))
+
+        t.equal(editPending, true,
+            'promise should still be pending after failed save')
+
+        const cancelBtn = cropDialog.querySelector(
+            '.crop-cancel'
+        ) as HTMLButtonElement
+        cancelBtn.click()
+
+        const result = await editPromise
+
+        t.equal(result, null, 'cancel should resolve the promise null')
+    } finally {
+        Reflect.deleteProperty(cropEl, 'getBlob')
+    }
 })
 
 test('ImageCrop is reachable from the package root', t => {
