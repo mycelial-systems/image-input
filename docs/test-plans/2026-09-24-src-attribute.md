@@ -133,9 +133,15 @@ Confirms native constraint validation and FormData match the README
    rendering, `image-crop`, `cropDialog`), and
    `docs/fdr/FDR-006-stored-image-source.md` with its row in
    `docs/fdr/INDEX.md`.
-2. Run
-   `grep -n $'—\|→' README.md docs/fdr/FDR-006-stored-image-source.md docs/fdr/INDEX.md`
-   and expect no output (no em dashes or arrow characters).
+2. Run this and expect no output (no em dashes or arrow characters).
+   It uses Python because macOS `grep` has no `\|` alternation:
+
+   ```sh
+   python3 -c "import sys; [print(f, n, l) for f in sys.argv[1:]
+       for n, l in enumerate(open(f), 1)
+       if '\u2014' in l or '\u2192' in l]" \
+       README.md docs/fdr/INDEX.md docs/fdr/FDR-006-stored-image-source.md
+   ```
 3. Confirm the branch carries a `BREAKING CHANGE:` footer:
    `git log main..src-attribute --format=%B | grep 'BREAKING CHANGE:'`.
 
