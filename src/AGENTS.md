@@ -145,17 +145,37 @@
   await a tick before asserting. `record` is `Record<string, File>`
   and covers files recursed out of a dropped *directory*; the raw
   `dataTransfer.files` does not, so scan `record`, not `files`.
-- `#setFile(file:File|Blob, name?:string)` is the single place that
-  normalizes every input path (pick, drop, `setImage()`) to a `File`
-  and calls `#syncInputFiles`. It hands the promotion itself to
-  `toFile()` in `src/file.ts`, but must read `this.#file?.name` (the
-  *previous* file's name) in that same call, before reassigning
-  `this.#file` to the new one -- `toFile()` falls back to that name
-  when none is passed, so reading it after reassignment would name a
-  cropped image after itself. Because of this, `#file` is always a
-  `File`, never a bare `Blob`, so callers/tests can assume
-  `detail.file instanceof File` on every `image-input:change`/`:edit`/
-  `:alt` event, even after a `setImage(croppedBlob)` call.
+- `#setFile(file:File|Blob, source?:string, name?:string)` is the
+  single place that normalizes every input path (pick, drop,
+  `setImage()`, crop save) to a `File`, emits `image-input:change` with
+  the `source` ('pick', 'drop', 'crop', or 'api'), and removes `src`.
+  Callers must not emit `change` separately. It hands the promotion
+  itself to `toFile()` in `src/file.ts`, but must read
+  `this.#file?.name` (the *previous* file's name) in that same call,
+  before reassigning `this.#file` to the new one -- `toFile()` falls
+  back to that name when none is passed, so reading it after
+  reassignment would name a cropped image after itself. Because of
+  this, `#file` is always a `File`, never a bare `Blob`, so
+  callers/tests can assume `detail.file instanceof File` on every
+  `image-input:change`/`:edit`/`:alt` event, even after a
+  `setImage(croppedBlob)` call.
+- `#syncView()` is the single re-sync point for the preview `<img>`,
+  the `.has-image` classes on `.box` and `.preview`, the `data-required`
+  and `required` attributes on the file input, and the `required`
+  property of the input. Every state transition (set `src`, remove `src`,
+  pick, drop, crop save, remove, `clear()`) ends by calling `#syncView()`
+  to apply all these changes consistently. Do not scatter the sync logic
+  across callers.
+- `handleCropSave` now emits `image-input:error` with
+  `reason: 'crop-failed'` when `getBlob()` rejects (e.g. on a tainted
+  canvas from a cross-origin image without CORS), where it used to only
+  log with `debug()`. The dialog stays open so the user can retry or
+  cancel.
+- `ImageCrop.handleChange_src` resets `#file`, the object URL, the
+  `#naturalWidth`/`#naturalHeight`, and the crop rect for any `src`
+  other than the object URL `setFile` just created. This ensures that
+  when a cropper is reused across a file-to-URL transition, stale state
+  from the previous file does not leak into the next crop.
 - `src/html.ts` is the only place this package's markup is written.
   `ImageInput.render()` calls `html()` rather than keeping its own
   template. The two used to be separate copies and drifted: `html()`
@@ -205,10 +225,10 @@
   Keep the pair in that direction: an instance method holding the body
   with a static that calls back into it would not survive being passed
   around without a `this` binding, which is the point of the static
-  form (`els.forEach(ImageInput.clear)`). This applies to `setImage`
-  and `clear`; it does not apply to `on`/`off` (overrides of the base
-  class's, keyed to `ImageInputEventMap`) or to the lifecycle and
-  `handleChange_*` callbacks the base class calls on an instance.
+  form (`els.forEach(ImageInput.clear)`). This applies to `setImage`,
+  `clear`, and `edit`; it does not apply to `on`/`off` (overrides of
+  the base class's, keyed to `ImageInputEventMap`) or to the lifecycle
+  and `handleChange_*` callbacks the base class calls on an instance.
   `ImageInputClient` deliberately does not follow this -- it is
   constructed per host and always has an instance to hand.
 - `clear()` does not emit `image-input:remove`, and must not start:
@@ -232,6 +252,14 @@
   server-rendered and custom-element paths from disagreeing. The
   client reads it off `this.host` live rather than caching it, for
   the same reason. See FDR-003 decisions 5 and 6.
+- `ImageInputClient` keeps `#storedSrc` (seeded from the rendered
+  `<img>` at construction), exposes `setSrc()` to set a stored URL,
+  `edit()` to crop either a file or the stored image, emits `error`
+  for both `not-an-image` and `crop-failed`, syncs `input.files` on
+  file changes via `#setFile`, reads the `required` intent from
+  `data-required` on the input, and applies the same `inputRequired()`
+  rule as the element. It is not a custom element and has no reflected
+  attributes.
 - `src/file.ts` holds the Blob-to-File promotion both `ImageInput` and
   `ImageInputClient` use. Both must guarantee the file they hold is a
   `File`: `ImageCrop.setFile()` requires one, and consumers read
@@ -249,3 +277,7 @@
   whole `<image-input>` markup into every crop-only bundle. Keep
   `crop.ts` free of imports from `html.ts`, `dialogs.ts`, `index.ts`
   and `client.ts` for the same reason.
+- Tests run through `tapout --html test/index.html`, which runs the
+  bundle built by `npm run build-tests` in a test runner. Static
+  fixtures live under `test/fixtures/` and are served at `/fixtures/...`
+  by the test runner's HTTP server.
