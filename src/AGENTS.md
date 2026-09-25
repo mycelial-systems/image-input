@@ -239,20 +239,21 @@
   off `:remove` would otherwise see an event it caused itself.
 - `nocrop` suppression lives in two files that have to stay in
   agreement: the `&[nocrop] .edit { display: none }` rule in
-  `src/index.css` hides the button, and the early return at the top of
-  `handleEdit` (`index.ts`) / `#handleEdit` (`client.ts`) makes it
-  inert. Neither is redundant. CSS cannot stop a scripted `.click()`
-  or help a consumer who ships their own stylesheet; the guard cannot
-  remove the button from the page, the tab order or the accessibility
-  tree. The guard is the contract -- `image-input:edit` must not fire
-  while the attribute is set -- and it is the only half a test can
-  assert without loading real CSS (`test/style.ts` does load it, so
-  `test/index.ts` asserts both). `html()` deliberately has no `nocrop`
-  option: identical markup either way is what lets the attribute be
-  toggled at runtime with no re-render, and what keeps the
-  server-rendered and custom-element paths from disagreeing. The
-  client reads it off `this.host` live rather than caching it, for
-  the same reason. See FDR-003 decisions 5 and 6.
+  `src/index.css` hides the button, and the guard in `edit()` (`index.ts`:
+  `ImageInput.edit(el)` / `client.ts`: `ImageInputClient.edit()`) makes it
+  inert. The click handlers delegate to `edit()`. Neither guard is
+  redundant. CSS cannot stop a scripted `.click()` or help a consumer
+  who ships their own stylesheet; the guard cannot remove the button
+  from the page, the tab order or the accessibility tree. The guard is
+  the contract -- `image-input:edit` must not fire while the attribute
+  is set -- and it is the only half a test can assert without loading
+  real CSS (`test/style.ts` does load it, so `test/index.ts` asserts
+  both). `html()` deliberately has no `nocrop` option: identical markup
+  either way is what lets the attribute be toggled at runtime with no
+  re-render, and what keeps the server-rendered and custom-element
+  paths from disagreeing. The client reads it off `this.host` live
+  rather than caching it, for the same reason. See FDR-003 decisions 5
+  and 6.
 - `ImageInputClient` keeps `#storedSrc` (seeded from the rendered
   `<img>` at construction), exposes `setSrc()` to set a stored URL,
   `edit()` to crop either a file or the stored image, emits `error`

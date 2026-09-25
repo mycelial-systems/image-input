@@ -272,11 +272,12 @@ They bubble, so you can listen on the element or an ancestor.
   `'crop'`, or `'api'`.
 * `image-input:remove` -- The remove button was clicked. The preview
   and file have already been cleared. No `detail`.
-* `image-input:edit` -- The edit button was clicked. `detail` is
-  `{ file:File|null, src:string|null }`, where `file` is null for a
-  stored image and `src` is null for a picked file. Cancelable: by
-  default, the built-in crop dialog (see [Built-in dialogs](#built-in-dialogs)
-  below) opens right after this event fires. Call `preventDefault()` on
+* `image-input:edit` -- The edit button was clicked or `edit()` was
+  called. `detail` is `{ file:File|null, src:string|null }`, where
+  `file` is null for a stored image and `src` is null for a picked
+  file. Cancelable: by default, the built-in crop dialog (see
+  [Built-in dialogs](#built-in-dialogs) below) opens right after this
+  event fires. Call `preventDefault()` on
   it to suppress that dialog and open your own crop UI instead, then
   call `setImage(blob)` with the result. Never fires while the `nocrop`
   attribute is set.
@@ -324,10 +325,11 @@ document.body.addEventListener('image-input:error', ev => {
 ```
 
 The map itself is exported as `ImageInputEventMap` if you want to name
-a handler's parameter type:
+a handler's parameter type. The `ChangeSource` and `ErrorReason` types
+are also exported for use in your own code:
 
 ```ts
-import type { ImageInputEventMap } from '@substrate-system/image-input'
+import type { ImageInputEventMap, ChangeSource } from '@substrate-system/image-input'
 
 function handleChange (ev:ImageInputEventMap['change']) {
     console.log(ev.detail.file.name)
@@ -422,8 +424,9 @@ wiring of your own is required.
   and a `.crop-save` button. The `<image-crop>` element is created
   the first time the crop dialog is opened, and reused after that --
   it is not present in the initial markup. Saving calls
-  `cropEl.getBlob()` and passes the result to `input.setImage(blob)`,
-  which emits `image-input:change`.
+  `cropEl.getBlob()` and emits `image-input:change` with
+  `source:'crop'`. For a stored image, the cropped file is named from
+  the URL and `src` is removed.
 
 No new event types exist for this. Both dialogs sit on top of the
 events already documented above: `image-input:edit` and
