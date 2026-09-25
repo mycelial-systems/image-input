@@ -29,8 +29,9 @@
   the dimmed area outside the rect free to pan the page. Keep the
   handles as descendants of `.crop-rect` or that coverage silently
   disappears. `test/crop.ts` asserts both halves; note this is only
-  testable because `test/index.html` loads the real bundled stylesheet
-  (built by `npm run build-tests`).
+  testable because `test/style.ts` injects the real bundled stylesheet
+  (built by `npm run build-tests`) as a `<style>` element;
+  `test/index.html` itself loads no CSS.
 - `setPointerCapture` calls should be wrapped in `try/catch`: synthetic
   `PointerEvent`s dispatched in tests don't correspond to a real active
   pointer session, and some environments throw when capture is
