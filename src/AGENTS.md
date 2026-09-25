@@ -122,7 +122,7 @@
   blank blob at stale dimensions and destroy the user's image.
   `getBlob()` rejects while `#naturalWidth` is 0, and the save handler
   catches that, emits `image-input:error` with `reason:'crop-failed'`,
-  leaves the dialog open. The save handler also holds a `#cropInFlight`
+  and leaves the dialog open. The save handler also holds a `#cropInFlight`
   boolean across its `await`, so a double Save click, or an Esc press
   mid-crop, cannot apply the crop twice or apply it to a dismissed
   dialog.

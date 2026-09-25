@@ -388,8 +388,8 @@ and write through a `ref`.
 `<img>` and the cropper's `<img>`, so they share one CORS cache entry.
 A CORS-mode load fails without the right headers; without `crossorigin`
 on the host, cropping a cross-origin image fails with `error`
-`crop-failed` (a tainted canvas). The server should send `Access-Control-Allow-Origin` with
-`Vary: Origin`, or `ACAO: *`.
+`crop-failed` (a tainted canvas). The server should send
+`Access-Control-Allow-Origin` with `Vary: Origin`, or `ACAO: *`.
 
 **Form submission:** A plain `<form>` submit with no JavaScript sends
 the picked, dropped, cropped or `setImage()` file if there is one. A

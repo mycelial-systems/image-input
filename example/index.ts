@@ -134,7 +134,7 @@ function Example ({ crop, nocrop, heading, description }:ExampleProps) {
         if (!el) return
         batch(() => {
             el.src = el.src ? null : storedUrl
-            el.alt = ''
+            el.alt = null
             State.reset(state)
         })
     }

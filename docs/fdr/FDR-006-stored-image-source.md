@@ -46,27 +46,27 @@ it into the file input.
 * `change.source` tells a pick (`'pick'`), drop (`'drop'`), crop
   (`'crop'`) or API call (`'api'`) apart.
 * An `alt` attribute present at parse time never emits `alt-change`; only
-  alt text set from code after connect does.
+  a change after connect does.
 * `ImageInputClient` gains parity: `setSrc()` to set a stored URL,
   `edit()` to crop, error events for `not-an-image` and
   `crop-failed`, `required` intent read from `data-required`, and
-  syncs picked/dropped/cropped files into `input.files` via `#setFile`
-  so a surrounding form sees the file, keeping a `required` input valid
-  after a crop.
+  syncs picked, cropped or `setImage()` files into `input.files` via
+  `#setFile` so a surrounding form sees the file, keeping a `required`
+  input valid after a crop.
 
 ### State transitions
 
 | Transition | Held file | `src` | Preview | `required` | Event |
 |--|--|--|--|--|--|
 | Set non-empty src | Dropped | Set | Src image | Adjusted by rule | None |
-| Empty/remove src | Unchanged | Cleared | Empty | Restored to intent | None |
+| Empty/remove src | Unchanged | Cleared | File preview if held, else empty | Restored to intent | None |
 | Pick file | Set | Cleared | File preview | Adjusted | `change` |
 | Drop file | Set | Cleared | File preview | Adjusted | `change` |
 | `setImage(blob)` | Set | Cleared | Blob preview | Adjusted | `change` |
 | `edit()` save on file | Set | Unchanged | File preview | Adjusted | `change` |
 | `edit()` save on src | Set | Cleared | Blob preview | Adjusted | `change` |
-| Remove button click | Dropped | Unchanged if from src | Empty | Restored if was src | `remove` |
-| `clear()` | Dropped | Cleared | Empty | Restored to intent | None |
+| Remove button click | Dropped | Cleared | Empty | Restored to intent | `alt-change` (if set), `remove` |
+| `clear()` | Dropped | Cleared | Empty | Restored to intent | `alt-change` (if set) |
 
 ## Design Decisions
 
@@ -163,12 +163,14 @@ two allows a server-rendered `ImageInputClient` to read intent from
 **Decision:** Setting `src` to the URL already shown still drops any
 held file.
 
-**Why:** A consumer's vdom framework (Preact, React) may diff against
-the previous prop value and skip setting an unchanged `src`. A
-consumer that assigns `el.src` on every render will lose a pick
-because the attribute setter runs every time. This predictable behavior
-means a consumer can rely on the attribute setter to synchronize state
-without worrying about framework diffing.
+**Why:** The component does not compare a new `src` value against the
+previous one. Any non-empty `src` write replaces a held file, because
+`attributeChangedCallback` fires on every attribute write and the
+element cannot tell a deliberate re-set from a redundant one. Frameworks
+like Preact that diff against the previous vdom and skip setting
+unchanged props hide this: a consumer that assigns `el.src` on every
+render hits it. Consumers must not assign to `el.src` on every render;
+write it through a ref only when the value actually changes.
 
 ### 9. Reopening `edit()` on same URL keeps crop rect
 

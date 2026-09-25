@@ -111,16 +111,17 @@ rather than left to be rediscovered.
    `Panel`'s `computed`s are built in a `useMemo` keyed on the signals
    object, so a re-render does not allocate a fresh set each pass.
 
-6. **`Controls` shows both halves of the API, and is its own
-   component for that reason.** Save is enabled only when
-   `signals.altText` is non-empty -- the page never asks the element
-   for its state, it only listens, so the button enables itself off
-   `image-input:alt-change` and disables itself again off the
-   `alt-change` that `clear()` and the remove button emit. Clear calls
-   `ref.current.clear()`, a method on the element. Stored image sets
-   `src` through the ref imperatively, never as a vdom prop (rule 1).
-   Keep the three buttons demonstrating different API approaches; each
-   shows a different way to interact with the component.
+6. **`Controls` shows three buttons demonstrating different API
+   approaches, and is its own component for that reason.** Save is
+   enabled only when `signals.altText` is non-empty -- the page never
+   asks the element for its state, it only listens, so the button
+   enables itself off `image-input:alt-change` and disables itself again
+   off the `alt-change` that `clear()` and the remove button emit. Clear
+   calls `ref.current.clear()`, a method on the element. Stored image
+   sets `src` through the ref imperatively, never as a vdom prop
+   (rule 1), and also resets the element's `alt`. Keep the three buttons
+   demonstrating their different approaches -- do not collapse them into
+   one style.
 
    `disabled` is an attribute, not text, so binding it means *reading*
    `altText.value` during render, which subscribes the reading

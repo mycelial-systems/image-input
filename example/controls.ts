@@ -9,14 +9,15 @@ interface ControlsProps {
 }
 
 /**
- * The two ways a page talks to an `<image-input>`, side by side.
+ * Three buttons demonstrating different API approaches.
  *
  * Save listens: it is enabled only once the component has reported alt
  * text through `image-input:alt-change`, and nothing on this page ever
  * asks the element for its state. Clear calls: it invokes the
  * component's `clear()` method (see `Example` in `index.ts`). Stored
  * image sets `src` on the element through the ref imperatively, not
- * as a vdom prop (see rule 1 in `example/AGENTS.md`).
+ * as a vdom prop (see rule 1 in `example/AGENTS.md`), and also resets
+ * the element's `alt` to `null`.
  *
  * `signals.altText.value` is read here rather than in `Example` so the
  * subscription stays out of the subtree holding the `<image-input>`
