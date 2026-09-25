@@ -9,7 +9,12 @@ import {
 } from './dialogs.js'
 import { html, DEFAULT_LABEL as LABEL } from './html.js'
 import { ImageCrop } from './crop.js'
-import { EXT, toFile } from './file.js'
+import {
+    EXT,
+    toFile,
+    storedSrc,
+    inputRequired
+} from './file.js'
 // The type-only import is enough to pull `events.d.ts` into a
 // consumer's program, which is what activates its `declare global`
 // augmentation of `HTMLElementEventMap`. No runtime import needed --
@@ -50,7 +55,7 @@ export class ImageInput extends WebComponent {
     static TAG = 'image-input'
     TAG = ImageInput.TAG
     static reflectedStringAttributes = [
-        'accept', 'name', 'alt', 'label', 'crop'
+        'accept', 'name', 'alt', 'label', 'crop', 'src', 'crossorigin'
     ]
 
     static reflectedBooleanAttributes = ['required', 'nocrop']
@@ -59,6 +64,8 @@ export class ImageInput extends WebComponent {
     declare alt:string|null
     declare label:string|null
     declare crop:string|null
+    declare src:string|null
+    declare crossorigin:string|null
     declare required:boolean
     declare nocrop:boolean
 
@@ -81,6 +88,7 @@ export class ImageInput extends WebComponent {
     #previewUrl:string|null = null
     #cleanupDrop:(() => void)|null = null
     #cropInFlight = false
+    #connectedOnce = false
 
     /**
      * Listen for a (non-namespaced) `image-input` event, with the
@@ -136,6 +144,7 @@ export class ImageInput extends WebComponent {
         debug('connected')
         super.connectedCallback()
         this.setupEventListeners()
+        this.#connectedOnce = true
     }
 
     disconnectedCallback () {
@@ -187,8 +196,8 @@ export class ImageInput extends WebComponent {
         }
     }
 
-    handleChange_required (_old:string|null, newValue:string|null) {
-        this.qs('input')?.toggleAttribute('required', newValue !== null)
+    handleChange_required () {
+        this.#syncView()
     }
 
     handleChange_label (_old:string|null, newValue:string|null) {
@@ -198,6 +207,20 @@ export class ImageInput extends WebComponent {
         if (promptText) promptText.textContent = text
 
         this.qs('input')?.setAttribute('aria-label', text)
+    }
+
+    /**
+     * A non-empty `src` replaces any held file, silently: a stored
+     * image is never announced with `change`. An empty or removed `src`
+     * leaves a held file alone.
+     */
+    handleChange_src (_old:string|null, newValue:string|null) {
+        if (storedSrc(newValue) !== null) this.#dropFile()
+        this.#syncView()
+    }
+
+    handleChange_crossorigin () {
+        this.#syncView()
     }
 
     handleChange_alt (_old:string|null, newValue:string|null) {
@@ -212,7 +235,11 @@ export class ImageInput extends WebComponent {
                 (hasAlt ? 'Edit alt text' : 'Add alt text'))
         }
 
-        this.emit('alt-change', { detail: { alt: newValue ?? '' } })
+        // An alt present at parse time (or set before the element is
+        // connected) is initial state, not a change.
+        if (this.#connectedOnce) {
+            this.emit('alt-change', { detail: { alt: newValue ?? '' } })
+        }
     }
 
     handleFileSelect = (event:Event) => {
@@ -223,8 +250,7 @@ export class ImageInput extends WebComponent {
 
         if (file.type.startsWith('image/')) {
             debug('Image file selected:', file.name)
-            this.#setFile(file)
-            this.emit('change', { detail: { file, alt: this.alt ?? '' } })
+            this.#setFile(file, 'pick')
         } else {
             this.emit('error', { detail: { reason: 'not-an-image' } })
         }
@@ -268,9 +294,13 @@ export class ImageInput extends WebComponent {
 
     handleAlt = (event:Event) => {
         event.preventDefault()
-        if (!this.#file) return
+        if (!this.#hasImage()) return
         const notCanceled = this.emit('alt', {
-            detail: { file: this.#file, alt: this.alt ?? '' }
+            detail: {
+                file: this.#file,
+                src: this.#file ? null : this.#storedSrc(),
+                alt: this.alt ?? ''
+            }
         })
         if (!notCanceled) return
 
@@ -321,7 +351,7 @@ export class ImageInput extends WebComponent {
         // The dialog closing during the await means the user canceled.
         if (dialog && !dialog.open) return
 
-        this.setImage(blob)
+        this.#setFile(blob, 'crop')
         if (dialog) closeDialog(dialog)
     }
 
@@ -340,8 +370,7 @@ export class ImageInput extends WebComponent {
         }
 
         debug('Image file dropped:', file.name)
-        this.#setFile(file)
-        this.emit('change', { detail: { file, alt: this.alt ?? '' } })
+        this.#setFile(file, 'drop')
     }
 
     /**
@@ -352,8 +381,7 @@ export class ImageInput extends WebComponent {
      * See the note above {@link ImageInput.clear}.
      */
     static setImage (el:ImageInput, blob:Blob, name?:string):void {
-        const file = el.#setFile(blob, name)
-        el.emit('change', { detail: { file, alt: el.alt ?? '' } })
+        el.#setFile(blob, 'api', name)
     }
 
     setImage (blob:Blob, name?:string):void {
@@ -361,10 +389,11 @@ export class ImageInput extends WebComponent {
     }
 
     /**
-     * Clear the selected file and reset the preview back to its empty
-     * state. Does not emit `image-input:remove` -- that event means the
-     * user clicked the remove button. Setting `alt` to `null` here does
-     * emit `image-input:alt-change` with an empty string.
+     * Clear the selected file and remove the stored source, resetting
+     * the preview back to its empty state. Does not emit
+     * `image-input:remove` -- that event means the user clicked the
+     * remove button. Setting `alt` to `null` here does emit
+     * `image-input:alt-change` with an empty string.
      *
      * Every method meant to be called from outside the component is
      * written as a static taking the instance first, with a one-line
@@ -376,16 +405,9 @@ export class ImageInput extends WebComponent {
      * inside the class body.
      */
     static clear (el:ImageInput):void {
-        el.#revokePreviewUrl()
-        el.#file = null
-
-        const input = el.qs('input')
-        if (input) input.value = ''
-
-        el.qs('img')?.removeAttribute('src')
-        el.qs('.preview')?.classList.remove('has-image')
-        el.qs('.box')?.classList.remove('has-image')
-
+        el.#dropFile()
+        el.removeAttribute('src')
+        el.#syncView()
         el.alt = null
     }
 
@@ -411,19 +433,25 @@ export class ImageInput extends WebComponent {
         return cropEl
     }
 
-    #setFile (file:File|Blob, name?:string):File {
+    #setFile (
+        file:File|Blob,
+        source:ChangeSource,
+        name?:string
+    ):File {
         const asFile = toFile(file, name, this.#file?.name)
 
         this.#syncInputFiles(asFile)
         this.#revokePreviewUrl()
         this.#file = asFile
         this.#previewUrl = URL.createObjectURL(asFile)
+        // The file replaces a stored image. #file is already set, so
+        // handleChange_src keeps it.
+        this.removeAttribute('src')
+        this.#syncView()
 
-        const img = this.qs('img')
-        if (img) img.src = this.#previewUrl
-        this.qs('.preview')?.classList.add('has-image')
-        this.qs('.box')?.classList.add('has-image')
-
+        this.emit('change', {
+            detail: { file: asFile, alt: this.alt ?? '', source }
+        })
         return asFile
     }
 
@@ -448,6 +476,61 @@ export class ImageInput extends WebComponent {
         }
     }
 
+    /** The stored URL being shown, or null. '' counts as none. */
+    #storedSrc ():string|null {
+        return storedSrc(this.src)
+    }
+
+    #hasImage ():boolean {
+        return !!this.#file || this.#storedSrc() !== null
+    }
+
+    /** Forget the held file without touching `src`. */
+    #dropFile ():void {
+        this.#revokePreviewUrl()
+        this.#file = null
+        const input = this.qs<HTMLInputElement>('input')
+        if (input) input.value = ''
+    }
+
+    /**
+     * Re-derive everything visible from state: the preview img
+     * (crossorigin first, so both loads share one CORS mode), the
+     * has-image classes, and the input's `required`. Every transition
+     * ends here. A no-op before the first render.
+     */
+    #syncView ():void {
+        const src = this.#previewUrl ?? this.#storedSrc()
+        const img = this.qs<HTMLImageElement>('.preview img')
+        if (img) {
+            if (this.crossorigin == null) {
+                img.removeAttribute('crossorigin')
+            } else {
+                img.setAttribute('crossorigin', this.crossorigin)
+            }
+            if (src === null) {
+                img.removeAttribute('src')
+            } else if (img.getAttribute('src') !== src) {
+                img.setAttribute('src', src)
+            }
+        }
+
+        const hasImage = src !== null
+        this.qs('.preview')?.classList.toggle('has-image', hasImage)
+        this.qs('.box')?.classList.toggle('has-image', hasImage)
+
+        const input = this.qs<HTMLInputElement>('input')
+        if (input) {
+            // keep the markup agreeing with html(): intent in
+            // data-required, the effective rule in required
+            input.toggleAttribute('data-required', this.required)
+            input.required = inputRequired(
+                this.required,
+                this.#storedSrc() !== null
+            )
+        }
+    }
+
     render () {
         this.innerHTML = html({
             accept: this.accept,
@@ -455,7 +538,9 @@ export class ImageInput extends WebComponent {
             required: this.required,
             alt: this.alt,
             label: this.label ?? ImageInput.DEFAULT_LABEL,
-            text: ImageInput.TEXT
+            text: ImageInput.TEXT,
+            src: this.#storedSrc(),
+            crossorigin: this.crossorigin
         })
     }
 }
