@@ -329,7 +329,10 @@ a handler's parameter type. The `ChangeSource` and `ErrorReason` types
 are also exported for use in your own code:
 
 ```ts
-import type { ImageInputEventMap, ChangeSource } from '@substrate-system/image-input'
+import type {
+    ImageInputEventMap,
+    ChangeSource
+} from '@substrate-system/image-input'
 
 function handleChange (ev:ImageInputEventMap['change']) {
     console.log(ev.detail.file.name)
