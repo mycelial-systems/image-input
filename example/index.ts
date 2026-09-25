@@ -5,6 +5,7 @@ import { ImageInput } from '../src/index.js'
 import { Panel } from './panel.js'
 import { Controls } from './controls.js'
 import { State, listeners } from './state.js'
+import storedUrl from './stored.jpg'
 import '../src/index.css'
 import './index.css'
 import Debug from '@substrate-system/debug'
@@ -119,6 +120,20 @@ function Example ({ crop, nocrop, heading, description }:ExampleProps) {
         State.reset(state)
     }
 
+    /**
+     * Show or hide a stored image by setting `src` on the element --
+     * imperatively, never as a vdom prop (rule 1). A stored image is
+     * never announced with `change`, and setting one drops any picked
+     * file silently, so the page resets its own panel -- as `onClear`
+     * does -- rather than waiting to be told.
+     */
+    const onToggleStored = () => {
+        const el = ref.current
+        if (!el) return
+        el.src = el.src ? null : storedUrl
+        State.reset(state)
+    }
+
     const onSave = () => State.save(state)
 
     return html`
@@ -136,6 +151,7 @@ function Example ({ crop, nocrop, heading, description }:ExampleProps) {
                 signals=${state}
                 onSave=${onSave}
                 onClear=${onClear}
+                onToggleStored=${onToggleStored}
             />
         </section>
     `

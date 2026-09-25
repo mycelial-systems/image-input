@@ -117,9 +117,10 @@ rather than left to be rediscovered.
    for its state, it only listens, so the button enables itself off
    `image-input:alt-change` and disables itself again off the
    `alt-change` that `clear()` and the remove button emit. Clear calls
-   `ref.current.clear()`, a method on the element. Keep the two
-   demonstrating different halves; collapsing them into one style
-   defeats the point of having both.
+   `ref.current.clear()`, a method on the element. Stored image sets
+   `src` through the ref imperatively, never as a vdom prop (rule 1).
+   Keep the three demonstrating different halves of the API; collapsing
+   them into one style defeats the point of having both.
 
    `disabled` is an attribute, not text, so binding it means *reading*
    `altText.value` during render, which subscribes the reading
