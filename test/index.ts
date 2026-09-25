@@ -1951,8 +1951,20 @@ test('AC1.5 with file held: Removing src leaves file in place',
         selectFile(el, file)
         await new Promise(_resolve => setTimeout(_resolve, 0))
 
+        const events:string[] = []
+        el.addEventListener('image-input:change', () => {
+            events.push('change')
+        })
+        el.addEventListener('image-input:alt-change', () => {
+            events.push('alt-change')
+        })
+        el.addEventListener('image-input:remove', () => {
+            events.push('remove')
+        })
+
         el.src = ''
         await new Promise(_resolve => setTimeout(_resolve, 0))
+        t.equal(events.length, 0, 'no events should fire')
 
         const previewImg = el.querySelector('.preview img')
         t.equal(el.querySelector('.box')?.classList.contains('has-image'),
@@ -1964,6 +1976,7 @@ test('AC1.5 with file held: Removing src leaves file in place',
 
         el.removeAttribute('src')
         await new Promise(_resolve => setTimeout(_resolve, 0))
+        t.equal(events.length, 0, 'no events should fire')
 
         t.equal(el.querySelector('.box')?.classList.contains('has-image'),
             true, '.box should still have has-image')
@@ -2279,12 +2292,14 @@ test('ALT event detail with held file has src === null',
         document.body.insertAdjacentHTML('beforeend', `
             <image-input class="alt-event-held-file"></image-input>
         `)
-        const el = await waitFor('image-input.alt-event-held-file') as ImageInput
+        const el = await waitFor(
+            'image-input.alt-event-held-file'
+        ) as ImageInput
         const file = imageFile('photo.png', 'image/png')
         selectFile(el, file)
 
         let detail:ImageInputEventMap['alt']['detail']|undefined
-        document.body.addEventListener('image-input:alt', (ev:Event) => {
+        el.addEventListener('image-input:alt', (ev:Event) => {
             detail = (ev as CustomEvent).detail
         })
 
