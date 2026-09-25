@@ -2,12 +2,31 @@ import { test } from '@substrate-system/tapzero'
 import { html, type ImageInputHtmlOptions } from '../src/html.js'
 import { ImageInputClient } from '../src/client.js'
 import type { ImageCrop } from '../src/crop.js'
+import type {
+    ImageInputEventMap
+} from '../src/events.js'
 import {
     makeImageFile,
     waitForCropRect,
     waitForImageLoad
 } from './helpers.js'
 import { imageBlob, imageFile } from './fixture.js'
+
+// Sentinel for race conditions with timeouts
+const TIMEOUT = Symbol('timeout')
+
+// Helper to race a promise against a timeout
+async function raceWithTimeout<T> (
+    promise:Promise<T>,
+    ms:number = 200
+):Promise<T|typeof TIMEOUT> {
+    return Promise.race([
+        promise,
+        new Promise<typeof TIMEOUT>(_resolve => {
+            setTimeout(() => _resolve(TIMEOUT), ms)
+        })
+    ])
+}
 
 /**
  * Mount markup from `html()` and attach a client to it.
@@ -81,16 +100,17 @@ test('setImage promotes a Blob to a File on the client', async t => {
     const { host, client } = mount('client-promote-test')
     selectFile(host, imageFile('photo.png', 'image/png'))
 
-    let seen:unknown = null
+    let seen:File|null = null
     host.addEventListener('image-input:change', ev => {
-        seen = (ev as CustomEvent).detail.file
+        seen = (ev as CustomEvent<
+            ImageInputEventMap['change']['detail']>).detail.file
     })
 
     client.setImage(imageBlob())
 
     t.ok(seen instanceof File,
         'the change detail should carry a File, not a bare Blob')
-    t.equal((seen as File).name, 'photo.jpg',
+    t.equal(seen?.name, 'photo.jpg',
         'should keep the base name and swap the extension')
 })
 
@@ -125,7 +145,8 @@ test('saving alt text updates the image and emits alt-change',
 
         let emitted:string|null = null
         host.addEventListener('image-input:alt-change', ev => {
-            emitted = (ev as CustomEvent).detail.alt
+            emitted = (ev as CustomEvent<
+                ImageInputEventMap['alt-change']['detail']>).detail.alt
         })
 
         const badge = host.querySelector('.alt-badge') as HTMLElement
@@ -289,7 +310,8 @@ test('saving the crop replaces the image and closes the dialog',
         // which the event could fire before we are listening.
         const changed = new Promise<File>(resolve => {
             host.addEventListener('image-input:change', ev => {
-                resolve((ev as CustomEvent).detail.file)
+                resolve((ev as CustomEvent<
+                    ImageInputEventMap['change']['detail']>).detail.file)
             }, { once: true })
         })
 
@@ -334,9 +356,11 @@ test('AC7.3: mounting with src shows the image and ALT opens dialog ' +
     t.equal(preview.classList.contains('has-image'), true,
         'the preview should have has-image')
 
-    let altDetail:unknown = null
+    let altDetail:
+        ImageInputEventMap['alt']['detail']|null = null
     host.addEventListener('image-input:alt', ev => {
-        altDetail = (ev as CustomEvent).detail
+        altDetail = (ev as CustomEvent<
+            ImageInputEventMap['alt']['detail']>).detail
     })
 
     ;(host.querySelector('.alt-badge') as HTMLElement).click()
@@ -350,6 +374,8 @@ test('AC7.3: mounting with src shows the image and ALT opens dialog ' +
         { file: null, src: '/fixtures/photo.png', alt: '' },
         'should emit alt detail with file:null, src, and empty alt'
     )
+
+    ;(host.querySelector('.alt-cancel') as HTMLElement).click()
 })
 
 test('AC7.4: setSrc() with a URL drops any held file and shows the ' +
@@ -417,9 +443,11 @@ test('AC7.5: edit() on a picked file resolves the cropped File after ' +
     const file = await makeImageFile(200, 100)
     selectFile(host, file)
 
-    let changeDetail:unknown = null
+    let changeDetail:
+        ImageInputEventMap['change']['detail']|null = null
     host.addEventListener('image-input:change', ev => {
-        changeDetail = (ev as CustomEvent).detail
+        changeDetail = (ev as CustomEvent<
+            ImageInputEventMap['change']['detail']>).detail
     })
 
     const p = client.edit()
@@ -429,13 +457,13 @@ test('AC7.5: edit() on a picked file resolves the cropped File after ' +
 
     ;(host.querySelector('.crop-save') as HTMLElement).click()
 
-    const result = await p
+    const result = await raceWithTimeout(p)
 
     t.ok(result instanceof File, 'should resolve a File')
+    t.ok(result === changeDetail?.file,
+        'resolved file should be the same object as change detail')
 
-    const changeSource = changeDetail ?
-        (changeDetail as any).source :
-        null
+    const changeSource = changeDetail?.source ?? null
     t.equal(changeSource, 'crop',
         'should emit change with source:crop')
 })
@@ -445,12 +473,14 @@ test('AC7.5: edit() on stored src emits edit with correct detail and ' +
     const { host, client } = mount('client-edit-src-test',
         { src: '/fixtures/photo.png' })
 
-    let editDetail:unknown = null
+    let editDetail:
+        ImageInputEventMap['edit']['detail']|null = null
     host.addEventListener('image-input:edit', ev => {
-        editDetail = (ev as CustomEvent).detail
+        editDetail = (ev as CustomEvent<
+            ImageInputEventMap['edit']['detail']>).detail
     })
 
-    client.edit()
+    const p = client.edit()
 
     t.deepEqual(
         editDetail,
@@ -463,14 +493,16 @@ test('AC7.5: edit() on stored src emits edit with correct detail and ' +
 
     let changeFile:File|null = null
     host.addEventListener('image-input:change', ev => {
-        changeFile = (ev as CustomEvent).detail.file
+        changeFile = (ev as CustomEvent<
+            ImageInputEventMap['change']['detail']>).detail.file
     })
 
     ;(host.querySelector('.crop-save') as HTMLElement).click()
 
-    await new Promise(_resolve => setTimeout(_resolve, 50))
+    const result = await raceWithTimeout(p)
 
-    t.ok(changeFile instanceof File, 'should emit a File')
+    t.ok(result !== TIMEOUT, 'edit should resolve')
+    t.ok(result === changeFile, 'resolved file should match change detail')
     t.equal(changeFile?.name, 'photo.png',
         'should derive name from the URL path')
     t.equal(changeFile?.type, 'image/png',
@@ -485,7 +517,7 @@ test('AC7.5: edit() cancel resolves null', async t => {
 
     ;(host.querySelector('.crop-cancel') as HTMLElement).click()
 
-    const result = await p
+    const result = await raceWithTimeout(p)
     t.ok(result === null, 'should resolve null')
 })
 
@@ -502,7 +534,7 @@ test('AC7.5: edit() Esc path (dialog.close()) resolves null', async t => {
     dialog.close()
     await new Promise(_resolve => setTimeout(_resolve, 0))
 
-    const result = await p
+    const result = await raceWithTimeout(p)
     t.ok(result === null, 'should resolve null')
 })
 
@@ -532,11 +564,13 @@ test('AC7.5: close then edit in one tick', async t => {
     await new Promise(_resolve => setTimeout(_resolve, 0))
 
     t.ok(settled === false, 'b should still be pending after stale close')
+    t.equal(dialog.open, true,
+        'the reopened dialog should stay open after the stale close')
 
     ;(host.querySelector('.crop-cancel') as HTMLElement).click()
 
-    const resultA = await a
-    const resultB = await b
+    const resultA = await raceWithTimeout(a)
+    const resultB = await raceWithTimeout(b)
     t.ok(resultA === null, 'a should resolve null')
     t.ok(resultB === null, 'b should resolve null')
 })
@@ -547,7 +581,8 @@ test('AC7.5: nocrop, no image, or canceled edit() resolves null',
         host.setAttribute('nocrop', '')
 
         const p1 = client.edit()
-        t.ok(await p1 === null, 'nocrop should resolve null immediately')
+        const r1 = await raceWithTimeout(p1)
+        t.ok(r1 === null, 'nocrop should resolve null immediately')
 
         const dialog = host.querySelector(
             '.crop-dialog'
@@ -562,8 +597,35 @@ test('AC7.5: nocrop, no image, or canceled edit() resolves null',
         })
 
         const p2 = client.edit()
-        t.ok(await p2 === null, 'canceled edit should resolve null')
+        const r2 = await raceWithTimeout(p2)
+        t.ok(r2 === null, 'canceled edit should resolve null')
     })
+
+test('AC7.5: edit() on no image resolves null and does not create ' +
+    'crop dialog or element', async t => {
+    const { host, client } = mount('client-edit-no-image-test')
+
+    let editCount = 0
+    host.addEventListener('image-input:edit', () => {
+        editCount++
+    })
+
+    const p = client.edit()
+    const result = await raceWithTimeout(p)
+
+    t.ok(result === null, 'should resolve null')
+    t.equal(editCount, 0, 'should not emit edit event')
+
+    const dialog = host.querySelector(
+        '.crop-dialog'
+    ) as HTMLDialogElement|null
+    if (dialog) {
+        t.equal(dialog.open, false, 'dialog should stay closed')
+    }
+
+    const cropEl = host.querySelector('image-crop')
+    t.equal(cropEl, null, 'no image-crop should be created')
+})
 
 test('AC7.5: calling edit() twice while open returns same promise and ' +
     'fires only one edit event', async t => {
@@ -576,7 +638,7 @@ test('AC7.5: calling edit() twice while open returns same promise and ' +
     const p1 = client.edit()
     const p2 = client.edit()
 
-    t.equal(p1, p2, 'should return the same promise')
+    t.ok(p1 === p2, 'should return the same promise')
     t.equal(editCount, 1, 'should fire only one edit event')
 
     const dialog = host.querySelector(
@@ -585,7 +647,8 @@ test('AC7.5: calling edit() twice while open returns same promise and ' +
     t.equal(dialog.open, true, 'dialog should stay open')
 
     ;(host.querySelector('.crop-cancel') as HTMLElement).click()
-    await p1
+    const result = await raceWithTimeout(p1)
+    t.ok(result === null, 'should resolve null')
 })
 
 test('destroy() while dialog is open resolves pending edit() with null',
@@ -600,20 +663,12 @@ test('destroy() while dialog is open resolves pending edit() with null',
         ) as HTMLDialogElement
         t.equal(dialog.open, true, 'dialog should be open')
 
-        let resolved = false
-        p.then(() => { resolved = true })
+        client.destroy()
 
-        // Race destroy against a timeout to ensure it resolves
-        // the pending edit
-        await new Promise(_resolve => {
-            client.destroy()
-            setTimeout(_resolve, 50)
-        })
-
-        t.ok(resolved, 'edit() should be resolved after destroy()')
-
-        const result = await p
+        const result = await raceWithTimeout(p)
         t.ok(result === null, 'edit() should resolve null after destroy()')
+
+        if (dialog) dialog.close()
     })
 
 test('AC7.5: in-flight save across sessions', async t => {
@@ -633,7 +688,7 @@ test('AC7.5: in-flight save across sessions', async t => {
     })
 
     try {
-        (cropEl as any).getBlob = () => deferred
+        cropEl.getBlob = () => deferred
 
         let changeCount = 0
         host.addEventListener('image-input:change', () => {
@@ -645,7 +700,7 @@ test('AC7.5: in-flight save across sessions', async t => {
         dialog.close()
 
         const b = client.edit()
-        t.notEqual(a, b, 'new session should have a new promise')
+        t.ok(a !== b, 'new session should have a new promise')
 
         const blob = await imageBlob('image/png')
         deferredResolve(blob)
@@ -667,7 +722,7 @@ test('AC7.5: in-flight save across sessions', async t => {
             'session b should still be pending after timeout')
 
         ;(host.querySelector('.crop-cancel') as HTMLElement).click()
-        const result = await b
+        const result = await raceWithTimeout(b)
 
         t.ok(result === null, 'session b should resolve null')
     } finally {
@@ -678,9 +733,11 @@ test('AC7.5: in-flight save across sessions', async t => {
 test('AC7.6: picking a non-image emits error', async t => {
     const { host } = mount('client-non-image-test')
 
-    let errorReason:unknown = null
+    let errorReason:
+        ImageInputEventMap['error']['detail']['reason']|null = null
     host.addEventListener('image-input:error', ev => {
-        errorReason = (ev as CustomEvent).detail.reason
+        errorReason = (ev as CustomEvent<
+            ImageInputEventMap['error']['detail']>).detail.reason
     })
 
     selectFile(host, new File(['x'], 'a.txt', { type: 'text/plain' }))
@@ -699,9 +756,11 @@ test('AC7.6: crop failure emits error and dialog stays open',
         const cropEl = host.querySelector('image-crop') as ImageCrop
         await waitForImageLoad(cropEl)
 
-        let errorReason:unknown = null
+        let errorReason:
+            ImageInputEventMap['error']['detail']['reason']|null = null
         host.addEventListener('image-input:error', ev => {
-            errorReason = (ev as CustomEvent).detail.reason
+            errorReason = (ev as CustomEvent<
+                ImageInputEventMap['error']['detail']>).detail.reason
         })
 
         const dialog = host.querySelector(
@@ -709,7 +768,7 @@ test('AC7.6: crop failure emits error and dialog stays open',
         ) as HTMLDialogElement
 
         try {
-            (cropEl as any).getBlob = () => {
+            cropEl.getBlob = () => {
                 return Promise.reject(new Error('blob failed'))
             }
 
@@ -723,6 +782,7 @@ test('AC7.6: crop failure emits error and dialog stays open',
                 'dialog should stay open on error')
         } finally {
             Reflect.deleteProperty(cropEl, 'getBlob')
+            ;(host.querySelector('.crop-cancel') as HTMLElement).click()
         }
     })
 
@@ -756,7 +816,8 @@ test('AC7.6: change from pick has source:pick, from setImage has ' +
 
     const sources:unknown[] = []
     host.addEventListener('image-input:change', ev => {
-        sources.push((ev as CustomEvent).detail.source)
+        sources.push((ev as CustomEvent<
+            ImageInputEventMap['change']['detail']>).detail.source)
     })
 
     selectFile(host, imageFile('photo.png', 'image/png'))
@@ -799,3 +860,56 @@ test('crossorigin from host is applied to preview img', async t => {
     t.equal(img.getAttribute('crossorigin'), 'anonymous',
         'preview img should have crossorigin attribute from host')
 })
+
+test('crossorigin fallback to rendered img without host attribute',
+    async t => {
+        const { host, client } = mount('client-crossorigin-fallback-test',
+            { src: '/fixtures/photo.png', crossorigin: 'anonymous' })
+
+        client.setSrc('/fixtures/photo.png')
+
+        const img = host.querySelector('img') as HTMLImageElement
+        t.equal(img.getAttribute('crossorigin'), 'anonymous',
+            'preview img should retain crossorigin from rendered value')
+    })
+
+test('crossorigin host attribute overrides then falls back to rendered',
+    async t => {
+        const { host, client } = mount(
+            'client-crossorigin-override-test',
+            { src: '/fixtures/photo.png', crossorigin: 'use-credentials' })
+
+        // First apply host attribute
+        host.setAttribute('crossorigin', 'anonymous')
+        client.setSrc('/fixtures/photo.png')
+
+        let img = host.querySelector('img') as HTMLImageElement
+        t.equal(img.getAttribute('crossorigin'), 'anonymous',
+            'host attribute should override rendered value')
+
+        // Then remove it and revert to rendered
+        host.removeAttribute('crossorigin')
+        client.setSrc('/fixtures/photo.png')
+
+        img = host.querySelector('img') as HTMLImageElement
+        t.equal(img.getAttribute('crossorigin'), 'use-credentials',
+            'should fall back to rendered value when host removed')
+    })
+
+test('crossorigin applied to crop element on src-only edit()',
+    async t => {
+        const { host, client } = mount(
+            'client-crossorigin-crop-test',
+            { src: '/fixtures/photo.png' })
+        host.setAttribute('crossorigin', 'anonymous')
+
+        const p = client.edit()
+
+        const cropEl = host.querySelector('image-crop')
+        t.equal(cropEl?.getAttribute('crossorigin'), 'anonymous',
+            'crop element should have crossorigin from host')
+
+        ;(host.querySelector('.crop-cancel') as HTMLElement).click()
+        const result = await raceWithTimeout(p)
+        t.ok(result === null, 'should cancel edit')
+    })

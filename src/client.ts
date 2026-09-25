@@ -389,10 +389,11 @@ export class ImageInputClient {
         const cropEl = this.#getOrCreateCropEl()
         if (!dialog || !cropEl) return Promise.resolve(null)
 
-        if (this.host.getAttribute('crop') == null) {
+        const crop = this.host.getAttribute('crop')
+        if (crop === null) {
             cropEl.removeAttribute('crop')
         } else {
-            cropEl.setAttribute('crop', this.host.getAttribute('crop')!)
+            cropEl.setAttribute('crop', crop)
         }
         if (file) {
             cropEl.setFile(file)
@@ -432,6 +433,7 @@ export class ImageInputClient {
     ):File {
         const asFile = toFile(file, name, this.#file?.name)
 
+        this.#syncInputFiles(asFile)
         this.#revokePreviewUrl()
         this.#file = asFile
         this.#storedSrc = null
@@ -445,6 +447,20 @@ export class ImageInputClient {
         })
 
         return asFile
+    }
+
+    #syncInputFiles (file:File):void {
+        const input = this.#qs<HTMLInputElement>('input')
+        if (!input) return
+
+        try {
+            const dt = new DataTransfer()
+            dt.items.add(file)
+            input.files = dt.files
+        } catch (_err) {
+            // DataTransfer is not constructible everywhere; the change
+            // event still carries the file.
+        }
     }
 
     /**
