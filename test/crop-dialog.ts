@@ -215,3 +215,77 @@ test('cropDialog rejects and cleans up when getBlob fails', async t => {
         ImageCrop.prototype.getBlob = original
     }
 })
+
+test('AC6.3 crossorigin: cropDialog forwards crossorigin to image-crop',
+    async t => {
+        const promise = cropDialog('/fixtures/photo.png',
+            { crossorigin: 'anonymous' })
+        const dialog = lastDialog()
+        const crop = dialog.querySelector('image-crop')
+
+        t.equal(crop?.getAttribute('crossorigin'), 'anonymous',
+            'the dialog should set crossorigin on image-crop')
+
+        dialog.querySelector<HTMLButtonElement>('.crop-cancel')?.click()
+        t.equal(await promise, null, 'cancel should resolve with null')
+    })
+
+test('AC6.3 type: cropDialog guesses type from URL extension and ' +
+    'returns correct blob type',
+    async t => {
+        const originalGetBlob = ImageCrop.prototype.getBlob
+        const blob = new Blob(['cropped'], { type: 'image/png' })
+        let capturedType:string|undefined = undefined
+        ImageCrop.prototype.getBlob = async (opts) => {
+            capturedType = opts?.type
+            return blob
+        }
+
+        try {
+            const promise = cropDialog('/fixtures/photo.png')
+            const dialog = lastDialog()
+            await new Promise(resolve => {
+                const crop = dialog.querySelector('image-crop')
+                crop?.addEventListener('image-crop:load', resolve, {
+                    once: true
+                })
+            })
+
+            dialog.querySelector<HTMLButtonElement>('.crop-save')?.click()
+            const result = await promise
+
+            t.equal(capturedType, 'image/png',
+                'guessType should find .png and pass image/png to getBlob')
+            t.equal(result?.type, 'image/png',
+                'the resolved blob should be image/png')
+        } finally {
+            ImageCrop.prototype.getBlob = originalGetBlob
+        }
+    })
+
+test('AC6.3 type: cropDialog uses dataUrl type fallback when there ' +
+    'is no extension', async t => {
+    const originalGetBlob = ImageCrop.prototype.getBlob
+    const blob = new Blob(['cropped'], { type: 'image/jpeg' })
+    let capturedType:string|undefined = undefined
+    ImageCrop.prototype.getBlob = async (opts) => {
+        capturedType = opts?.type
+        return blob
+    }
+
+    try {
+        const { imageDataUrl } = await import('./fixture.js')
+        const promise = cropDialog(imageDataUrl())
+        const dialog = lastDialog()
+
+        dialog.querySelector<HTMLButtonElement>('.crop-save')?.click()
+        const result = await promise
+
+        t.equal(capturedType, 'image/jpeg',
+            'dataUrl with no extension should pass image/jpeg to getBlob')
+        t.equal(result?.type, 'image/jpeg',
+            'the resolved blob should be image/jpeg')
+    } finally {
+        ImageCrop.prototype.getBlob = originalGetBlob
+    }
+})

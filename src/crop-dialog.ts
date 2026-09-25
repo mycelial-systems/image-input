@@ -3,7 +3,7 @@
 import { ImageCrop } from './crop.js'
 import { DEFAULT_TEXT } from './dialogs.js'
 import { escapeAttr } from './escape.js'
-import { toFile } from './file.js'
+import { toFile, encodableType, guessType } from './file.js'
 import type { CropConstraint } from './crop-math.js'
 
 export type CropDialogOptions = {
@@ -11,11 +11,14 @@ export type CropDialogOptions = {
     save?:string
     cancel?:string
     crop?:CropConstraint|string
+    crossorigin?:string
 }
 
 export type CropSource = File|Blob|string
 
-function markup (options:Required<Omit<CropDialogOptions, 'crop'>>):string {
+function markup (
+    options:Required<Omit<CropDialogOptions, 'crop'|'crossorigin'>>
+):string {
     return `<dialog class="crop-dialog" aria-label="${
         escapeAttr(options.heading)
     }">
@@ -56,9 +59,17 @@ export function cropDialog (
                     String(options.crop.ratio) : options.crop.kind
         crop.setAttribute('crop', value)
     }
+    if (options.crossorigin !== undefined) {
+        crop.setAttribute('crossorigin', options.crossorigin)
+    }
     if (source instanceof File) crop.setFile(source)
     else if (source instanceof Blob) crop.setFile(toFile(source))
     else crop.setAttribute('src', source)
+
+    const type = typeof source === 'string' ?
+        encodableType(guessType(source)) :
+        undefined
+
     dialog.showModal()
 
     return new Promise((resolve, reject) => {
@@ -87,7 +98,7 @@ export function cropDialog (
             if (saving || settled) return
             saving = true
             try {
-                const blob = await crop.getBlob()
+                const blob = await crop.getBlob({ type })
                 if (!settled && dialog.open) {
                     dialog.close()
                     finish(blob)
