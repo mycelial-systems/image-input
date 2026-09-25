@@ -435,8 +435,8 @@ export class ImageInput extends WebComponent {
             el.#settleEdit(null)
         }
         // Even though CSS hides .edit when nocrop is set, scripted clicks and
-        // pages without our stylesheet can invoke this, so the guard is essential
-        // (FDR-003).
+        // pages without our stylesheet can invoke this, so the guard is
+        // essential (FDR-003).
         if (el.nocrop || !el.#hasImage()) return Promise.resolve(null)
 
         const file = el.#file

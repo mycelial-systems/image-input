@@ -2383,8 +2383,8 @@ test('AC2.2 and plan test 12: edit() on a src-only image hands the ' +
     'URL to image-crop, saving emits change with source crop and a ' +
     'File named from the URL', async t => {
     document.body.insertAdjacentHTML('beforeend', `
-    <image-input class="edit-src-ac2-2-test" src="/fixtures/photo.png">
-    </image-input>
+        <image-input class="edit-src-ac2-2-test" src="/fixtures/photo.png">
+        </image-input>
     `)
     const el = await waitFor('image-input.edit-src-ac2-2-test') as ImageInput
     const editBtn = el.querySelector('.edit') as HTMLButtonElement
@@ -2423,16 +2423,13 @@ test('AC2.2 and plan test 12: edit() on a src-only image hands the ' +
     t.equal(el.hasAttribute('src'), false,
         'src should be removed after saving')
 
-    const cancelBtn = cropDialog.querySelector(
-        '.crop-cancel'
-    ) as HTMLButtonElement
-    cancelBtn.click()
+    t.equal(cropDialog.open, false, 'dialog should close after save')
 })
 
 test('plan test 12 fallback: editing a data URL generates a .jpg ' +
     'from a guessed image/jpeg type', async t => {
     document.body.insertAdjacentHTML('beforeend', `
-    <image-input class="edit-data-url-test"></image-input>
+        <image-input class="edit-data-url-test"></image-input>
     `)
     const el = await waitFor(
         'image-input.edit-data-url-test'
@@ -2468,21 +2465,18 @@ test('plan test 12 fallback: editing a data URL generates a .jpg ' +
     t.equal(detail.file.name, 'image.jpg',
         'file name should be image.jpg')
 
-    const cancelBtn = cropDialog.querySelector(
-        '.crop-cancel'
-    ) as HTMLButtonElement
-    cancelBtn.click()
+    t.equal(cropDialog.open, false, 'dialog should close after save')
 })
 
 test('AC3.1: edit() on a file opens the dialog, emits edit with ' +
     '{file, src: null}, resolves after change with the cropped File, ' +
     'and change fires before the promise resolves', async t => {
     document.body.insertAdjacentHTML('beforeend', `
-    <image-input class="edit-file-ac3-1"></image-input>
+        <image-input class="edit-file-ac3-1"></image-input>
     `)
     const el = await waitFor('image-input.edit-file-ac3-1') as ImageInput
-    const file = makeImageFile(200, 100)
-    selectFile(el, await file)
+    const heldFile = await makeImageFile(200, 100)
+    selectFile(el, heldFile)
 
     const events:string[] = []
 
@@ -2504,8 +2498,8 @@ test('AC3.1: edit() on a file opens the dialog, emits edit with ' +
     ) as HTMLDialogElement
     t.equal(cropDialog.open, true, 'dialog should be open')
 
-    t.equal(editDetail?.file instanceof File, true,
-        'edit detail should have file')
+    t.ok(editDetail?.file === heldFile,
+        'edit detail file should be the held file')
     t.ok(editDetail?.src === null,
         'edit detail should have src: null for a file')
 
@@ -2532,9 +2526,9 @@ test('AC3.1: edit() on a file opens the dialog, emits edit with ' +
 test('AC3.1 src-only variant: edit detail has {file: null, src: url}',
     async t => {
         document.body.insertAdjacentHTML('beforeend', `
-        <image-input class="edit-src-detail-test" src="/fixtures/photo.png">
-        </image-input>
-    `)
+            <image-input class="edit-src-detail-test" src="/fixtures/photo.png">
+            </image-input>
+        `)
         const el = await waitFor(
             'image-input.edit-src-detail-test'
         ) as ImageInput
@@ -2562,8 +2556,8 @@ test('AC3.1 src-only variant: edit detail has {file: null, src: url}',
 test('AC3.2: edit() resolves null when cancel is clicked',
     async t => {
         document.body.insertAdjacentHTML('beforeend', `
-        <image-input class="edit-cancel-test"></image-input>
-    `)
+            <image-input class="edit-cancel-test"></image-input>
+        `)
         const el = await waitFor(
             'image-input.edit-cancel-test'
         ) as ImageInput
@@ -2588,8 +2582,8 @@ test('AC3.2: edit() resolves null when cancel is clicked',
 test('AC3.2 Esc closes the dialog and resolves edit() to null',
     async t => {
         document.body.insertAdjacentHTML('beforeend', `
-        <image-input class="edit-esc-test"></image-input>
-    `)
+            <image-input class="edit-esc-test"></image-input>
+        `)
         const el = await waitFor('image-input.edit-esc-test') as ImageInput
         const file = await makeImageFile(200, 100)
         selectFile(el, file)
@@ -2726,7 +2720,7 @@ test('in-flight save across sessions: blob from previous Save does ' +
         cancelBtn.click()
         const result = await b
 
-        t.equal(result, null, 'session b should resolve null')
+        t.ok(result === null, 'session b should resolve null')
     } finally {
         Reflect.deleteProperty(cropEl, 'getBlob')
     }
@@ -2781,8 +2775,8 @@ test('close then edit in one tick: close from previous session does ' +
 test('AC3.3: edit() returns null immediately when nocrop is set',
     async t => {
         document.body.insertAdjacentHTML('beforeend', `
-        <image-input class="nocrop-test" nocrop></image-input>
-    `)
+            <image-input class="nocrop-test" nocrop></image-input>
+        `)
         const el = await waitFor('image-input.nocrop-test') as ImageInput
         const file = await makeImageFile(200, 100)
         selectFile(el, file)
@@ -2800,8 +2794,8 @@ test('AC3.3: edit() returns null immediately when nocrop is set',
 test('AC3.3: edit() returns null immediately when there is no image',
     async t => {
         document.body.insertAdjacentHTML('beforeend', `
-        <image-input class="no-image-test"></image-input>
-    `)
+            <image-input class="no-image-test"></image-input>
+        `)
         const el = await waitFor('image-input.no-image-test') as ImageInput
 
         const result = await el.edit()
@@ -2925,10 +2919,7 @@ test('AC3.5: clicking the edit button has the same effect as calling ' +
 
     t.equal(detail.source, 'crop',
         'saving should emit change with source: crop')
-    const cancelBtn = cropDialog.querySelector(
-        '.crop-cancel'
-    ) as HTMLButtonElement
-    cancelBtn.click()
+    t.equal(cropDialog.open, false, 'dialog should close after save')
 })
 
 test('Disconnect: removing el while edit() dialog is open resolves ' +
