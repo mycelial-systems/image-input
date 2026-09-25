@@ -58,13 +58,13 @@ it into the file input.
 
 | Transition | Held file | `src` | Preview | `required` | Event |
 |--|--|--|--|--|--|
-| Set non-empty src | Dropped | Set | Src image | Adjusted by rule | None |
+| Set non-empty src | Dropped | Set | Stored image | Off (stored image) | None |
 | Empty/remove src | Unchanged | Cleared | File preview if held, else empty | Restored to intent | None |
-| Pick file | Set | Cleared | File preview | Adjusted | `change` |
-| Drop file | Set | Cleared | File preview | Adjusted | `change` |
-| `setImage(blob)` | Set | Cleared | Blob preview | Adjusted | `change` |
-| `edit()` save on file | Set | Unchanged | File preview | Adjusted | `change` |
-| `edit()` save on src | Set | Cleared | Blob preview | Adjusted | `change` |
+| Pick file | Set | Cleared | File preview | Restored to intent | `change` |
+| Drop file | Set | Cleared | File preview | Restored to intent | `change` |
+| `setImage(blob)` | Set | Cleared | File preview | Restored to intent | `change` |
+| `edit()` save on file | Set | Cleared | Cropped preview | Restored to intent | `change` |
+| `edit()` save on src | Set | Cleared | Cropped preview | Restored to intent | `change` |
 | Remove button click | Dropped | Cleared | Empty | Restored to intent | `alt-change` (if set), `remove` |
 | `clear()` | Dropped | Cleared | Empty | Restored to intent | `alt-change` (if set) |
 
@@ -158,19 +158,19 @@ depends on whether one is already present via `src`. Splitting the
 two allows a server-rendered `ImageInputClient` to read intent from
 `data-required` and apply the rule dynamically.
 
-### 8. Re-setting the same URL still drops a pick
+### 8. Writing a stored URL again still drops a pick
 
-**Decision:** Setting `src` to the URL already shown still drops any
-held file.
+**Decision:** Any non-empty `src` write drops a held file, including a
+write of the URL that was shown before the pick.
 
-**Why:** The component does not compare a new `src` value against the
-previous one. Any non-empty `src` write replaces a held file, because
-`attributeChangedCallback` fires on every attribute write and the
-element cannot tell a deliberate re-set from a redundant one. Frameworks
-like Preact that diff against the previous vdom and skip setting
-unchanged props hide this: a consumer that assigns `el.src` on every
-render hits it. Consumers must not assign to `el.src` on every render;
-write it through a ref only when the value actually changes.
+**Why:** A pick, drop, crop or `setImage()` removes `src`, so writing
+the previous URL again is a real change (absent -> url), not a
+same-value write. Any non-empty `src` write means "show this stored
+image", and the element does not remember the last stored URL in order
+to ignore a re-write. Frameworks like Preact that diff against the
+previous vdom and skip unchanged props hide this, but a consumer that
+assigns `el.src` on every render will lose a pick. Write `src` through a
+ref only when the value actually changes.
 
 ### 9. Reopening `edit()` on same URL keeps crop rect
 
