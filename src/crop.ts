@@ -82,8 +82,9 @@ interface DragState {
 export class ImageCrop extends WebComponent {
     static TAG = 'image-crop'
     TAG = ImageCrop.TAG
-    static reflectedStringAttributes = ['src']
+    static reflectedStringAttributes = ['src', 'crossorigin']
     declare src:string|null
+    declare crossorigin:string|null
 
     /**
      * `crop` is deliberately *not* in `reflectedStringAttributes`.
@@ -145,9 +146,36 @@ export class ImageCrop extends WebComponent {
         this.#revokeObjectUrl()
     }
 
-    handleChange_src (_old:string|null, newValue:string|null) {
-        const img = this.qs('img')
-        if (img) img.src = newValue ?? ''
+    #applyCrossOrigin (img:HTMLImageElement):void {
+        if (this.crossorigin == null) {
+            img.removeAttribute('crossorigin')
+        } else {
+            img.setAttribute('crossorigin', this.crossorigin)
+        }
+    }
+
+    handleChange_src (old:string|null, newValue:string|null) {
+        if (newValue === old) return
+        // Anything but the object URL setFile() just made means a new
+        // image from outside: forget the old file, its object URL, and
+        // its size and rect, exactly as setFile() does, so crop and
+        // getBlob() cannot report the previous image.
+        if (newValue !== this.#objectUrl) {
+            this.#revokeObjectUrl()
+            this.#file = null
+            this.#naturalWidth = 0
+            this.#naturalHeight = 0
+            this.#crop = { x: 0, y: 0, width: 0, height: 0 }
+        }
+        const img = this.qs<HTMLImageElement>('img')
+        if (!img) return
+        this.#applyCrossOrigin(img)
+        img.src = newValue ?? ''
+    }
+
+    handleChange_crossorigin () {
+        const img = this.qs<HTMLImageElement>('img')
+        if (img) this.#applyCrossOrigin(img)
     }
 
     /**
@@ -559,12 +587,15 @@ export class ImageCrop extends WebComponent {
 
     render () {
         const src = escapeAttr(this.src ?? '')
+        const crossorigin = this.crossorigin == null ?
+            '' :
+            ` crossorigin="${escapeAttr(this.crossorigin)}"`
         const handles = HANDLES.map(dir => (
             `<span class="handle handle-${dir}" aria-hidden="true"></span>`
         )).join('')
 
         this.innerHTML = `<div class="image-crop-frame">
-            <img src="${src}" alt="" />
+            <img${crossorigin} src="${src}" alt="" />
             <div class="dim dim-top"></div>
             <div class="dim dim-bottom"></div>
             <div class="dim dim-left"></div>
