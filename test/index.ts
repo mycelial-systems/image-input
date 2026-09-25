@@ -2422,6 +2422,11 @@ test('AC2.2 and plan test 12: edit() on a src-only image hands the ' +
         'file type should be guessed from extension')
     t.equal(el.hasAttribute('src'), false,
         'src should be removed after saving')
+
+    const cancelBtn = cropDialog.querySelector(
+        '.crop-cancel'
+    ) as HTMLButtonElement
+    cancelBtn.click()
 })
 
 test('plan test 12 fallback: editing a data URL generates a .jpg ' +
@@ -2462,6 +2467,11 @@ test('plan test 12 fallback: editing a data URL generates a .jpg ' +
         'data URL with no extension should default to image/jpeg')
     t.equal(detail.file.name, 'image.jpg',
         'file name should be image.jpg')
+
+    const cancelBtn = cropDialog.querySelector(
+        '.crop-cancel'
+    ) as HTMLButtonElement
+    cancelBtn.click()
 })
 
 test('AC3.1: edit() on a file opens the dialog, emits edit with ' +
@@ -2496,11 +2506,13 @@ test('AC3.1: edit() on a file opens the dialog, emits edit with ' +
 
     t.equal(editDetail?.file instanceof File, true,
         'edit detail should have file')
-    t.equal(editDetail?.src, null,
+    t.ok(editDetail?.src === null,
         'edit detail should have src: null for a file')
 
     const cropEl = el.querySelector('image-crop') as ImageCrop
     await waitForImageLoad(cropEl)
+
+    editPromise.then(() => { events.push('resolved') })
 
     const saveBtn = cropDialog.querySelector(
         '.crop-save'
@@ -2509,10 +2521,12 @@ test('AC3.1: edit() on a file opens the dialog, emits edit with ' +
 
     const resolved = await editPromise
 
-    t.equal(resolved, changeDetail?.file,
-        'promise should resolve with the same File as change detail')
-    t.deepEqual(events, ['edit', 'change'],
-        'change should fire before the promise resolves')
+    t.ok(resolved instanceof File,
+        'promise should resolve with a File')
+    t.ok(resolved === changeDetail?.file,
+        'resolved file should be the same as change detail file')
+    t.deepEqual(events, ['edit', 'change', 'resolved'],
+        'resolved should be recorded after change fires')
 })
 
 test('AC3.1 src-only variant: edit detail has {file: null, src: url}',
@@ -2532,10 +2546,17 @@ test('AC3.1 src-only variant: edit detail has {file: null, src: url}',
 
         el.edit()
 
-        t.equal(editDetail?.file, null,
-            'file should be null for src-only')
-        t.equal(editDetail?.src, '/fixtures/photo.png',
-            'src should be the stored URL')
+        t.deepEqual(editDetail,
+            { file: null, src: '/fixtures/photo.png' },
+            'edit detail should have file: null and src: url')
+
+        const cropDialog = el.querySelector(
+            '.crop-dialog'
+        ) as HTMLDialogElement
+        const cancelBtn = cropDialog.querySelector(
+            '.crop-cancel'
+        ) as HTMLButtonElement
+        cancelBtn.click()
     })
 
 test('AC3.2: edit() resolves null when cancel is clicked',
@@ -2560,7 +2581,7 @@ test('AC3.2: edit() resolves null when cancel is clicked',
         cancelBtn.click()
         const result = await editPromise
 
-        t.equal(result, null, 'promise should resolve null')
+        t.ok(result === null, 'promise should resolve null')
         t.equal(cropDialog.open, false, 'dialog should be closed')
     })
 
@@ -2582,7 +2603,7 @@ test('AC3.2 Esc closes the dialog and resolves edit() to null',
         cropDialog.close()
         const result = await editPromise
 
-        t.equal(result, null, 'promise should resolve null')
+        t.ok(result === null, 'promise should resolve null')
         t.equal(cropDialog.open, false, 'dialog should be closed')
     })
 
@@ -2610,13 +2631,20 @@ test('AC3.2 stale close: close event from previous session does not ' +
 
     await p1
 
+    const staleClose = new Promise(_resolve => cropDialog
+        .addEventListener('close', _resolve, { once: true }))
+
     const p2 = el.edit()
     t.equal(cropDialog.open, true,
         'sanity: dialog reopened for second session')
 
+    let settled = false
+    p2.then(() => { settled = true })
+
+    await staleClose
     await new Promise(_resolve => setTimeout(_resolve, 0))
 
-    t.equal(p2.constructor.name, 'Promise',
+    t.ok(settled === false,
         'p2 should still be pending after stale close task')
     t.equal(cropDialog.open, true,
         'dialog should still be open after stale close task')
@@ -2627,7 +2655,7 @@ test('AC3.2 stale close: close event from previous session does not ' +
     cancelBtn.click()
     const result = await p2
 
-    t.equal(result, null, 'p2 should resolve null')
+    t.ok(result === null, 'p2 should resolve null')
 })
 
 test('in-flight save across sessions: blob from previous Save does ' +
@@ -2654,7 +2682,12 @@ test('in-flight save across sessions: blob from previous Save does ' +
     })
 
     try {
-        cropEl.getBlob = (() => deferred) as any
+        cropEl.getBlob = () => deferred
+
+        let changeCount = 0
+        el.addEventListener('image-input:change', () => {
+            changeCount++
+        })
 
         const saveBtn = cropDialog.querySelector(
             '.crop-save'
@@ -2670,17 +2703,21 @@ test('in-flight save across sessions: blob from previous Save does ' +
         deferredResolve(blob)
 
         await new Promise(_resolve => setTimeout(_resolve, 0))
-        let aResolved = false
-        a.then(() => { aResolved = true })
+
+        let aResolved:File|null|undefined
+        a.then((result) => { aResolved = result })
         await new Promise(_resolve => setTimeout(_resolve, 0))
 
-        t.equal(aResolved, true, 'session a should resolve')
+        t.ok(aResolved === null,
+            'session a should resolve null')
+        t.equal(changeCount, 0,
+            'no change should be emitted for stale blob')
 
         let bResolved = false
         b.then(() => { bResolved = true })
         await new Promise(_resolve => setTimeout(_resolve, 0))
 
-        t.equal(bResolved, false,
+        t.ok(bResolved === false,
             'session b should still be pending after timeout')
 
         const cancelBtn = cropDialog.querySelector(
@@ -2711,11 +2748,23 @@ test('close then edit in one tick: close from previous session does ' +
         '.crop-dialog'
     ) as HTMLDialogElement
 
+    const staleClose = new Promise(_resolve => cropDialog
+        .addEventListener('close', _resolve, { once: true }))
+
     cropDialog.close()
     const b = el.edit()
 
     t.notEqual(a, b, 'should have two distinct promises')
     t.equal(cropDialog.open, true, 'dialog should be open')
+
+    let settled = false
+    b.then(() => { settled = true })
+
+    await staleClose
+    await new Promise(_resolve => setTimeout(_resolve, 0))
+
+    t.ok(settled === false,
+        'b should still be pending after stale close')
 
     const cancelBtn = cropDialog.querySelector(
         '.crop-cancel'
@@ -2725,8 +2774,8 @@ test('close then edit in one tick: close from previous session does ' +
     const resultA = await a
     const resultB = await b
 
-    t.equal(resultA, null, 'session a should resolve null')
-    t.equal(resultB, null, 'session b should resolve null')
+    t.ok(resultA === null, 'session a should resolve null')
+    t.ok(resultB === null, 'session b should resolve null')
 })
 
 test('AC3.3: edit() returns null immediately when nocrop is set',
@@ -2740,7 +2789,7 @@ test('AC3.3: edit() returns null immediately when nocrop is set',
 
         const result = await el.edit()
 
-        t.equal(result, null, 'should resolve null immediately')
+        t.ok(result === null, 'should resolve null immediately')
 
         const cropDialog = el.querySelector(
             '.crop-dialog'
@@ -2757,7 +2806,7 @@ test('AC3.3: edit() returns null immediately when there is no image',
 
         const result = await el.edit()
 
-        t.equal(result, null, 'should resolve null immediately')
+        t.ok(result === null, 'should resolve null immediately')
 
         const cropDialog = el.querySelector(
             '.crop-dialog'
@@ -2782,7 +2831,7 @@ test('AC3.3: edit() returns null when a listener calls ' +
 
     const result = await el.edit()
 
-    t.equal(result, null, 'should resolve null')
+    t.ok(result === null, 'should resolve null')
 
     const cropDialog = el.querySelector(
         '.crop-dialog'
@@ -2801,24 +2850,27 @@ test('AC3.4: calling edit() twice while dialog is open returns the ' +
     const file = await makeImageFile(200, 100)
     selectFile(el, file)
 
-    const p1 = el.edit()
-    const p2 = el.edit()
-
-    t.equal(p1, p2, 'should return the same promise')
-
     let editEventCount = 0
     el.addEventListener('image-input:edit', () => {
         editEventCount++
     })
 
-    el.edit()
+    const p1 = el.edit()
+    const p2 = el.edit()
 
-    t.equal(editEventCount, 0,
-        'additional edit() calls should not fire edit event')
+    t.equal(p1, p2, 'should return the same promise')
+    t.equal(editEventCount, 1, 'edit event should fire only once')
 
     const cropDialog = el.querySelector(
         '.crop-dialog'
     ) as HTMLDialogElement
+    t.equal(cropDialog.open, true, 'dialog should be open')
+
+    el.edit()
+
+    t.equal(editEventCount, 1,
+        'additional edit() calls should not fire edit event')
+
     const cancelBtn = cropDialog.querySelector(
         '.crop-cancel'
     ) as HTMLButtonElement
@@ -2850,6 +2902,8 @@ test('AC3.5: clicking the edit button has the same effect as calling ' +
     t.equal(cropDialog.open, true, 'dialog should open')
     t.equal(editDetail?.file instanceof File, true,
         'should emit edit with file detail')
+    t.ok(editDetail?.src === null,
+        'should emit edit with src: null for a file')
 
     const cropEl = el.querySelector('image-crop') as ImageCrop
     await waitForImageLoad(cropEl)
@@ -2871,6 +2925,33 @@ test('AC3.5: clicking the edit button has the same effect as calling ' +
 
     t.equal(detail.source, 'crop',
         'saving should emit change with source: crop')
+    const cancelBtn = cropDialog.querySelector(
+        '.crop-cancel'
+    ) as HTMLButtonElement
+    cancelBtn.click()
+})
+
+test('Disconnect: removing el while edit() dialog is open resolves ' +
+    'edit() with null', async t => {
+    document.body.insertAdjacentHTML('beforeend', `
+        <image-input class="disconnect-test"></image-input>
+    `)
+    const el = await waitFor('image-input.disconnect-test') as ImageInput
+    const file = await makeImageFile(200, 100)
+    selectFile(el, file)
+
+    const editPromise = el.edit()
+    const cropEl = el.querySelector('image-crop') as ImageCrop
+    await waitForImageLoad(cropEl)
+
+    el.remove()
+
+    const timeoutSentinel = new Promise(_resolve => {
+        setTimeout(_resolve, 100)
+    })
+    const result = await Promise.race([editPromise, timeoutSentinel])
+
+    t.ok(result === null, 'edit() should resolve null after disconnect')
 })
 
 test('AC4.1: when getBlob() rejects, error is emitted with ' +
@@ -2897,9 +2978,7 @@ test('AC4.1: when getBlob() rejects, error is emitted with ' +
     const srcBefore = imgBefore.getAttribute('src')
 
     try {
-        cropEl.getBlob = (() => Promise.reject(
-            new Error('tainted')
-        )) as any
+        cropEl.getBlob = () => Promise.reject(new Error('tainted'))
 
         let errorReason:ImageInputEventMap['error']['detail']['reason']|
             undefined
@@ -2927,6 +3006,11 @@ test('AC4.1: when getBlob() rejects, error is emitted with ' +
             srcBefore,
             'preview src should be unchanged')
         t.equal(changeCount, 0, 'no change should be emitted')
+
+        const cancelBtn = cropDialog.querySelector(
+            '.crop-cancel'
+        ) as HTMLButtonElement
+        cancelBtn.click()
     } finally {
         Reflect.deleteProperty(cropEl, 'getBlob')
     }
@@ -2952,9 +3036,7 @@ test('AC4.2: failed save does not settle edit() promise, ' +
     await waitForImageLoad(cropEl)
 
     try {
-        cropEl.getBlob = (() => Promise.reject(
-            new Error('tainted')
-        )) as any
+        cropEl.getBlob = () => Promise.reject(new Error('tainted'))
 
         const saveBtn = cropDialog.querySelector(
             '.crop-save'
@@ -2977,7 +3059,7 @@ test('AC4.2: failed save does not settle edit() promise, ' +
 
         const result = await editPromise
 
-        t.equal(result, null, 'cancel should resolve the promise null')
+        t.ok(result === null, 'cancel should resolve the promise null')
     } finally {
         Reflect.deleteProperty(cropEl, 'getBlob')
     }

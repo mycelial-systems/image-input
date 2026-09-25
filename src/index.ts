@@ -323,7 +323,8 @@ export class ImageInput extends WebComponent {
         if (!cropEl) return
         // A second Save click, or an Esc press, while getBlob() is
         // still running would otherwise apply the crop twice, or apply
-        // it to a dialog the user has already dismissed.
+        // it to a dialog the user has already dismissed. If Save is
+        // clicked in a different session, this guard silently drops it.
         if (this.#cropInFlight) return
         this.#cropInFlight = true
 
@@ -433,6 +434,9 @@ export class ImageInput extends WebComponent {
             if (dialog?.open) return el.#edit.promise
             el.#settleEdit(null)
         }
+        // Even though CSS hides .edit when nocrop is set, scripted clicks and
+        // pages without our stylesheet can invoke this, so the guard is essential
+        // (FDR-003).
         if (el.nocrop || !el.#hasImage()) return Promise.resolve(null)
 
         const file = el.#file
