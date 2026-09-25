@@ -14,10 +14,14 @@ import { EXT, toFile } from './file.js'
 // consumer's program, which is what activates its `declare global`
 // augmentation of `HTMLElementEventMap`. No runtime import needed --
 // events.ts emits no JS.
-import type { ImageInputEventMap } from './events.js'
+import type {
+    ImageInputEventMap,
+    ChangeSource,
+    ErrorReason
+} from './events.js'
 const debug = createDebug('image-input')
 
-export type { ImageInputEventMap }
+export type { ImageInputEventMap, ChangeSource, ErrorReason }
 
 /**
  * `<image-crop>` is a first-class element (ADR-002): the reusable

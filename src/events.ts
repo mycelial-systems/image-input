@@ -9,13 +9,20 @@
  * `addEventListener` sees, and they are augmented onto
  * `HTMLElementEventMap` below.
  */
+
+/** What produced the file in an `image-input:change`. */
+export type ChangeSource = 'pick'|'drop'|'crop'|'api'
+
+/** Why an `image-input:error` fired. */
+export type ErrorReason = 'not-an-image'|'crop-failed'
+
 export interface ImageInputEventMap {
-    change:CustomEvent<{ file:File, alt:string }>
+    change:CustomEvent<{ file:File, alt:string, source:ChangeSource }>
     'alt-change':CustomEvent<{ alt:string }>
     remove:CustomEvent<null>
-    error:CustomEvent<{ reason:'not-an-image' }>
-    edit:CustomEvent<{ file:File }>
-    alt:CustomEvent<{ file:File, alt:string }>
+    error:CustomEvent<{ reason:ErrorReason }>
+    edit:CustomEvent<{ file:File|null, src:string|null }>
+    alt:CustomEvent<{ file:File|null, src:string|null, alt:string }>
 }
 
 /**
