@@ -136,17 +136,16 @@ export function guessType (url:string, base?:string):string|null {
 /**
  * A file name for a crop of `src`: the base name comes from the URL's
  * last path segment, and the extension from the blob's actual type, so
- * the two always agree. Falls back to `image` when the URL has no
- * usable segment.
+ * the two always agree. Trailing dots are stripped to avoid doubling
+ * the extension. Falls back to `image` when the URL has no usable
+ * segment.
  */
 export function cropName (
     src:string,
     blobType:string,
     base?:string
 ):string {
-    let segment = lastSegment(src, base)
-    // Strip trailing dots so /x/abc. doesn't produce abc..png
-    segment = segment.replace(/\.+$/, '')
+    const segment = lastSegment(src, base).replace(/\.+$/, '')
     const stem = segment.replace(/\.[^.]+$/, '')
     return deriveName(blobType, stem ? segment : null)
 }

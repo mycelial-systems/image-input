@@ -126,10 +126,8 @@ test('cropName handles invalid URLs by falling back to image.<ext>',
     })
 
 test('cropName handles malformed percent-encoding', t => {
-    const result = cropName('/a%E0%A4%A.png', 'image/png')
-    t.ok(result.endsWith('.png'), 'result ends with .png')
-    t.ok(result !== 'image.png',
-        'not entirely fallen back (has attempted stem)')
+    t.equal(cropName('/a%E0%A4%A.png', 'image/png'), 'a%E0%A4%A.png',
+        'undecodable segment is kept raw')
 })
 
 test('cropName preserves dots in stem', t => {
