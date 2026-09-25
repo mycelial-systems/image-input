@@ -869,14 +869,15 @@ test('AC6.1 after render: crossorigin reflected before appending', async t => {
         'the inner img should have crossOrigin set after render')
 
     el.crossorigin = null
-    t.ok(!img.getAttribute('crossorigin'),
+    t.equal(img.crossOrigin, null,
         'removing the attribute should clear the crossorigin attribute')
 })
 
 test('AC6.2: switching from file to URL resets crop and rejects getBlob ' +
     'until load', async t => {
     document.body.insertAdjacentHTML('beforeend', `
-        <image-crop class="reset-test" style="display:block;width:200px;"></image-crop>
+        <image-crop class="reset-test"
+            style="display:block;width:200px;"></image-crop>
     `)
     const el = await waitFor('image-crop.reset-test') as ImageCrop
 

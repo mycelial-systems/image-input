@@ -1,7 +1,8 @@
 import { test } from '@substrate-system/tapzero'
 import { cropDialog } from '../src/crop-dialog.js'
 import { ImageCrop } from '../src/crop.js'
-import { imageFile } from './fixture.js'
+import { imageFile, imageDataUrl } from './fixture.js'
+import { waitForImageLoad } from './helpers.js'
 
 function lastDialog ():HTMLDialogElement {
     const dialogs = document.querySelectorAll<HTMLDialogElement>(
@@ -231,61 +232,29 @@ test('AC6.3 crossorigin: cropDialog forwards crossorigin to image-crop',
     })
 
 test('AC6.3 type: cropDialog guesses type from URL extension and ' +
-    'returns correct blob type',
-    async t => {
-        const originalGetBlob = ImageCrop.prototype.getBlob
-        const blob = new Blob(['cropped'], { type: 'image/png' })
-        let capturedType:string|undefined = undefined
-        ImageCrop.prototype.getBlob = async (opts) => {
-            capturedType = opts?.type
-            return blob
-        }
+    'returns correct blob type', async t => {
+    const promise = cropDialog('/fixtures/photo.png')
+    const dialog = lastDialog()
+    const crop = dialog.querySelector('image-crop') as ImageCrop
+    await waitForImageLoad(crop)
 
-        try {
-            const promise = cropDialog('/fixtures/photo.png')
-            const dialog = lastDialog()
-            await new Promise(resolve => {
-                const crop = dialog.querySelector('image-crop')
-                crop?.addEventListener('image-crop:load', resolve, {
-                    once: true
-                })
-            })
+    dialog.querySelector<HTMLButtonElement>('.crop-save')?.click()
+    const result = await promise
 
-            dialog.querySelector<HTMLButtonElement>('.crop-save')?.click()
-            const result = await promise
-
-            t.equal(capturedType, 'image/png',
-                'guessType should find .png and pass image/png to getBlob')
-            t.equal(result?.type, 'image/png',
-                'the resolved blob should be image/png')
-        } finally {
-            ImageCrop.prototype.getBlob = originalGetBlob
-        }
-    })
+    t.equal(result?.type, 'image/png',
+        'the resolved blob should be image/png')
+})
 
 test('AC6.3 type: cropDialog uses dataUrl type fallback when there ' +
     'is no extension', async t => {
-    const originalGetBlob = ImageCrop.prototype.getBlob
-    const blob = new Blob(['cropped'], { type: 'image/jpeg' })
-    let capturedType:string|undefined = undefined
-    ImageCrop.prototype.getBlob = async (opts) => {
-        capturedType = opts?.type
-        return blob
-    }
+    const promise = cropDialog(imageDataUrl())
+    const dialog = lastDialog()
+    const crop = dialog.querySelector('image-crop') as ImageCrop
+    await waitForImageLoad(crop)
 
-    try {
-        const { imageDataUrl } = await import('./fixture.js')
-        const promise = cropDialog(imageDataUrl())
-        const dialog = lastDialog()
+    dialog.querySelector<HTMLButtonElement>('.crop-save')?.click()
+    const result = await promise
 
-        dialog.querySelector<HTMLButtonElement>('.crop-save')?.click()
-        const result = await promise
-
-        t.equal(capturedType, 'image/jpeg',
-            'dataUrl with no extension should pass image/jpeg to getBlob')
-        t.equal(result?.type, 'image/jpeg',
-            'the resolved blob should be image/jpeg')
-    } finally {
-        ImageCrop.prototype.getBlob = originalGetBlob
-    }
+    t.equal(result?.type, 'image/jpeg',
+        'the resolved blob should be image/jpeg')
 })

@@ -11,6 +11,7 @@ export type CropDialogOptions = {
     save?:string
     cancel?:string
     crop?:CropConstraint|string
+    /** Forwarded to the <image-crop> so the image loads in CORS mode. */
     crossorigin?:string
 }
 
