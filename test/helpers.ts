@@ -55,6 +55,42 @@ export async function makeImageFile (
 }
 
 /**
+ * A fully transparent PNG File at `width` x `height`.
+ */
+export function makeTransparentFile (
+    width:number,
+    height:number
+):Promise<File> {
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    return new Promise(resolve => {
+        canvas.toBlob(blob => {
+            resolve(new File([blob as Blob], 'clear.png', {
+                type: 'image/png'
+            }))
+        }, 'image/png')
+    })
+}
+
+/**
+ * The RGBA values of one pixel of a decoded image Blob.
+ */
+export async function pixelAt (
+    blob:Blob,
+    x:number,
+    y:number
+):Promise<number[]> {
+    const bitmap = await createImageBitmap(blob)
+    const canvas = document.createElement('canvas')
+    canvas.width = bitmap.width
+    canvas.height = bitmap.height
+    const ctx = canvas.getContext('2d') as CanvasRenderingContext2D
+    ctx.drawImage(bitmap, 0, 0)
+    return Array.from(ctx.getImageData(x, y, 1, 1).data)
+}
+
+/**
  * Wait until an `<image-crop>` is usable: its image has decoded and
  * its crop rect has been fitted to the natural size.
  *

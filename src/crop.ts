@@ -10,14 +10,18 @@ import {
     resizeRect,
     resizeRectLocked,
     fitRatioRect,
+    containRatioRect,
+    clampPan,
+    shiftRect,
+    zoomMax,
     parseCropAttribute,
     resolveCropRatio,
-    CORNER_DIRS,
     type CropRect,
     type CropConstraint,
     type DisplaySize,
     type HandleDir,
-    type CornerDir
+    type CornerDir,
+    CORNER_DIRS
 } from './crop-math.js'
 const debug = createDebug('image-crop')
 
@@ -59,9 +63,22 @@ export interface GetBlobOptions {
     quality?:number
 }
 
+/**
+ * The padding color of a zoomed-out crop when `fill` is not set.
+ */
+export const DEFAULT_FILL = '#fff'
+
+/**
+ * How far past the image, in natural pixels, a rect must reach before it
+ * counts as padded. Clamping and zooming in floating point can leave an
+ * edge a hair past the image without any real padding.
+ */
+const PAD_EPSILON = 1e-6
+
 const HANDLES:HandleDir[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
 const MIN_DISPLAY_SIZE = 32
 const KEY_STEP = 8
+const ZOOM_STEP = 1.1
 
 const MOVE_KEYS:Record<string, [number, number]> = {
     ArrowUp: [0, -KEY_STEP],
@@ -70,21 +87,70 @@ const MOVE_KEYS:Record<string, [number, number]> = {
     ArrowRight: [KEY_STEP, 0]
 }
 
-interface DragState {
-    mode:'move'|'resize'
-    handle?:HandleDir
+/**
+ * The zoom factor of shift plus an arrow key under a lock.
+ */
+const ZOOM_KEYS:Record<string, number> = {
+    ArrowUp: ZOOM_STEP,
+    ArrowRight: ZOOM_STEP,
+    ArrowDown: 1 / ZOOM_STEP,
+    ArrowLeft: 1 / ZOOM_STEP
+}
+
+/**
+ * A free-form drag works on the rect in display pixels. A locked pan
+ * works on `#crop` in natural pixels, at the scale it started with. A
+ * locked window drag works on the window in display pixels, with the
+ * image held where it started: a corner `handle` resizes it, and a
+ * `null` one moves it.
+ */
+type DragState = {
     pointerId:number
     startClientX:number
     startClientY:number
-    startRect:CropRect
+} & (
+    | { mode:'move', startRect:CropRect }
+    | { mode:'resize', handle:HandleDir, startRect:CropRect }
+    | { mode:'pan', startCrop:CropRect, scale:number }
+    | {
+        mode:'window',
+        handle:CornerDir|null,
+        startRect:CropRect,
+        image:CropRect,
+        scale:number
+    }
+)
+
+/**
+ * Where the image and the crop rect sit in the frame, in display
+ * pixels, and how many display pixels one natural pixel spans.
+ */
+interface View {
+    frame:DisplaySize
+    scale:number
+    image:CropRect
+    rect:CropRect
+}
+
+function place (el:HTMLElement, box:CropRect):void {
+    el.style.left = `${box.x}px`
+    el.style.top = `${box.y}px`
+    el.style.width = `${box.width}px`
+    el.style.height = `${box.height}px`
 }
 
 export class ImageCrop extends WebComponent {
     static TAG = 'image-crop'
     TAG = ImageCrop.TAG
-    static reflectedStringAttributes = ['src', 'crossorigin']
+    static reflectedStringAttributes = ['src', 'crossorigin', 'fill']
     declare src:string|null
     declare crossorigin:string|null
+    /**
+     * The color painted where a zoomed-out crop extends past the image,
+     * on screen and in `getBlob()`. Any canvas `fillStyle` color;
+     * `DEFAULT_FILL` when unset.
+     */
+    declare fill:string|null
 
     /**
      * `crop` is deliberately *not* in `reflectedStringAttributes`.
@@ -105,6 +171,12 @@ export class ImageCrop extends WebComponent {
     #naturalWidth = 0
     #naturalHeight = 0
     #crop:CropRect = { x: 0, y: 0, width: 0, height: 0 }
+    /**
+     * The locked window, in the frame's natural pixels (the space a
+     * free-form rect lives in), so it scales with the frame. `null` is
+     * the largest window of the ratio, centered.
+     */
+    #window:CropRect|null = null
     #drag:DragState|null = null
     #constraint:CropConstraint|null = null
     #ratio:number|null = null
@@ -115,11 +187,17 @@ export class ImageCrop extends WebComponent {
         super.connectedCallback()
         this.qs('img')?.addEventListener('load', this.#handleImageLoad)
         window.addEventListener('resize', this.#handleResize)
+        this.qs<HTMLElement>('.image-crop-frame')?.addEventListener(
+            'pointerdown', this.#handlePanStart
+        )
         this.qs<HTMLElement>('.crop-rect')?.addEventListener(
             'pointerdown', this.#handleMoveStart
         )
         this.qs<HTMLElement>('.crop-rect')?.addEventListener(
             'keydown', this.#handleKeyDown
+        )
+        this.qs<HTMLInputElement>('.image-crop-zoom input')?.addEventListener(
+            'input', this.#handleZoom
         )
         Array.from(this.querySelectorAll<HTMLElement>('.handle')).forEach(
             handle => {
@@ -139,6 +217,8 @@ export class ImageCrop extends WebComponent {
         this.qs<HTMLElement>('.crop-rect')?.removeEventListener(
             'keydown', this.#handleKeyDown
         )
+        this.qs<HTMLInputElement>('.image-crop-zoom input')
+            ?.removeEventListener('input', this.#handleZoom)
         window.removeEventListener('resize', this.#handleResize)
         window.removeEventListener('pointermove', this.#handlePointerMove)
         window.removeEventListener('pointerup', this.#handlePointerEnd)
@@ -178,6 +258,10 @@ export class ImageCrop extends WebComponent {
         if (img) this.#applyCrossOrigin(img)
     }
 
+    handleChange_fill () {
+        this.#layout()
+    }
+
     /**
      * Re-parses the `crop` constraint and, if an image is already
      * loaded, re-fits the rect to it right away. Before an image has
@@ -196,6 +280,7 @@ export class ImageCrop extends WebComponent {
                 width: this.#naturalWidth,
                 height: this.#naturalHeight
             }
+        this.#window = null
         this.#layout()
         this.emit('change', { detail: { ...this.#crop } })
     }
@@ -277,7 +362,20 @@ export class ImageCrop extends WebComponent {
         canvas.width = width
         canvas.height = height
         const ctx = canvas.getContext('2d') as CanvasRenderingContext2D
-        if (img) {
+        // A rect inside the image draws exactly as it always has, with no
+        // fill, so a transparent source stays transparent. Only a locked
+        // rect that reaches past the image gets the fill behind it.
+        const padded = !!this.#ratio && (
+            x < -PAD_EPSILON ||
+            y < -PAD_EPSILON ||
+            x + width > this.#naturalWidth + PAD_EPSILON ||
+            y + height > this.#naturalHeight + PAD_EPSILON
+        )
+        if (img && padded) {
+            ctx.fillStyle = this.fill ?? DEFAULT_FILL
+            ctx.fillRect(0, 0, width, height)
+            ctx.drawImage(img, -x, -y)
+        } else if (img) {
             ctx.drawImage(img, x, y, width, height, 0, 0, width, height)
         }
 
@@ -313,6 +411,7 @@ export class ImageCrop extends WebComponent {
                 width: this.#naturalWidth,
                 height: this.#naturalHeight
             }
+        this.#window = null
         this.#layout()
 
         // Loading is the one place this element becomes usable, and
@@ -351,6 +450,13 @@ export class ImageCrop extends WebComponent {
      * landed on. `max-height` is authored in CSS and never depends on
      * the content, so it is a stable ceiling.
      *
+     * The zoom slider sits below the frame inside this element, so its
+     * row comes out of the budget whenever it shows. Otherwise a tall
+     * image fills the whole `max-height` and the slider overflows the
+     * element, under whatever follows it -- the dialog's buttons. The
+     * row's height does not depend on the frame, so measuring it cannot
+     * start the feedback loop above.
+     *
      * Returns 0, meaning unconstrained, for `none` and for anything
      * that does not resolve to pixels. A percentage against an
      * auto-height parent resolves to a percentage string rather than a
@@ -361,12 +467,26 @@ export class ImageCrop extends WebComponent {
         const raw = getComputedStyle(this).maxHeight
         if (!raw.endsWith('px')) return 0
         const px = parseFloat(raw)
-        return (Number.isFinite(px) && px > 0) ? px : 0
+        if (!Number.isFinite(px) || px <= 0) return 0
+        const budget = px - this.#zoomRowHeight()
+        // Never 0, which would read as unconstrained
+        return Math.max(budget, 1)
     }
 
     /**
-     * The displayed image size, fitted to the element's available width
-     * *and* height so a tall image never overflows its container.
+     * The block size the zoom slider adds below the frame, margin
+     * included, or 0 while it is hidden.
+     */
+    #zoomRowHeight ():number {
+        const label = this.qs<HTMLLabelElement>('.image-crop-zoom')
+        if (!label || label.hidden) return 0
+        const margin = parseFloat(getComputedStyle(label).marginBlockStart)
+        return label.offsetHeight + (Number.isFinite(margin) ? margin : 0)
+    }
+
+    /**
+     * The frame's size: the image fitted to the element's available
+     * width *and* height, so a tall image never overflows its container.
      */
     #fitted ():DisplaySize {
         return fitWithin(
@@ -378,61 +498,238 @@ export class ImageCrop extends WebComponent {
     }
 
     /**
-     * Scale factor from natural-image pixels to the current display,
-     * consistent with `#fitted()`.
+     * Everything on screen, derived from `#crop` and `#window`.
+     * Free-form, the image fills the frame and the rect moves over it.
+     * Under a lock the rect is the window, and the image is scaled and
+     * placed behind it so that `#crop` fills the window exactly. A pan
+     * or a zoom then moves only the image.
      */
-    #scale ():number {
-        if (this.#naturalWidth <= 0) return 1
-        return this.#fitted().width / this.#naturalWidth
+    #view ():View {
+        const frame = this.#fitted()
+        const frameScale = frame.width / this.#naturalWidth
+        if (!this.#ratio) {
+            return {
+                frame,
+                scale: frameScale,
+                image: { x: 0, y: 0, ...frame },
+                rect: toDisplayRect(this.#crop, frameScale)
+            }
+        }
+
+        const rect = toDisplayRect(this.#window ?? fitRatioRect(
+            this.#ratio, this.#naturalWidth, this.#naturalHeight
+        ), frameScale)
+        const scale = rect.width / this.#crop.width
+        return {
+            frame,
+            scale,
+            image: {
+                x: rect.x - this.#crop.x * scale,
+                y: rect.y - this.#crop.y * scale,
+                width: this.#naturalWidth * scale,
+                height: this.#naturalHeight * scale
+            },
+            rect
+        }
     }
 
+    /**
+     * `from`, with the image dragged (dx, dy) display pixels behind a
+     * locked window. The crop moves the other way, in natural pixels.
+     */
+    #panned (
+        from:CropRect,
+        dx:number,
+        dy:number,
+        scale:number
+    ):CropRect {
+        return clampPan(
+            shiftRect(from, -dx / scale, -dy / scale),
+            this.#naturalWidth,
+            this.#naturalHeight
+        )
+    }
+
+    /**
+     * The zoom scale under a lock. Zoom is `stage.width / crop.width`,
+     * where the stage is the largest crop, the one that shows the whole
+     * image. So 1 is the stage, and `max` is `MAX_ZOOM_PAST_COVER` past
+     * the cover rect.
+     */
+    #zoom (ratio:number):{ stage:CropRect, value:number, max:number } {
+        const stage = containRatioRect(
+            ratio, this.#naturalWidth, this.#naturalHeight
+        )
+        const cover = fitRatioRect(
+            ratio, this.#naturalWidth, this.#naturalHeight
+        )
+        return {
+            stage,
+            value: stage.width / this.#crop.width,
+            max: zoomMax(stage.width, cover.width)
+        }
+    }
+
+    /**
+     * `#crop` at zoom `value`, kept in range, about the center of the
+     * window. Sizing off the stage rather than the ratio makes zoom 1 the
+     * stage's exact size, so the encoded image cannot lose a row to float
+     * error.
+     */
+    #zoomed (ratio:number, value:number):CropRect {
+        const { stage, max } = this.#zoom(ratio)
+        const zoom = Math.min(Math.max(value, 1), max)
+        const width = stage.width / zoom
+        const height = stage.height / zoom
+        return clampPan({
+            x: this.#crop.x + (this.#crop.width - width) / 2,
+            y: this.#crop.y + (this.#crop.height - height) / 2,
+            width,
+            height
+        }, this.#naturalWidth, this.#naturalHeight)
+    }
+
+    /**
+     * Under a lock, a drag anywhere on the frame outside the window pans
+     * the image. The window takes its own presses, see `#handleMoveStart`.
+     */
+    #handlePanStart = (e:PointerEvent):void => {
+        if (!this.#naturalWidth || !this.#ratio) return
+        e.preventDefault()
+        const frame = e.currentTarget as HTMLElement
+        try {
+            frame.setPointerCapture(e.pointerId)
+        } catch { /* not a real pointer in this environment */ }
+        frame.classList.add('panning')
+
+        this.#drag = {
+            mode: 'pan',
+            pointerId: e.pointerId,
+            startClientX: e.clientX,
+            startClientY: e.clientY,
+            startCrop: { ...this.#crop },
+            scale: this.#view().scale
+        }
+    }
+
+    /**
+     * A drag inside the rect moves it. Under a lock that is the window,
+     * moving over the still image, so the frame must not also pan.
+     */
     #handleMoveStart = (e:PointerEvent):void => {
         if (!this.#naturalWidth) return
         e.preventDefault()
+        if (this.#ratio) e.stopPropagation()
         const rectEl = this.qs<HTMLElement>('.crop-rect')
         try {
             rectEl?.setPointerCapture(e.pointerId)
         } catch { /* not a real pointer in this environment */ }
 
-        const scale = this.#scale()
-        this.#drag = {
-            mode: 'move',
+        const view = this.#view()
+        const start = {
             pointerId: e.pointerId,
             startClientX: e.clientX,
             startClientY: e.clientY,
-            startRect: toDisplayRect(this.#crop, scale)
+            startRect: view.rect
         }
+        this.#drag = this.#ratio ?
+            {
+                ...start,
+                mode: 'window',
+                handle: null,
+                image: view.image,
+                scale: view.scale
+            } :
+            { ...start, mode: 'move' }
     }
 
     #handleResizeStart = (e:PointerEvent):void => {
         if (!this.#naturalWidth) return
-        e.preventDefault()
-        e.stopPropagation()
         const handleEl = e.currentTarget as HTMLElement
         const handle = HANDLES.find(
             dir => handleEl.classList.contains(`handle-${dir}`)
         )
         if (!handle) return
-        // Edge handles have no honest behavior once the ratio is
-        // locked (see FDR-001) -- CSS hides them, but ignore a drag
-        // that somehow still reaches one rather than break the ratio.
-        if (this.#ratio && !CORNER_DIRS.includes(handle as CornerDir)) {
-            return
-        }
+        // Under a lock CSS hides the edge handles, which have no honest
+        // behavior (FDR-001). A press that still reaches one bubbles to
+        // the window, which moves.
+        const corner = CORNER_DIRS.find(dir => dir === handle)
+        if (this.#ratio && !corner) return
+        e.preventDefault()
+        e.stopPropagation()
 
         try {
             handleEl.setPointerCapture(e.pointerId)
         } catch { /* not a real pointer in this environment */ }
 
-        const scale = this.#scale()
-        this.#drag = {
-            mode: 'resize',
-            handle,
+        const view = this.#view()
+        const start = {
             pointerId: e.pointerId,
             startClientX: e.clientX,
             startClientY: e.clientY,
-            startRect: toDisplayRect(this.#crop, scale)
+            startRect: view.rect
         }
+        this.#drag = (this.#ratio && corner) ?
+            {
+                ...start,
+                mode: 'window',
+                handle: corner,
+                image: view.image,
+                scale: view.scale
+            } :
+            { ...start, mode: 'resize', handle }
+    }
+
+    /**
+     * A locked corner drag resizes the window with the image held still,
+     * so the crop becomes whatever the window now covers. The window's
+     * width is held to the zoom slider's range, and `clampPan` keeps a
+     * zoomed-out drag from opening up padding.
+     */
+    #resizedWindow (
+        drag:Extract<DragState, { mode:'window' }>,
+        handle:CornerDir,
+        ratio:number,
+        dx:number,
+        dy:number
+    ):void {
+        const { frame } = this.#view()
+        const { stage, max } = this.#zoom(ratio)
+        const rect = resizeRectLocked(
+            drag.startRect, handle, dx, dy, frame, ratio, {
+                min: Math.max(
+                    MIN_DISPLAY_SIZE * Math.max(1, ratio),
+                    stage.width / max * drag.scale
+                ),
+                max: stage.width * drag.scale
+            }
+        )
+        this.#window = toNaturalRect(rect, frame.width / this.#naturalWidth)
+        this.#crop = clampPan(toNaturalRect(
+            shiftRect(rect, -drag.image.x, -drag.image.y), drag.scale
+        ), this.#naturalWidth, this.#naturalHeight)
+    }
+
+    /**
+     * A locked window dragged from inside moves over the still image, so
+     * the crop becomes whatever the window now covers. It stays in the
+     * frame, and `clampPan` keeps it on the image the way it keeps a pan
+     * from opening up padding. The window is then put back over the
+     * clamped crop, so it stops at the image's edge.
+     */
+    #movedWindow (
+        drag:Extract<DragState, { mode:'window' }>,
+        dx:number,
+        dy:number
+    ):void {
+        const { frame } = this.#view()
+        const { image, scale } = drag
+        this.#crop = clampPan(toNaturalRect(shiftRect(
+            moveRect(drag.startRect, dx, dy, frame), -image.x, -image.y
+        ), scale), this.#naturalWidth, this.#naturalHeight)
+        this.#window = toNaturalRect(shiftRect(
+            toDisplayRect(this.#crop, scale), image.x, image.y
+        ), frame.width / this.#naturalWidth)
     }
 
     #handlePointerMove = (e:PointerEvent):void => {
@@ -441,22 +738,25 @@ export class ImageCrop extends WebComponent {
 
         const dx = e.clientX - drag.startClientX
         const dy = e.clientY - drag.startClientY
-        const bounds = this.#fitted()
 
-        const newDisplayRect = drag.mode === 'move' ?
-            moveRect(drag.startRect, dx, dy, bounds) :
-            this.#ratio ?
-                resizeRectLocked(
-                    drag.startRect, drag.handle as CornerDir, dx, dy,
-                    bounds, MIN_DISPLAY_SIZE, this.#ratio
-                ) :
+        if (drag.mode === 'pan') {
+            this.#crop = this.#panned(drag.startCrop, dx, dy, drag.scale)
+        } else if (drag.mode === 'window') {
+            if (!this.#ratio) return
+            if (drag.handle) {
+                this.#resizedWindow(drag, drag.handle, this.#ratio, dx, dy)
+            } else {
+                this.#movedWindow(drag, dx, dy)
+            }
+        } else {
+            const { frame, scale } = this.#view()
+            this.#crop = toNaturalRect(drag.mode === 'move' ?
+                moveRect(drag.startRect, dx, dy, frame) :
                 resizeRect(
-                    drag.startRect, drag.handle!, dx, dy, bounds,
+                    drag.startRect, drag.handle, dx, dy, frame,
                     MIN_DISPLAY_SIZE
-                )
-
-        const scale = this.#scale()
-        this.#crop = toNaturalRect(newDisplayRect, scale)
+                ), scale)
+        }
         this.#layout()
         this.emit('change', { detail: { ...this.#crop } })
     }
@@ -468,27 +768,39 @@ export class ImageCrop extends WebComponent {
         e.preventDefault()
 
         const [dx, dy] = delta
-        const bounds = this.#fitted()
-        const scale = this.#scale()
-        const displayRect = toDisplayRect(this.#crop, scale)
+        const { frame, scale, rect } = this.#view()
 
-        const newDisplayRect = e.shiftKey ?
-            (this.#ratio ?
-                resizeRectLocked(
-                    displayRect, 'se', dx, dy, bounds, MIN_DISPLAY_SIZE,
-                    this.#ratio
+        if (this.#ratio) {
+            this.#crop = e.shiftKey ?
+                this.#zoomed(
+                    this.#ratio,
+                    this.#zoom(this.#ratio).value * ZOOM_KEYS[e.key]
                 ) :
+                this.#panned(this.#crop, dx, dy, scale)
+        } else {
+            this.#crop = toNaturalRect(e.shiftKey ?
                 resizeRect(
-                    displayRect,
+                    rect,
                     (dx !== 0 ? 'e' : 's'),
                     dx,
                     dy,
-                    bounds,
+                    frame,
                     MIN_DISPLAY_SIZE
-                )) :
-            moveRect(displayRect, dx, dy, bounds)
+                ) :
+                moveRect(rect, dx, dy, frame), scale)
+        }
+        this.#layout()
+        this.emit('change', { detail: { ...this.#crop } })
+    }
 
-        this.#crop = toNaturalRect(newDisplayRect, scale)
+    /**
+     * `#layout()` writes the slider's value back, which is what keeps it
+     * in step with the keys too.
+     */
+    #handleZoom = (e:Event):void => {
+        if (!this.#naturalWidth || !this.#ratio) return
+        const value = Number((e.currentTarget as HTMLInputElement).value)
+        this.#crop = this.#zoomed(this.#ratio, value)
         this.#layout()
         this.emit('change', { detail: { ...this.#crop } })
     }
@@ -496,37 +808,55 @@ export class ImageCrop extends WebComponent {
     #handlePointerEnd = (e:PointerEvent):void => {
         if (!this.#drag || e.pointerId !== this.#drag.pointerId) return
         this.#drag = null
+        this.qs<HTMLElement>('.image-crop-frame')?.classList
+            .remove('panning')
     }
 
     #layout ():void {
         const frame = this.qs<HTMLElement>('.image-crop-frame')
-        const img = this.qs('img')
+        const img = this.qs<HTMLElement>('img')
         const rect = this.qs<HTMLElement>('.crop-rect')
         if (!frame || !img || !rect || !this.#naturalWidth) return
 
         frame.classList.toggle('locked', !!this.#ratio)
         frame.classList.toggle('circle', this.#circle)
         rect.setAttribute('aria-label', this.#ratio ?
-            'Crop area, locked to a fixed shape. Use arrow keys to ' +
-                'move, shift plus arrow keys to scale.' :
+            'Crop area, locked to a fixed shape. Drag or use arrow ' +
+                'keys to move the image, and shift plus arrow keys or ' +
+                'the zoom slider to zoom.' :
             'Crop area. Use arrow keys to move, shift plus arrow keys ' +
                 'to resize.')
 
-        const displaySize = this.#fitted()
-        frame.style.width = `${displaySize.width}px`
-        frame.style.height = `${displaySize.height}px`
-        img.style.width = `${displaySize.width}px`
-        img.style.height = `${displaySize.height}px`
+        // Before `#view()`: the slider's visibility sets the height budget
+        const label = this.qs<HTMLLabelElement>('.image-crop-zoom')
+        if (label) label.hidden = !this.#ratio
 
-        const scale = this.#scale()
-        const displayRect = toDisplayRect(this.#crop, scale)
+        const view = this.#view()
+        frame.style.width = `${view.frame.width}px`
+        frame.style.height = `${view.frame.height}px`
+        frame.style.backgroundColor = this.#ratio ?
+            (this.fill ?? DEFAULT_FILL) :
+            ''
+        place(img, view.image)
+        place(rect, view.rect)
 
-        rect.style.left = `${displayRect.x}px`
-        rect.style.top = `${displayRect.y}px`
-        rect.style.width = `${displayRect.width}px`
-        rect.style.height = `${displayRect.height}px`
+        this.#layoutDimPanels(view.frame.width, view.frame.height, view.rect)
+        this.#layoutZoom()
+    }
 
-        this.#layoutDimPanels(displaySize.width, displaySize.height, displayRect)
+    /**
+     * Set the zoom slider from the current rect. Every rect change ends
+     * in `#layout()`, so this is the one place the slider is kept in
+     * sync. `#layout()` shows or hides it.
+     */
+    #layoutZoom ():void {
+        const input = this.qs<HTMLInputElement>('.image-crop-zoom input')
+        if (!input || !this.#ratio) return
+
+        // Set max before value: a range input clamps its value to max.
+        const { value, max } = this.#zoom(this.#ratio)
+        input.max = String(max)
+        input.value = String(value)
     }
 
     #layoutDimPanels (
@@ -606,7 +936,11 @@ export class ImageCrop extends WebComponent {
                 role="group"
                 aria-label="Crop area. Use arrow keys to move, shift plus arrow keys to resize."
             >${handles}</div>
-        </div>`
+        </div>
+        <label class="image-crop-zoom" hidden>
+            <span>Zoom</span>
+            <input type="range" min="1" max="1" step="any" value="1" />
+        </label>`
     }
 }
 

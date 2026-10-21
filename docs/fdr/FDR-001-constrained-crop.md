@@ -2,7 +2,7 @@
 
 **Status:** Implemented, pending the revision in
 [ADR-002](../adr/ADR-002-events-not-dialogs.md)
-**Last reviewed:** 2026-07-29
+**Last reviewed:** 2026-10-20
 
 ## Overview
 
@@ -36,15 +36,11 @@ without validating it afterwards or writing their own crop UI.
   circle rather than a square.
 * When a ratio is locked, the rect starts as the largest rect of that
   ratio, centered on the image, rather than covering the whole image.
-* When a ratio is locked, only the four corner handles are shown. A
-  corner drag anchors the opposite corner and scales the rect
-  proportionally.
-* Keyboard resizing (shift plus an arrow key) scales the locked rect
-  proportionally instead of resizing one axis. Plain arrow keys move
-  the rect, unchanged.
-* The rect stays fully inside the image at all times. A drag or
-  keypress that would push it past an edge stops at the edge instead
-  of breaking the ratio.
+* When a ratio is locked, the rect becomes a window and the image pans
+  and zooms behind it. The four corner handles still resize the window,
+  and a drag inside it still moves it, both with the image held still.
+  Shift plus an arrow key zooms instead of
+  resizing. See [FDR-007](FDR-007-crop-zoom.md).
 * Changing the attribute after an image has loaded re-fits the rect to
   the new constraint.
 * The cropped `Blob` is unaffected by the constraint beyond its
@@ -125,6 +121,9 @@ less than its name suggests, so the README has to be explicit that the
 blob is square.
 
 ### 4. Corner handles only when a ratio is locked
+
+Still in force under [FDR-007](FDR-007-crop-zoom.md): a corner drag
+resizes the window, and the image behind it stays put.
 
 **Decision:** The four edge handles are hidden while a constraint is
 active.

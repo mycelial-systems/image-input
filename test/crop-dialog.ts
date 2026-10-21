@@ -258,3 +258,13 @@ test('AC6.3 type: cropDialog uses dataUrl type fallback when there ' +
     t.equal(result?.type, 'image/jpeg',
         'the resolved blob should be image/jpeg')
 })
+
+test('cropDialog forwards fill to its image-crop', async t => {
+    const promise = cropDialog(imageFile('photo.png', 'image/png'),
+        { crop: '2', fill: '#000' })
+    const crop = lastDialog().querySelector('image-crop') as ImageCrop
+    t.equal(crop.getAttribute('fill'), '#000', 'should forward fill')
+
+    lastDialog().querySelector<HTMLButtonElement>('.crop-cancel')?.click()
+    await promise
+})

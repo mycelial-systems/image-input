@@ -8,7 +8,11 @@ import {
     fitRatioRect,
     parseAspectRatio,
     parseCropAttribute,
-    resolveCropRatio
+    resolveCropRatio,
+    containRatioRect,
+    clampPan,
+    shiftRect,
+    zoomMax
 } from '../src/crop-math.js'
 
 test('fitWithin fits to the width when height is unconstrained', t => {
@@ -208,12 +212,14 @@ test('fitRatioRect centers the largest rect of the given ratio inside ' +
     t.deepEqual(rect, { x: 0, y: 100, width: 200, height: 200 })
 })
 
+const ANY_WIDTH = { min: 32, max: Infinity }
+
 test('resizeRectLocked with a corner handle scales both axes, ' +
     'preserving the ratio', t => {
     const rect = { x: 20, y: 20, width: 100, height: 50 }
     const bounds = { width: 400, height: 400 }
 
-    const resized = resizeRectLocked(rect, 'se', 40, 0, bounds, 32, 2)
+    const resized = resizeRectLocked(rect, 'se', 40, 0, bounds, 2, ANY_WIDTH)
 
     t.equal(resized.width / resized.height, 2, 'ratio should be preserved')
     t.equal(resized.x, 20, 'the anchored (nw) corner should not move')
@@ -225,7 +231,7 @@ test('resizeRectLocked anchors the opposite corner from the dragged one', t => {
     const rect = { x: 100, y: 100, width: 100, height: 50 }
     const bounds = { width: 400, height: 400 }
 
-    const resized = resizeRectLocked(rect, 'nw', -40, 0, bounds, 32, 2)
+    const resized = resizeRectLocked(rect, 'nw', -40, 0, bounds, 2, ANY_WIDTH)
 
     t.equal(resized.width / resized.height, 2, 'ratio should be preserved')
     t.equal(resized.x + resized.width, rect.x + rect.width,
@@ -234,16 +240,27 @@ test('resizeRectLocked anchors the opposite corner from the dragged one', t => {
         'the anchored (se) corner\'s bottom edge should not move')
 })
 
-test('resizeRectLocked enforces a minimum size on both axes without ' +
-    'breaking the ratio', t => {
+test('resizeRectLocked keeps the width at or above its minimum', t => {
     const rect = { x: 20, y: 20, width: 100, height: 50 }
     const bounds = { width: 400, height: 400 }
 
-    const resized = resizeRectLocked(rect, 'se', -1000, -1000, bounds, 32, 2)
+    const resized = resizeRectLocked(rect, 'se', -1000, -1000, bounds, 2,
+        { min: 64, max: Infinity })
 
     t.equal(resized.width / resized.height, 2, 'ratio should be preserved')
-    t.ok(resized.width >= 32, 'width should not shrink below the minimum')
-    t.ok(resized.height >= 32, 'height should not shrink below the minimum')
+    t.equal(resized.width, 64, 'width should stop at the minimum')
+})
+
+test('resizeRectLocked keeps the width at or below its maximum', t => {
+    const rect = { x: 20, y: 20, width: 100, height: 50 }
+    const bounds = { width: 400, height: 400 }
+
+    const resized = resizeRectLocked(rect, 'se', 1000, 1000, bounds, 2,
+        { min: 32, max: 150 })
+
+    t.equal(resized.width / resized.height, 2, 'ratio should be preserved')
+    t.equal(resized.width, 150, 'width should stop at the maximum')
+    t.equal(resized.x, 20, 'the anchored (nw) corner should not move')
 })
 
 test('resizeRectLocked shrinks from a delta on a single axis -- a ' +
@@ -253,7 +270,7 @@ t => {
     const rect = { x: 50, y: 0, width: 100, height: 100 }
     const bounds = { width: 200, height: 100 }
 
-    const resized = resizeRectLocked(rect, 'se', -30, 0, bounds, 32, 1)
+    const resized = resizeRectLocked(rect, 'se', -30, 0, bounds, 1, ANY_WIDTH)
 
     t.ok(resized.width < rect.width, 'should shrink from a dx-only delta')
     t.equal(resized.width, resized.height, 'ratio should be preserved')
@@ -264,11 +281,75 @@ test('resizeRectLocked clamps growth to the bounds without breaking ' +
     const rect = { x: 20, y: 20, width: 100, height: 50 }
     const bounds = { width: 150, height: 100 }
 
-    const resized = resizeRectLocked(rect, 'se', 1000, 1000, bounds, 32, 2)
+    const resized = resizeRectLocked(rect, 'se', 1000, 1000, bounds, 2,
+        ANY_WIDTH)
 
     t.equal(resized.width / resized.height, 2, 'ratio should be preserved')
     t.ok(resized.x + resized.width <= bounds.width,
         'right edge should stay inside the bounds')
     t.ok(resized.y + resized.height <= bounds.height,
         'bottom edge should stay inside the bounds')
+})
+
+test('containRatioRect pads a square image at the sides', t => {
+    const r = containRatioRect(1200 / 630, 100, 100)
+    t.equal(r.height, 100, 'height should match the image')
+    t.equal(r.width, 100 * (1200 / 630), 'width should follow the ratio')
+    t.equal(r.x, -(r.width - 100) / 2, 'should center horizontally')
+    t.equal(r.y, 0, 'should not pad vertically')
+})
+
+test('containRatioRect pads a wide image above and below', t => {
+    const r = containRatioRect(2, 300, 100)
+    t.equal(r.width, 300, 'width should match the image')
+    t.equal(r.height, 150, 'height should follow the ratio')
+    t.equal(r.x, 0, 'should not pad horizontally')
+    t.equal(r.y, -25, 'should center vertically')
+})
+
+test('containRatioRect equals the image when the ratios match', t => {
+    t.deepEqual(containRatioRect(2, 200, 100),
+        { x: 0, y: 0, width: 200, height: 100 },
+        'should be the image itself')
+})
+
+test('clampPan keeps a crop smaller than the image inside it', t => {
+    t.deepEqual(clampPan({ x: -10, y: 80, width: 50, height: 50 }, 200, 100),
+        { x: 0, y: 50, width: 50, height: 50 },
+        'should pull the crop back from the top left and bottom edges')
+    t.deepEqual(clampPan({ x: 180, y: -1, width: 50, height: 50 }, 200, 100),
+        { x: 150, y: 0, width: 50, height: 50 },
+        'should pull the crop back from the right and top edges')
+})
+
+test('clampPan keeps an image smaller than the crop inside the crop', t => {
+    t.deepEqual(clampPan({ x: 10, y: 0, width: 190, height: 100 }, 100, 100),
+        { x: 0, y: 0, width: 190, height: 100 },
+        'the image should not leave the crop\'s left edge')
+    t.deepEqual(
+        clampPan({ x: -100, y: 0, width: 190, height: 100 }, 100, 100),
+        { x: -90, y: 0, width: 190, height: 100 },
+        'the image should not leave the crop\'s right edge')
+})
+
+test('clampPan clamps each axis on its own', t => {
+    // wider than the image, so the image sits inside it across, but
+    // shorter, so it sits inside the image down
+    t.deepEqual(clampPan({ x: 5, y: -5, width: 150, height: 50 }, 100, 100),
+        { x: 0, y: 0, width: 150, height: 50 },
+        'should clamp x as padded and y as covered')
+    t.deepEqual(
+        clampPan({ x: -20, y: 30, width: 150, height: 50 }, 100, 100),
+        { x: -20, y: 30, width: 150, height: 50 },
+        'should leave a position inside both ranges alone')
+})
+
+test('shiftRect translates without resizing', t => {
+    t.deepEqual(shiftRect({ x: 1, y: 2, width: 3, height: 4 }, -1, 5),
+        { x: 0, y: 7, width: 3, height: 4 }, 'should move by dx, dy')
+})
+
+test('zoomMax is 4x past the cover zoom', t => {
+    // stage 200 wide, cover 100 wide, so the cover zoom is 2
+    t.equal(zoomMax(200, 100), 8, 'should stop at 4 x 2')
 })

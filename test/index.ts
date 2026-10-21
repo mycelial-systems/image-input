@@ -953,6 +953,23 @@ test('clicking edit forwards the crop attribute onto the lazily ' +
         'the crop attribute should be forwarded onto the image-crop')
 })
 
+test('clicking edit forwards the fill attribute onto the image-crop',
+    async t => {
+        document.body.insertAdjacentHTML('beforeend', `
+            <image-input class="fill-forward-test" crop="2" fill="#000">
+            </image-input>
+        `)
+        const el = await waitFor(
+            'image-input.fill-forward-test'
+        ) as ImageInput
+        selectFile(el, imageFile('photo.png', 'image/png'))
+        ;(el.querySelector('.edit') as HTMLButtonElement).click()
+
+        const cropEl = el.querySelector('image-crop') as HTMLElement
+        t.equal(cropEl.getAttribute('fill'), '#000',
+            'the fill attribute should be forwarded onto the image-crop')
+    })
+
 test('reopening the crop dialog reuses the existing image-crop, ' +
     'without appending a duplicate', async t => {
     document.body.insertAdjacentHTML('beforeend', `

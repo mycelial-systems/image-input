@@ -2,7 +2,13 @@ import { test } from '@substrate-system/tapzero'
 import { waitFor } from '@substrate-system/dom'
 import '../src/crop.js'
 import type { CropRect, ImageCrop } from '../src/crop.js'
-import { makeImageFile, waitForImageLoad } from './helpers.js'
+import {
+    makeImageFile,
+    makeTransparentFile,
+    pixelAt,
+    waitForImageLoad
+} from './helpers.js'
+import { containRatioRect, fitRatioRect } from '../src/crop-math.js'
 
 test('example test', async t => {
     document.body.insertAdjacentHTML('beforeend', `
@@ -472,6 +478,25 @@ test('constrains the displayed height by the element\'s max-height, ' +
         'capped height')
 })
 
+test('a locked crop keeps the frame and zoom slider within max-height',
+    async t => {
+        document.body.insertAdjacentHTML('beforeend', `
+            <image-crop class="max-height-zoom-test" crop="1/1"
+                style="display:block;width:400px;max-height:200px;">
+            </image-crop>
+        `)
+        const el = await waitFor(
+            'image-crop.max-height-zoom-test'
+        ) as ImageCrop
+        el.setFile(await makeImageFile(400, 800))
+        await waitForImageLoad(el)
+
+        const zoom = el.querySelector('.image-crop-zoom') as HTMLElement
+        t.ok(!zoom.hidden, 'should show the zoom slider under a lock')
+        t.ok(el.scrollHeight <= el.clientHeight,
+            'the frame and zoom slider should not overflow the element')
+    })
+
 /**
  * Regression test. `#fitted` used to take its height budget from
  * `clientHeight`, which is the height of the frame it had itself just
@@ -527,9 +552,8 @@ test('crop="3/4" locks the initial rect to that ratio, centered', async t => {
         'the frame should be marked locked')
 })
 
-test('crop="constrain" locks to the source image\'s own ratio -- the ' +
-    'starting rect covers the whole image, but edge handles are inert',
-async t => {
+test('crop="constrain" locks to the source image\'s own ratio, and ' +
+    'the starting rect covers the whole image', async t => {
     document.body.insertAdjacentHTML('beforeend', `
             <image-crop class="constrain-test" crop="constrain"
                 style="display:block;width:200px;"></image-crop>
@@ -545,21 +569,6 @@ async t => {
     const frame = el.querySelector('.image-crop-frame') as HTMLElement
     t.ok(frame.classList.contains('locked'),
         'the frame should be marked locked')
-
-    const edgeHandle = el.querySelector('.handle-n') as HTMLElement
-    const handleRect = edgeHandle.getBoundingClientRect()
-    edgeHandle.dispatchEvent(
-        pointer('pointerdown', handleRect.left, handleRect.top)
-    )
-    window.dispatchEvent(
-        pointer('pointermove', handleRect.left, handleRect.top + 30)
-    )
-    window.dispatchEvent(
-        pointer('pointerup', handleRect.left, handleRect.top + 30)
-    )
-
-    t.deepEqual(el.crop, { x: 0, y: 0, width: 200, height: 100 },
-        'dragging an edge handle should do nothing while locked')
 })
 
 test('crop="circle" locks to 1:1 and marks the frame for circular chrome',
@@ -616,75 +625,169 @@ test('an invalid crop value falls back to free-form cropping, without ' +
         'the frame should not be marked locked')
 })
 
-test('a corner drag under a lock scales the rect proportionally, ' +
-    'anchoring the opposite corner', async t => {
+async function lockedWide (cls:string):Promise<ImageCrop> {
     document.body.insertAdjacentHTML('beforeend', `
-        <image-crop class="locked-drag-test" crop="1/1"
+        <image-crop class="${cls}" crop="1/1"
             style="display:block;width:200px;"></image-crop>
     `)
-    const el = await waitFor('image-crop.locked-drag-test') as ImageCrop
-    const file = await makeImageFile(200, 100)
-    el.setFile(file)
+    const el = await waitFor(`image-crop.${cls}`) as ImageCrop
+    el.setFile(await makeImageFile(200, 100))
     await waitForImageLoad(el)
+    return el
+}
 
-    t.deepEqual(el.crop, { x: 50, y: 0, width: 100, height: 100 },
-        'sanity check: initial square rect')
+test('a corner handle resizes a locked window, and the image stays put',
+    async t => {
+        const el = await lockedWide('locked-handle-test')
+        const changes:CropRect[] = []
+        el.addEventListener('image-crop:change', ev => {
+            changes.push(ev.detail)
+        })
+        const windowBefore = box(el, '.crop-rect')
+        const imgBefore = box(el, 'img')
 
-    const handle = el.querySelector('.handle-se') as HTMLElement
-    const handleRect = handle.getBoundingClientRect()
-    const startX = handleRect.left + handleRect.width / 2
-    const startY = handleRect.top + handleRect.height / 2
+        drag(el.querySelector('.handle-nw') as HTMLElement, 20, 20)
 
-    handle.dispatchEvent(pointer('pointerdown', startX, startY))
-    window.dispatchEvent(pointer('pointermove', startX - 30, startY - 10))
-    window.dispatchEvent(pointer('pointerup', startX - 30, startY - 10))
+        const win = box(el, '.crop-rect')
+        t.ok(near(win.width, windowBefore.width - 20, 0.5),
+            'the window should shrink with the pointer')
+        t.ok(near(win.width, win.height, 0.5), 'and keep its 1:1 ratio')
+        t.ok(near(win.right, windowBefore.right, 0.5) &&
+            near(win.bottom, windowBefore.bottom, 0.5),
+        'the opposite corner should stay put')
+        t.ok(nearRect(box(el, 'img'), imgBefore, 0.5),
+            'the image should not move or resize')
 
-    t.deepEqual(el.crop, { x: 50, y: 0, width: 90, height: 90 },
-        'should shrink, preserving the 1:1 ratio, anchored at the nw corner')
+        t.ok(nearRect(el.crop, { x: 70, y: 20, width: 80, height: 80 }),
+            'the crop should be what the window now covers')
+        t.ok(changes.length > 0 &&
+            nearRect(changes[changes.length - 1], el.crop),
+        'should emit change with the new crop')
+        t.ok(near(Number(zoomInput(el).value), 200 / 80),
+            'the slider should follow the new crop size')
+    })
+
+test('an edge handle does not resize a locked window', async t => {
+    const el = await lockedWide('locked-edge-handle-test')
+    const windowBefore = box(el, '.crop-rect')
+
+    for (const dir of ['n', 'e', 's', 'w']) {
+        drag(el.querySelector(`.handle-${dir}`) as HTMLElement, -20, 10)
+    }
+
+    const win = box(el, '.crop-rect')
+    t.ok(near(win.width, windowBefore.width) &&
+        near(win.height, windowBefore.height),
+    'the window should not resize')
+    t.equal(el.crop.width, 100, 'the crop width should not change')
+    t.equal(el.crop.height, 100, 'the crop height should not change')
 })
 
-test('shift+arrow keys scale the locked rect proportionally, unlike ' +
-    'the free-form case where only one axis changes', async t => {
-    document.body.insertAdjacentHTML('beforeend', `
-        <image-crop class="locked-key-test" crop="1/1"
-            style="display:block;width:200px;"></image-crop>
-    `)
-    const el = await waitFor('image-crop.locked-key-test') as ImageCrop
-    const file = await makeImageFile(200, 100)
-    el.setFile(file)
-    await waitForImageLoad(el)
+test('a resized window keeps its size through a pan, a zoom and a ' +
+    'container resize', async t => {
+    const el = await lockedWide('locked-window-keeps-test')
+    drag(el.querySelector('.handle-se') as HTMLElement, -40, 0)
+    const win = box(el, '.crop-rect')
+    t.ok(near(win.width, 60, 0.5), 'sanity check: the window shrank')
 
-    const rectEl = el.querySelector('.crop-rect') as HTMLElement
-    const before = el.crop
+    drag(el.querySelector('img') as HTMLElement, 10, 10)
+    setZoom(el, Number(zoomInput(el).value) * 1.5)
+    t.ok(nearRect(box(el, '.crop-rect'), win, 0.5),
+        'the window should keep its size and place')
 
-    rectEl.dispatchEvent(key('ArrowLeft', true))
-
-    const after = el.crop
-    t.ok(after.width < before.width, 'shift+ArrowLeft should shrink width')
-    t.ok(after.height < before.height,
-        'shift+ArrowLeft should also shrink height')
-    t.equal(after.width, after.height, 'the 1:1 ratio should be preserved')
+    const crop = el.crop
+    el.style.width = '100px'
+    window.dispatchEvent(new Event('resize'))
+    const half = box(el, '.crop-rect')
+    t.ok(near(half.width, win.width / 2, 0.5) &&
+        near(half.height, win.height / 2, 0.5),
+    'a container half as wide should halve the window')
+    t.ok(nearRect(el.crop, crop), 'and keep the crop')
 })
 
-test('plain arrow keys still move (not resize) a locked crop rect', async t => {
-    document.body.insertAdjacentHTML('beforeend', `
-        <image-crop class="locked-key-move-test" crop="1/1"
-            style="display:block;width:200px;"></image-crop>
-    `)
-    const el = await waitFor('image-crop.locked-key-move-test') as ImageCrop
-    const file = await makeImageFile(200, 100)
-    el.setFile(file)
-    await waitForImageLoad(el)
+test('a corner handle cannot push the zoom past the slider\'s range',
+    async t => {
+        const el = await lockedWide('locked-handle-zoom-range-test')
+        const input = zoomInput(el)
 
+        setZoom(el, input.max)
+        const atMax = box(el, '.crop-rect')
+        drag(el.querySelector('.handle-nw') as HTMLElement, 1000, 1000)
+        t.ok(Number(input.value) <= Number(input.max) + 1e-6,
+            'shrinking the window should not zoom in past the max')
+        t.ok(nearRect(box(el, '.crop-rect'), atMax, 0.5),
+            'so at max zoom the window should not shrink')
+
+        const grow = await lockedWide('locked-handle-zoom-out-test')
+        drag(grow.querySelector('.handle-se') as HTMLElement, -50, 0)
+        setZoom(grow, 1)
+        drag(grow.querySelector('.handle-se') as HTMLElement, 1000, 1000)
+        t.ok(grow.crop.width <= 200 + 1e-6,
+            'growing the window should not zoom out past the stage')
+    })
+
+test('a corner handle cannot open up padding', async t => {
+    const el = await lockedWide('locked-handle-padding-test')
+    setZoom(el, 1)
+    drag(el.querySelector('.handle-se') as HTMLElement, -40, 0)
+
+    const { x, y, width, height } = el.crop
+    t.ok(width < 200 && x >= 0 && x + width <= 200,
+        'narrower than the image, the crop should stay inside it')
+    t.ok(height > 100 && y <= 0 && y + height >= 100,
+        'taller than the image, the image should stay inside the crop')
+})
+
+test('shift+arrow keys zoom a locked crop: up and right in, down and ' +
+    'left out', async t => {
+    const el = await lockedWide('locked-key-zoom-test')
     const rectEl = el.querySelector('.crop-rect') as HTMLElement
-    const before = el.crop
 
+    for (const name of ['ArrowUp', 'ArrowRight']) {
+        const before = el.crop
+        rectEl.dispatchEvent(key(name, true))
+        t.ok(el.crop.width < before.width,
+            `shift+${name} should zoom in to a smaller crop`)
+        t.ok(near(el.crop.width, el.crop.height),
+            'the 1:1 ratio should be preserved')
+    }
+
+    for (const name of ['ArrowDown', 'ArrowLeft']) {
+        const before = el.crop
+        rectEl.dispatchEvent(key(name, true))
+        t.ok(el.crop.width > before.width,
+            `shift+${name} should zoom out to a larger crop`)
+        t.ok(near(el.crop.width, el.crop.height),
+            'the 1:1 ratio should be preserved')
+    }
+})
+
+test('arrow keys move the image behind a locked crop', async t => {
+    const el = await lockedWide('locked-key-pan-test')
+    const rectEl = el.querySelector('.crop-rect') as HTMLElement
+    const img = el.querySelector('img') as HTMLImageElement
+    const windowBefore = rectEl.getBoundingClientRect()
+
+    const before = el.crop
+    const imgBefore = img.getBoundingClientRect()
+    rectEl.dispatchEvent(key('ArrowRight'))
+    t.ok(img.getBoundingClientRect().left > imgBefore.left,
+        'ArrowRight should move the image right')
+    t.ok(el.crop.x < before.x,
+        'so the crop should move toward the image\'s left edge')
+    t.equal(el.crop.width, before.width, 'the size should not change')
+
+    const middle = el.crop
+    const imgMiddle = img.getBoundingClientRect()
     rectEl.dispatchEvent(key('ArrowLeft'))
+    rectEl.dispatchEvent(key('ArrowLeft'))
+    t.ok(img.getBoundingClientRect().left < imgMiddle.left,
+        'ArrowLeft should move the image left')
+    t.ok(el.crop.x > middle.x,
+        'so the crop should move toward the image\'s right edge')
 
-    const after = el.crop
-    t.equal(after.width, before.width, 'size should be unchanged')
-    t.equal(after.height, before.height, 'size should be unchanged')
-    t.ok(after.x < before.x, 'should have moved left')
+    t.ok(nearRect(rectEl.getBoundingClientRect(), windowBefore),
+        'the crop window should stay put')
 })
 
 test('changing the crop attribute after an image has loaded re-fits ' +
@@ -907,4 +1010,442 @@ test('AC6.2: switching from file to URL resets crop and rejects getBlob ' +
     const blob = await el.getBlob()
     t.ok(blob instanceof Blob,
         'getBlob should resolve after URL load')
+})
+
+const CARD = 1200 / 630
+
+async function lockedSquare (
+    cls:string,
+    attrs = '',
+    file?:File
+):Promise<ImageCrop> {
+    document.body.insertAdjacentHTML('beforeend', `
+        <image-crop class="${cls}" crop="1200/630" ${attrs}
+            style="display:block;width:380px;"></image-crop>
+    `)
+    const el = await waitFor(`image-crop.${cls}`) as ImageCrop
+    el.setFile(file ?? await makeImageFile(100, 100))
+    await waitForImageLoad(el)
+    return el
+}
+
+function near (a:number, b:number, epsilon = 0.01):boolean {
+    return Math.abs(a - b) <= epsilon
+}
+
+test('a locked ratio still starts at the cover rect', async t => {
+    const el = await lockedSquare('stage-cover-test')
+    t.deepEqual(el.crop, fitRatioRect(CARD, 100, 100),
+        'should start at the largest card-shaped rect inside the image')
+})
+
+function box (el:ImageCrop, selector:string):DOMRect {
+    return (el.querySelector(selector) as HTMLElement).getBoundingClientRect()
+}
+
+function drag (target:Element, dx:number, dy:number):void {
+    const { left, top } = target.getBoundingClientRect()
+    target.dispatchEvent(pointer('pointerdown', left + 5, top + 5))
+    window.dispatchEvent(pointer('pointermove', left + 5 + dx, top + 5 + dy))
+    window.dispatchEvent(pointer('pointerup', left + 5 + dx, top + 5 + dy))
+}
+
+function inside (inner:DOMRect, outer:DOMRect, epsilon = 0.5):boolean {
+    return inner.left >= outer.left - epsilon &&
+        inner.top >= outer.top - epsilon &&
+        inner.right <= outer.right + epsilon &&
+        inner.bottom <= outer.bottom + epsilon
+}
+
+test('the crop window stays put while the image zooms and pans',
+    async t => {
+        const el = await lockedSquare('window-fixed-test')
+        const windowBefore = box(el, '.crop-rect')
+        const imgBefore = box(el, 'img')
+
+        setZoom(el, zoomInput(el).max)
+        drag(el.querySelector('img') as HTMLElement, 15, -10)
+        t.ok(!nearRect(box(el, 'img'), imgBefore),
+            'sanity check: the image should have moved')
+        t.ok(nearRect(box(el, '.crop-rect'), windowBefore),
+            'the window should not move or resize')
+
+        setZoom(el, 1)
+        t.ok(nearRect(box(el, '.crop-rect'), windowBefore),
+            'the window should not move or resize at zoom 1 either')
+    })
+
+test('zooming changes the image\'s size on screen', async t => {
+    const el = await lockedSquare('zoom-image-size-test')
+    const before = box(el, 'img')
+    const zoom = Number(zoomInput(el).value)
+
+    setZoom(el, zoom * 2)
+    const zoomedIn = box(el, 'img')
+    t.ok(near(zoomedIn.width / before.width, 2) &&
+        near(zoomedIn.height / before.height, 2),
+    'twice the zoom should draw the image twice as large')
+
+    setZoom(el, 1)
+    t.ok(box(el, 'img').width < before.width,
+        'zooming out should draw the image smaller')
+})
+
+test('at zoom 1 the whole image fits inside the window', async t => {
+    const el = await lockedSquare('zoom-one-fit-test')
+    setZoom(el, 1)
+    const win = box(el, '.crop-rect')
+    const img = box(el, 'img')
+
+    t.ok(inside(img, win), 'the image should be inside the window')
+    t.ok(near(img.height, win.height, 0.5),
+        'and should fill it on its own long axis')
+})
+
+test('dragging the image around the window pans the image', async t => {
+    const el = await lockedSquare('pan-drag-test')
+    const changes:CropRect[] = []
+    el.addEventListener('image-crop:change', ev => {
+        changes.push(ev.detail)
+    })
+    const before = el.crop
+    const imgBefore = box(el, 'img')
+    const windowBefore = box(el, '.crop-rect')
+
+    drag(el.querySelector('img') as HTMLElement, 0, 10)
+
+    t.ok(near(box(el, 'img').top, imgBefore.top + 10, 0.5),
+        'the image should move with the pointer')
+    t.ok(nearRect(box(el, '.crop-rect'), windowBefore),
+        'the window should not move')
+    t.ok(el.crop.y < before.y, 'so the crop should move up the image')
+    t.equal(el.crop.height, before.height, 'the size should not change')
+    t.ok(changes.length > 0 &&
+        nearRect(changes[changes.length - 1], el.crop),
+    'the pan should emit change with the new rect')
+})
+
+test('dragging the window moves it over the still image', async t => {
+    const el = await lockedWide('window-move-test')
+    const changes:CropRect[] = []
+    el.addEventListener('image-crop:change', ev => {
+        changes.push(ev.detail)
+    })
+    const windowBefore = box(el, '.crop-rect')
+    const imgBefore = box(el, 'img')
+
+    drag(el.querySelector('.crop-rect') as HTMLElement, -20, 0)
+
+    const win = box(el, '.crop-rect')
+    t.ok(near(win.left, windowBefore.left - 20, 0.5),
+        'the window should move with the pointer')
+    t.ok(near(win.width, windowBefore.width, 0.5),
+        'the window should not resize')
+    t.ok(nearRect(box(el, 'img'), imgBefore, 0.5),
+        'the image should not move or resize')
+    t.ok(nearRect(el.crop, { x: 30, y: 0, width: 100, height: 100 }),
+        'the crop should be what the window now covers')
+    t.ok(changes.length > 0 &&
+        nearRect(changes[changes.length - 1], el.crop),
+    'the move should emit change with the new rect')
+})
+
+test('a window shrunk from a top corner can be dragged back up',
+    async t => {
+        const el = await lockedWide('window-move-up-test')
+        drag(el.querySelector('.handle-ne') as HTMLElement, -40, 40)
+        const parked = box(el, '.crop-rect')
+        const imgBefore = box(el, 'img')
+        t.ok(near(parked.bottom, imgBefore.bottom, 0.5),
+            'sanity check: the window sits on the bottom edge')
+
+        drag(el.querySelector('.crop-rect') as HTMLElement, 0, -20)
+
+        t.ok(near(box(el, '.crop-rect').top, parked.top - 20, 0.5),
+            'the window should move up with the pointer')
+        t.ok(nearRect(box(el, 'img'), imgBefore, 0.5),
+            'the image should not move')
+        t.ok(near(el.crop.y, 20), 'the crop should move up the image')
+    })
+
+test('a dragged window stays on the image and cannot open up padding',
+    async t => {
+        const el = await lockedWide('window-move-clamp-test')
+        drag(el.querySelector('.crop-rect') as HTMLElement, 1000, 1000)
+
+        t.ok(inside(box(el, '.crop-rect'), box(el, 'img')),
+            'the window should stay on the image')
+        t.ok(inside(box(el, '.crop-rect'),
+            box(el, '.image-crop-frame')),
+        'and inside the frame')
+        t.ok(nearRect(el.crop, { x: 100, y: 0, width: 100, height: 100 }),
+            'the crop should stop at the image\'s edge')
+
+        setZoom(el, 1)
+        drag(el.querySelector('.crop-rect') as HTMLElement, 0, 1000)
+        const { y, height } = el.crop
+        t.ok(y <= 1e-6 && y + height >= 100 - 1e-6,
+            'taller than the image, the image should stay inside the crop')
+    })
+
+test('panning cannot open up padding at the cover zoom', async t => {
+    const el = await lockedSquare('pan-clamp-test', 'fill="#ff0000"',
+        await makeTransparentFile(100, 100))
+    const img = el.querySelector('img') as HTMLImageElement
+    const rectEl = el.querySelector('.crop-rect') as HTMLElement
+
+    for (const [dx, dy] of [[1000, 1000], [-2000, -2000]]) {
+        drag(img, dx, dy)
+        for (let i = 0; i < 40; i++) {
+            rectEl.dispatchEvent(key(dx > 0 ? 'ArrowRight' : 'ArrowLeft'))
+            rectEl.dispatchEvent(key(dy > 0 ? 'ArrowDown' : 'ArrowUp'))
+        }
+
+        const { x, y, width, height } = el.crop
+        t.ok(x >= 0 && y >= 0 && x + width <= 100 + 1e-6 &&
+            y + height <= 100 + 1e-6,
+        'the crop should stay inside the image')
+        t.ok(inside(box(el, '.crop-rect'), box(el, 'img')),
+            'the image should still cover the window')
+
+        const blob = await el.getBlob({ type: 'image/png' })
+        const dims = await loadBlobDimensions(blob)
+        t.equal((await pixelAt(blob, 0, 0))[3], 0,
+            'the top left pixel should not be filled')
+        t.equal((await pixelAt(blob, dims.width - 1, dims.height - 1))[3],
+            0, 'the bottom right pixel should not be filled')
+    }
+})
+
+test('shift+arrow zooms out to the stage and in to the slider\'s ' +
+    'max, and no further', async t => {
+    const el = await lockedSquare('key-zoom-range-test')
+    const rectEl = el.querySelector('.crop-rect') as HTMLElement
+    const stage = containRatioRect(CARD, 100, 100)
+
+    for (let i = 0; i < 80; i++) rectEl.dispatchEvent(key('ArrowDown', true))
+    t.equal(Number(zoomInput(el).value), 1, 'should stop at zoom 1')
+    const dims = await loadBlobDimensions(await el.getBlob())
+    t.equal(dims.width, Math.floor(stage.width),
+        'the blob should be the stage width')
+    t.equal(dims.height, stage.height, 'the blob should be the stage height')
+
+    for (let i = 0; i < 80; i++) rectEl.dispatchEvent(key('ArrowUp', true))
+    t.ok(near(Number(zoomInput(el).value), Number(zoomInput(el).max)),
+        'should stop at the slider\'s max')
+    t.ok(near(el.crop.width, fitRatioRect(CARD, 100, 100).width / 4),
+        'the max should be 4x past the cover rect')
+})
+
+function zoomLabel (el:ImageCrop):HTMLLabelElement {
+    return el.querySelector('.image-crop-zoom') as HTMLLabelElement
+}
+
+function zoomInput (el:ImageCrop):HTMLInputElement {
+    return el.querySelector('.image-crop-zoom input') as HTMLInputElement
+}
+
+function setZoom (el:ImageCrop, value:number|string):void {
+    const input = zoomInput(el)
+    input.value = String(value)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+}
+
+function center (rect:CropRect):[number, number] {
+    return [rect.x + rect.width / 2, rect.y + rect.height / 2]
+}
+
+function nearRect (a:CropRect, b:CropRect, epsilon = 0.01):boolean {
+    return near(a.x, b.x, epsilon) && near(a.y, b.y, epsilon) &&
+        near(a.width, b.width, epsilon) && near(a.height, b.height, epsilon)
+}
+
+test('a free-form cropper hides the zoom slider', async t => {
+    document.body.insertAdjacentHTML('beforeend', `
+        <image-crop class="zoom-free-test"
+            style="display:block;width:200px;"></image-crop>
+    `)
+    const el = await waitFor('image-crop.zoom-free-test') as ImageCrop
+    el.setFile(await makeImageFile(100, 100))
+    await waitForImageLoad(el)
+
+    t.ok(zoomLabel(el), 'should render the slider')
+    t.equal(zoomLabel(el).hidden, true, 'should hide it')
+})
+
+test('a locked cropper shows the zoom slider at the cover zoom',
+    async t => {
+        const el = await lockedSquare('zoom-cover-test')
+        const input = zoomInput(el)
+        const stage = containRatioRect(CARD, 100, 100)
+        const cover = fitRatioRect(CARD, 100, 100)
+
+        t.equal(zoomLabel(el).hidden, false, 'should show the slider')
+        t.equal(input.type, 'range', 'should be a native range input')
+        t.equal(input.min, '1', 'should start at the whole stage')
+        t.ok(near(Number(input.value), stage.width / cover.width),
+            'should sit at the cover rect')
+    })
+
+test('zoom 1 sets the rect to the stage', async t => {
+    const el = await lockedSquare('zoom-one-test')
+    const changes:CropRect[] = []
+    el.addEventListener('image-crop:change', ev => {
+        changes.push(ev.detail)
+    })
+    setZoom(el, 1)
+
+    const stage = containRatioRect(CARD, 100, 100)
+    t.ok(nearRect(el.crop, stage), 'should be the whole stage')
+    t.equal(changes.length, 1, 'should emit one change')
+    t.ok(changes[0] && nearRect(changes[0], stage),
+        'the change should carry the new rect')
+})
+
+test('the zoom slider keeps the rect centered', async t => {
+    const el = await lockedSquare('zoom-center-test')
+    const [cx, cy] = center(el.crop)
+    setZoom(el, zoomInput(el).max)
+    const [nx, ny] = center(el.crop)
+
+    t.ok(el.crop.width < fitRatioRect(CARD, 100, 100).width,
+        'should zoom in')
+    t.ok(near(cx, nx, 0.5) && near(cy, ny, 0.5),
+        'should keep the center')
+})
+
+test('shift+arrow keys move the zoom slider', async t => {
+    const el = await lockedSquare('zoom-key-slider-test')
+    const rectEl = el.querySelector('.crop-rect') as HTMLElement
+    const before = Number(zoomInput(el).value)
+
+    rectEl.dispatchEvent(key('ArrowUp', true))
+    t.ok(Number(zoomInput(el).value) > before,
+        'zooming in should raise the slider')
+
+    rectEl.dispatchEvent(key('ArrowDown', true))
+    rectEl.dispatchEvent(key('ArrowDown', true))
+    t.ok(Number(zoomInput(el).value) < before,
+        'zooming out should lower the slider')
+})
+
+test('a resize keeps the zoomed rect and the slider value', async t => {
+    const el = await lockedSquare('zoom-resize-test')
+    setZoom(el, 1)
+    const rect = el.crop
+    const value = Number(zoomInput(el).value)
+
+    el.style.width = '250px'
+    window.dispatchEvent(new Event('resize'))
+
+    t.ok(nearRect(el.crop, rect), 'should keep the natural rect')
+    t.ok(near(Number(zoomInput(el).value), value),
+        'should keep the slider value')
+})
+
+test('a second image resets the zoom to its own cover', async t => {
+    const el = await lockedSquare('zoom-second-test')
+    setZoom(el, 1)
+    el.setFile(await makeImageFile(400, 100))
+    await waitForImageLoad(el)
+
+    const stage = containRatioRect(CARD, 400, 100)
+    const cover = fitRatioRect(CARD, 400, 100)
+    t.deepEqual(el.crop, cover, 'should start at the new cover rect')
+    t.ok(near(Number(zoomInput(el).value), stage.width / cover.width),
+        'the slider should sit at the new cover zoom')
+})
+
+test('switching to free-form after zooming out returns the rect to ' +
+    'the image', async t => {
+    const el = await lockedSquare('zoom-free-again-test')
+    setZoom(el, 1)
+    el.removeAttribute('crop')
+
+    t.deepEqual(el.crop, { x: 0, y: 0, width: 100, height: 100 },
+        'should cover exactly the image')
+    t.equal(zoomLabel(el).hidden, true, 'should hide the slider')
+
+    const rectEl = el.querySelector('.crop-rect') as HTMLElement
+    for (let i = 0; i < 40; i++) rectEl.dispatchEvent(key('ArrowLeft'))
+    t.ok(el.crop.x >= 0, 'the stage should be the image again')
+})
+
+test('a zoomed-out crop pads the blob with the fill color', async t => {
+    const el = await lockedSquare('fill-color-test', 'fill="#ff0000"')
+    setZoom(el, 1)
+    const blob = await el.getBlob()
+
+    const dims = await loadBlobDimensions(blob)
+    t.equal(dims.width, 190, 'should be the stage width')
+    t.equal(dims.height, 100, 'should be the stage height')
+    t.deepEqual(await pixelAt(blob, 1, 50), [255, 0, 0, 255],
+        'the padding should be the fill color')
+    t.notDeepEqual(await pixelAt(blob, 95, 50), [255, 0, 0, 255],
+        'the image should be drawn over the fill')
+})
+
+test('the padding defaults to white', async t => {
+    const el = await lockedSquare('fill-default-test')
+    setZoom(el, 1)
+    const blob = await el.getBlob()
+    t.deepEqual(await pixelAt(blob, 1, 50), [255, 255, 255, 255],
+        'the padding should be white')
+})
+
+test('a crop inside the image paints no fill', async t => {
+    const el = await lockedSquare('fill-none-test', 'fill="#ff0000"',
+        await makeTransparentFile(100, 100))
+    const blob = await el.getBlob({ type: 'image/png' })
+    t.equal((await pixelAt(blob, 1, 1))[3], 0,
+        'a transparent pixel should stay transparent')
+})
+
+test('a resize at max zoom keeps the slider in step with the rect',
+    async t => {
+        const el = await lockedSquare('zoom-resize-max-test')
+        setZoom(el, zoomInput(el).max)
+        el.style.width = '250px'
+        window.dispatchEvent(new Event('resize'))
+
+        const stage = containRatioRect(CARD, 100, 100)
+        t.ok(near(Number(zoomInput(el).value),
+            stage.width / el.crop.width),
+        'the slider should still read the rect\'s zoom')
+    })
+
+test('a free-form crop nudged against an edge paints no fill',
+    async t => {
+        document.body.insertAdjacentHTML('beforeend', `
+            <image-crop class="drift-free-test" fill="#ff0000"
+                style="display:block;width:209px;"></image-crop>
+        `)
+        const el = await waitFor('image-crop.drift-free-test') as ImageCrop
+        el.setFile(await makeTransparentFile(100, 100))
+        await waitForImageLoad(el)
+        const rectEl = el.querySelector('.crop-rect') as HTMLElement
+        rectEl.dispatchEvent(key('ArrowLeft', true))
+        rectEl.dispatchEvent(key('ArrowLeft', true))
+        for (let i = 0; i < 3; i++) rectEl.dispatchEvent(key('ArrowRight'))
+
+        const blob = await el.getBlob({ type: 'image/png' })
+        t.equal((await pixelAt(blob, 1, 1))[3], 0,
+            'a transparent pixel should stay transparent')
+    })
+
+test('a locked crop nudged inside the image paints no fill', async t => {
+    document.body.insertAdjacentHTML('beforeend', `
+        <image-crop class="drift-locked-test" crop="1200/630"
+            fill="#ff0000" style="display:block;width:251px;"></image-crop>
+    `)
+    const el = await waitFor('image-crop.drift-locked-test') as ImageCrop
+    el.setFile(await makeTransparentFile(100, 100))
+    await waitForImageLoad(el)
+    const rectEl = el.querySelector('.crop-rect') as HTMLElement
+    rectEl.dispatchEvent(key('ArrowUp'))
+    rectEl.dispatchEvent(key('ArrowDown'))
+
+    const blob = await el.getBlob({ type: 'image/png' })
+    t.equal((await pixelAt(blob, 1, 1))[3], 0,
+        'a transparent pixel should stay transparent')
 })

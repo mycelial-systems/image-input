@@ -75,14 +75,18 @@ image-input {
         position: relative;
         pointer-events: none;
 
-        &.has-image {
-            display: block;
-        }
-
         & img {
             display: block;
             max-width: 100%;
             border-radius: var(--image-input-radius);
+        }
+
+        &.has-image {
+            display: block;
+
+            & img {
+                margin: 0 auto;
+            }
         }
 
         & .overlay {

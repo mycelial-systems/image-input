@@ -79,6 +79,7 @@
     "lightningcss-cli": "^1.33.0",
     "markdown-toc": "^1.2.0",
     "newneostandard": "^0.14.1",
+    "poteto-mode": "^0.0.2",
     "preact": "^10.29.7",
     "stylelint": "^17.14.1",
     "stylelint-config-standard": "^40.0.0",

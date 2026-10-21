@@ -58,7 +58,8 @@ export class ImageInput extends WebComponent {
     static TAG = 'image-input'
     TAG = ImageInput.TAG
     static reflectedStringAttributes = [
-        'accept', 'name', 'alt', 'label', 'crop', 'src', 'crossorigin'
+        'accept', 'name', 'alt', 'label', 'crop', 'src', 'crossorigin',
+        'fill'
     ]
 
     static reflectedBooleanAttributes = ['required', 'nocrop']
@@ -69,6 +70,7 @@ export class ImageInput extends WebComponent {
     declare crop:string|null
     declare src:string|null
     declare crossorigin:string|null
+    declare fill:string|null
     declare required:boolean
     declare nocrop:boolean
 
@@ -451,6 +453,11 @@ export class ImageInput extends WebComponent {
             cropEl.removeAttribute('crop')
         } else {
             cropEl.setAttribute('crop', el.crop)
+        }
+        if (el.fill == null) {
+            cropEl.removeAttribute('fill')
+        } else {
+            cropEl.setAttribute('fill', el.fill)
         }
         if (file) {
             cropEl.setFile(file)

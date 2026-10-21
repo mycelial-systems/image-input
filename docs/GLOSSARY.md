@@ -59,20 +59,37 @@ suppressed; see *`nocrop`*.
 
 **Crop Frame** (`.image-crop-frame`) -- `image-crop`'s positioned
 container, sized to the image's fitted display size. Everything else
-in the crop UI is absolutely positioned inside it.
+in the crop UI is absolutely positioned inside it. Under a locked ratio
+it clips the image, and a drag anywhere on it outside the Crop Rect pans
+the image.
 
 **Crop Rect** (`.crop-rect`) -- The selected region of the image. It is
-focusable and exposed as `role="group"`, so arrow keys move it and
-shift plus arrow keys resize it. Its geometry is reported in natural
-pixels, not display pixels.
+focusable and exposed as `role="group"`. Free-form, arrow keys move it
+and shift plus arrow keys resize it. Under a locked ratio it is a
+window over the image. A drag inside it moves it and the corner handles
+resize it, both with the image held still. Arrow keys pan the image
+behind it and shift plus arrow keys zoom. Its geometry is reported in natural pixels, not display pixels.
 
 **Handle** (`.handle`, `.handle-nw` through `.handle-w`) -- The eight
 corner and edge grips on the Crop Rect. Corner handles resize both
-axes, edge handles resize one.
+axes, edge handles resize one. Under a locked ratio the edge handles
+are hidden, and a corner handle resizes the window with the image held
+still.
 
 **Dim Panels** (`.dim-top`, `.dim-bottom`, `.dim-left`, `.dim-right`)
 -- Four rectangles that darken everything outside the Crop Rect. Four
 separate panels, not one overlay with a hole punched in it.
+
+**Stage** -- Under a locked ratio, the largest crop: the smallest rect
+of that ratio containing the whole image, centered on it. At zoom 1 the
+crop is the Stage's size, so the whole image fits in the window and the
+rest is padding painted with *Fill*. It is derived when a zoom needs
+it, not stored, and is not a layout surface. See FDR-007.
+
+**Zoom Slider** (`.image-crop-zoom`) -- The native range input under a
+locked Crop Frame. Its value is Stage width / Crop Rect width, so 1 is
+the whole Stage. Named zoom because *Scale* already means the
+natural-to-display ratio.
 
 ## Consumer API
 
@@ -138,6 +155,11 @@ a `--image-input-*` or `--image-crop-*` property declared in
 `src/_vars.css`. There is no JS theme object and no style props, so
 adding a property is never a breaking change.
 
+**Fill** (`fill`) -- The attribute on `image-crop`, forwarded from
+`image-input` and `cropDialog`, that colors the padding of a crop
+zoomed out past the image. `#fff` by default. It is painted only when
+the rect extends past the image.
+
 ## Internals
 
 **Light DOM** -- The component renders into itself with no shadow root,
@@ -169,9 +191,11 @@ created and on disconnect.
 **Natural pixels** / **Display pixels** -- The two coordinate spaces in
 the crop UI. Natural pixels are the image's own resolution and are what
 the crop rect is stored in and what `image-crop:change` reports.
-Display pixels are what is on screen after fitting the image into the
-Crop Frame. **Scale** is the ratio between them; `crop-math.ts` holds
-the pure conversions.
+Display pixels are what is on screen. **Scale** is the ratio between
+them: the image fitted to the Crop Frame when free-form, the window
+width over the crop width under a lock; `crop-math.ts` holds
+the pure conversions. A rect padded past the image (see *Stage*) has a
+negative natural `x` or `y`, or reaches past the natural size.
 
 **Drag snapshot** -- The pointer-drag convention: capture the start
 rect and start pointer position on `pointerdown`, then recompute the

@@ -117,9 +117,6 @@ export function moveRect (
 }
 
 export type HandleDir = 'nw'|'n'|'ne'|'e'|'se'|'s'|'sw'|'w'
-export type CornerDir = 'nw'|'ne'|'se'|'sw'
-
-export const CORNER_DIRS:CornerDir[] = ['nw', 'ne', 'se', 'sw']
 
 /**
  * Resize a rect by dragging one of its 8 handles by (dx, dy). Corner
@@ -165,6 +162,10 @@ export function resizeRect (
     }
 }
 
+export type CornerDir = 'nw'|'ne'|'se'|'sw'
+
+export const CORNER_DIRS:CornerDir[] = ['nw', 'ne', 'se', 'sw']
+
 const CORNER_SIGN:Record<CornerDir, { signX:number, signY:number }> = {
     nw: { signX: -1, signY: -1 },
     ne: { signX: 1, signY: -1 },
@@ -175,10 +176,10 @@ const CORNER_SIGN:Record<CornerDir, { signX:number, signY:number }> = {
 /**
  * Resize a rect by dragging one of its 4 corner handles by (dx, dy),
  * keeping `width / height` equal to `ratio` throughout. The opposite
- * corner is the anchor and never moves. Growth is clamped to `bounds`
- * by shrinking the rect proportionally rather than letting either
- * axis push past an edge, so the ratio can never break. Never shrinks
- * below `minSize` on either axis.
+ * corner is the anchor and never moves. The width is held between
+ * `width.min` and `width.max`, then growth is clamped to `bounds` by
+ * shrinking the rect proportionally rather than letting either axis
+ * push past an edge, so the ratio can never break.
  */
 export function resizeRectLocked (
     rect:CropRect,
@@ -186,68 +187,45 @@ export function resizeRectLocked (
     dx:number,
     dy:number,
     bounds:DisplaySize,
-    minSize:number,
-    ratio:number
+    ratio:number,
+    width:{ min:number, max:number }
 ):CropRect {
     const { signX, signY } = CORNER_SIGN[handle]
     const anchorX = signX > 0 ? rect.x : rect.x + rect.width
     const anchorY = signY > 0 ? rect.y : rect.y + rect.height
 
-    // Two candidate sizes, each preserving the ratio -- one driven by
+    // Two candidate widths, each preserving the ratio -- one driven by
     // the horizontal delta, one by the vertical. A diagonal drag (both
-    // nonzero) picks whichever candidate has the larger area, so the
-    // rect grows as far as the user actually dragged. A drag or
-    // keyboard step on a single axis leaves the other delta at exactly
-    // zero -- the larger-area candidate would then always be the
-    // *unchanged* axis (its area never shrinks), which would make
-    // shrinking via one axis impossible. Drive off that axis alone
-    // instead whenever the other is exactly zero.
+    // nonzero) picks the larger, so the rect grows as far as the user
+    // actually dragged. A drag or keyboard step on a single axis leaves
+    // the other delta at exactly zero -- the larger candidate would
+    // then always be the *unchanged* axis, which would make shrinking
+    // via one axis impossible. Drive off that axis alone instead
+    // whenever the other is exactly zero.
     const widthFromDx = rect.width + dx * signX
-    const heightFromDy = rect.height + dy * signY
-
-    let width:number
-    let height:number
-    if (dy === 0 && dx !== 0) {
-        width = widthFromDx
-        height = widthFromDx / ratio
-    } else if (dx === 0 && dy !== 0) {
-        width = heightFromDy * ratio
-        height = heightFromDy
-    } else {
-        const areaA = widthFromDx > 0 ? widthFromDx * widthFromDx / ratio : -1
-        const areaB = heightFromDy > 0 ?
-            heightFromDy * heightFromDy * ratio :
-            -1
-        if (areaA >= areaB) {
-            width = widthFromDx
-            height = widthFromDx / ratio
-        } else {
-            width = heightFromDy * ratio
-            height = heightFromDy
-        }
-    }
-
-    const minWidth = Math.max(minSize, minSize * ratio)
-    if (width < minWidth) {
-        width = minWidth
-        height = width / ratio
-    }
+    const widthFromDy = (rect.height + dy * signY) * ratio
+    const wanted = (dy === 0 && dx !== 0) ?
+        widthFromDx :
+        (dx === 0 && dy !== 0) ?
+            widthFromDy :
+            Math.max(widthFromDx, widthFromDy)
 
     // Clamp so the anchored rect stays inside bounds, shrinking both
     // axes by the same factor rather than breaking the ratio.
-    const maxWidth = signX > 0 ? bounds.width - anchorX : anchorX
-    const maxHeight = signY > 0 ? bounds.height - anchorY : anchorY
-    const scale = Math.min(1, maxWidth / width, maxHeight / height)
-    if (scale < 1) {
-        width *= scale
-        height *= scale
-    }
+    const roomX = signX > 0 ? bounds.width - anchorX : anchorX
+    const roomY = signY > 0 ? bounds.height - anchorY : anchorY
+    const w = Math.min(
+        Math.max(Math.min(wanted, width.max), width.min),
+        roomX,
+        roomY * ratio
+    )
+    const h = w / ratio
 
     return {
-        x: signX > 0 ? anchorX : anchorX - width,
-        y: signY > 0 ? anchorY : anchorY - height,
-        width,
-        height
+        x: signX > 0 ? anchorX : anchorX - w,
+        y: signY > 0 ? anchorY : anchorY - h,
+        width: w,
+        height: h
     }
 }
 
@@ -272,6 +250,80 @@ export function fitRatioRect (
         width,
         height
     }
+}
+
+/**
+ * The smallest rect of the given `ratio` (width / height) that contains
+ * the whole `naturalWidth` x `naturalHeight` image, centered on it. This
+ * is the stage of a locked crop: its `x` or `y` is zero or negative, and
+ * the area outside the image is padding.
+ */
+export function containRatioRect (
+    ratio:number,
+    naturalWidth:number,
+    naturalHeight:number
+):CropRect {
+    let width = naturalWidth
+    let height = width / ratio
+    if (height < naturalHeight) {
+        height = naturalHeight
+        width = height * ratio
+    }
+    return {
+        x: (naturalWidth - width) / 2,
+        y: (naturalHeight - height) / 2,
+        width,
+        height
+    }
+}
+
+/**
+ * Clamp a locked crop's position so that a pan cannot open up padding.
+ * Each axis is clamped on its own: where the crop is smaller than the
+ * image it must stay inside the image, and where it is larger (zoomed
+ * out past the image) the image must stay inside it. Padding then only
+ * ever comes from zooming out, never from a pan.
+ */
+export function clampPan (
+    crop:CropRect,
+    naturalWidth:number,
+    naturalHeight:number
+):CropRect {
+    return {
+        ...crop,
+        x: clampToSlack(crop.x, naturalWidth - crop.width),
+        y: clampToSlack(crop.y, naturalHeight - crop.height)
+    }
+}
+
+/**
+ * Clamp `position` between 0 and `slack`, whichever of the two is lower.
+ */
+function clampToSlack (position:number, slack:number):number {
+    return Math.min(
+        Math.max(position, Math.min(0, slack)),
+        Math.max(0, slack)
+    )
+}
+
+/**
+ * Translate a rect by (dx, dy) without resizing it.
+ */
+export function shiftRect (rect:CropRect, dx:number, dy:number):CropRect {
+    return { ...rect, x: rect.x + dx, y: rect.y + dy }
+}
+
+/**
+ * How far past the cover rect the zoom slider reaches, at most.
+ */
+export const MAX_ZOOM_PAST_COVER = 4
+
+/**
+ * The zoom slider's maximum, where zoom is `stageWidth / crop width`:
+ * `MAX_ZOOM_PAST_COVER` times the cover rect's zoom.
+ */
+export function zoomMax (stageWidth:number, coverWidth:number):number {
+    return MAX_ZOOM_PAST_COVER * stageWidth / coverWidth
 }
 
 /**

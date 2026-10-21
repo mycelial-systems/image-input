@@ -148,6 +148,7 @@ The `--image-crop-*` variables, in `_vars-crop.css`:
   from pushing the Cancel and Save buttons off screen. It must be a
   value that resolves to a length, because `ImageCrop` reads it back
   to size the crop frame; a percentage is treated as no cap at all.
+* `--image-crop-zoom-accent` -- the `accent-color` of the zoom slider.
 
 
 ------------------------------
@@ -251,6 +252,8 @@ is the same as setting the attribute in HTML.
   `<img>`. Use it (e.g. `anonymous`) when a cross-origin stored image
   must be croppable. See [Stored images](#stored-images) below for
   details.
+* `fill` -- Forwarded to the cropper: the color that pads a crop zoomed
+  out past the image. See `fill` under [`image-crop`](#image-crop).
 
 ```html
 <image-input
@@ -510,14 +513,23 @@ import { ImageCrop } from '@substrate-system/image-input/crop'
   * A ratio literal, following CSS `aspect-ratio` syntax: `3/4`,
     `3 / 4`, or the bare number `0.75` all mean the same thing.
 
-  Locking changes three things: the rect starts as the largest rect
-  of that ratio, centered, instead of covering the whole image; only
-  the four corner handles are shown, and a corner drag (or shift plus
-  an arrow key) anchors the opposite corner and scales the rect
-  proportionally instead of resizing one side; and the rect can never
-  be dragged, or keyed, past the image's edges without breaking the
-  ratio. Changing the attribute after an image has loaded re-fits the
-  rect to the new constraint.
+  Under a lock the crop area is a window, at first the largest rect of
+  that ratio centered in the frame, and the image pans and zooms
+  behind it. Drag the window to move it over the image, or drag one of
+  the four corner handles to resize it; either way the image stays
+  put. Drag anywhere else on the frame, or use the arrow keys, to move
+  the image. The crop starts as the largest rect of
+  the ratio inside the image, so the window is filled.
+  Changing the attribute after an image has loaded re-fits the crop to
+  the new constraint.
+
+  A locked cropper also shows a zoom slider, a native
+  `<input type="range">` under the frame. Shift plus an arrow key moves
+  it too. At its minimum, 1, the whole image fits inside the window,
+  and the rest of the window is padding painted with `fill`. Zooming
+  keeps the center of the window fixed. An image larger than the
+  window always covers it, so padding appears only after zooming out
+  past the image. See [FDR-007](docs/fdr/FDR-007-crop-zoom.md).
 
   `circle` is crop-UI chrome, not a pixel mask -- `getBlob()` still
   returns an ordinary square image, in whatever type you requested.
@@ -529,6 +541,12 @@ import { ImageCrop } from '@substrate-system/image-input/crop'
   typo, `0`, a negative number) falls back to free-form cropping and
   is reported through the debug channel. Nothing throws and no error
   event fires.
+* `fill` -- The color painted where a zoomed-out crop extends past the
+  image, both on screen and in `getBlob()`'s output. Any color a
+  canvas `fillStyle` accepts; `#fff` by default. It is painted only
+  when the rect extends past the image, so a crop inside the image
+  produces exactly what it did before. JPEG has no transparency, so
+  `fill="transparent"` with JPEG output encodes black padding.
 
 #### Events
 
@@ -541,8 +559,10 @@ import { ImageCrop } from '@substrate-system/image-input/crop'
   again.
 * `image-crop:change` -- The crop rectangle changed. `detail` is the
   crop rect, `{ x:number, y:number, width:number, height:number }`, in
-  natural (not displayed) image pixels. This fires for a pointer drag,
-  for a keyboard move or resize, when the `crop` attribute changes,
+  natural (not displayed) image pixels. A rect padded past the image
+  has a negative `x` or `y`, or reaches past the natural size. This
+  fires for a pointer drag, for a keyboard move, resize or zoom, for the zoom
+  slider, when the `crop` attribute changes,
   and once on load with the initial rect -- so a listener on this
   event alone sees every rect the element has ever had, starting with
   the first.
@@ -594,8 +614,8 @@ if (cropped) saveImage(cropped)
 The `heading`, `save`, and `cancel` options change the dialog copy.
 The `crop` option accepts the same values as the `image-crop` `crop`
 attribute, including `constrain`, `circle`, and ratio literals. The
-`crossorigin` option (e.g. `crossorigin: 'anonymous'`) is forwarded to
-the inner `<image-crop>`. Load `@substrate-system/image-input/css/crop`
+`crossorigin` option (e.g. `crossorigin: 'anonymous'`) and the `fill`
+option (e.g. `fill: '#000'`) are forwarded to the inner `<image-crop>`. Load `@substrate-system/image-input/css/crop`
 separately. The function does not inject styles.
 
 When a URL source is provided, the cropped blob's type is guessed from

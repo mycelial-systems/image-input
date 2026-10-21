@@ -6,5 +6,6 @@
     --image-crop-handle-color: #fff;
     --image-crop-handle-border-color: #1d9bf0;
     --image-crop-focus-color: #1d9bf0;
+    --image-crop-zoom-accent: #1d9bf0;
     --image-crop-max-height: 65vh;
 }

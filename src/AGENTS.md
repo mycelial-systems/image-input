@@ -22,8 +22,8 @@
   after a couple of pixels, fires `pointercancel`, and pans the page;
   `#handlePointerEnd` treats that cancel as the end of the drag, which
   is correct behavior on its part. `e.preventDefault()` in
-  `pointerdown` does *not* prevent this. The declaration goes on
-  `.crop-rect` rather than the frame because the effective value for a
+  `pointerdown` does *not* prevent this. Free-form, the declaration
+  goes on `.crop-rect` rather than the frame because the effective value for a
   touch is the intersection of the hit element's with all its
   ancestors' -- so it covers the `.handle` children too, while leaving
   the dimmed area outside the rect free to pan the page. Keep the
@@ -283,3 +283,27 @@
   bundle built by `npm run build-tests` in a test runner. Static
   fixtures live under `test/fixtures/` and are served at `/fixtures/...`
   by the test runner's HTTP server.
+- `#crop`, in image natural pixels, and `#window`, the locked window
+  in the frame's natural pixels, are the only crop state. `#view()`
+  derives everything on screen from them on every layout: the frame
+  size, the scale, the image's box and the rect's box. Free-form, the
+  image fills the frame and the rect moves over it. Under a lock the
+  rect is the window (`#window`, or `fitRatioRect` of the image when it
+  is `null`) and the image is scaled and placed so `#crop` fills it, so
+  a pan or a zoom changes only `#crop` and the image moves. A corner
+  drag (`#resizedWindow`) or a drag inside the window (`#movedWindow`)
+  changes both, holding the image still with the scale and image box
+  snapshotted at `pointerdown`. `#handleMoveStart` must stop the press
+  propagating under a lock: the frame's `pointerdown` is the pan, and
+  it would run next and overwrite `#drag`. Wherever
+  `#crop` is reset, `#window` must go back to `null`. Don't add a
+  third piece of layout state such as a stored stage or scale; derive
+  it. A locked pan
+  works in natural pixels (`#panned`, clamped by `clampPan`) with the
+  scale snapshotted at `pointerdown`. A zoom goes through `#zoomed`,
+  which sizes the crop off the stage so zoom 1 is the stage's exact
+  size. Under a lock the whole frame takes `touch-action: none` and
+  the grab cursor, and the window the move cursor (FDR-007). The zoom slider is kept in sync only by `#layoutZoom()` at the end of
+  `#layout()`; a new rect mutation path needs nothing extra as long as
+  it ends in `#layout()`. `.image-crop-zoom` sets `display: flex`, so
+  `src/crop.css` needs its own `&[hidden] { display: none }` rule.

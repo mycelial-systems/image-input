@@ -24,10 +24,20 @@ image-crop {
          */
         margin-inline: auto;
 
+        /**
+         * Positioned, so that under a locked ratio `crop.ts` can pan and
+         * zoom the image behind the fixed crop window. The frame's size
+         * is set explicitly, so nothing depends on the image being in
+         * flow. `max-width: none` beats a page's common
+         * `img { max-width: 100% }` reset, which would stop a zoomed-in
+         * image from growing past the frame.
+         */
         & img {
             display: block;
+            position: absolute;
             width: 100%;
             height: auto;
+            max-width: none;
         }
 
         & .dim {
@@ -49,7 +59,8 @@ image-crop {
          * for a touch is the intersection of the hit element's with
          * its ancestors', so this one declaration also covers the
          * `.handle` children, while a touch on the dimmed area
-         * outside the rect still pans the page normally.
+         * outside the rect still pans the page normally. A locked
+         * frame is the exception, see `.locked` below.
          */
         & .crop-rect {
             position: absolute;
@@ -123,12 +134,30 @@ image-crop {
         }
 
         /**
-         * An edge handle has no honest behavior once the ratio is
-         * locked -- resizing it would have to move a side the user
-         * did not grab (see FDR-001). Only the four corners, which
-         * each have exactly one sensible anchor, stay interactive.
+         * Under a lock the image pans and zooms behind the crop window,
+         * so a drag anywhere on the frame outside the window is a pan:
+         * the whole frame takes `touch-action: none` and the grab
+         * cursor. A drag inside the window moves the window over the
+         * image instead, so it takes the move cursor. The frame clips a
+         * zoomed-in image, and the circle's
+         * dimming shadow. An edge handle has no honest behavior once the
+         * ratio is locked -- resizing it would have to move a side the
+         * user did not grab (see FDR-001). Only the four corners, which
+         * each have exactly one sensible anchor, resize the window.
          */
         &.locked {
+            overflow: hidden;
+            touch-action: none;
+            cursor: grab;
+
+            &.panning {
+                cursor: grabbing;
+            }
+
+            & .crop-rect {
+                cursor: move;
+            }
+
             & .handle-n,
             & .handle-e,
             & .handle-s,
@@ -141,12 +170,10 @@ image-crop {
          * Four rectangular dim panels cannot cut a round hole. In
          * circle mode the crop rect itself dims the rest of the image
          * via a spread `box-shadow` that follows its own border
-         * radius -- one element, no second rendering technique.
-         * `overflow: hidden` contains the oversized shadow.
+         * radius -- one element, no second rendering technique. A
+         * circle is always locked, so `.locked` clips the shadow.
          */
         &.circle {
-            overflow: hidden;
-
             & .dim {
                 display: none;
             }
@@ -155,6 +182,27 @@ image-crop {
                 border-radius: 50%;
                 box-shadow: 0 0 0 9999px var(--image-crop-dim-color);
             }
+        }
+    }
+
+    /**
+     * The zoom slider, shown only under a locked ratio. `[hidden]` needs
+     * its own rule because `display: flex` would otherwise override it.
+     */
+    & .image-crop-zoom {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-block-start: 0.75rem;
+        font-size: 1rem;
+
+        &[hidden] {
+            display: none;
+        }
+
+        & input {
+            flex: 1;
+            accent-color: var(--image-crop-zoom-accent);
         }
     }
 }

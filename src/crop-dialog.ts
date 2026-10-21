@@ -13,12 +13,14 @@ export type CropDialogOptions = {
     crop?:CropConstraint|string
     /** Forwarded to the <image-crop> so the image loads in CORS mode. */
     crossorigin?:string
+    /** Forwarded to the <image-crop>: the padding of a zoomed-out crop. */
+    fill?:string
 }
 
 export type CropSource = File|Blob|string
 
 function markup (
-    options:Required<Omit<CropDialogOptions, 'crop'|'crossorigin'>>
+    options:Required<Omit<CropDialogOptions, 'crop'|'crossorigin'|'fill'>>
 ):string {
     return `<dialog class="crop-dialog" aria-label="${
         escapeAttr(options.heading)
@@ -62,6 +64,9 @@ export function cropDialog (
     }
     if (options.crossorigin !== undefined) {
         crop.setAttribute('crossorigin', options.crossorigin)
+    }
+    if (options.fill !== undefined) {
+        crop.setAttribute('fill', options.fill)
     }
     if (source instanceof File) crop.setFile(source)
     else if (source instanceof Blob) crop.setFile(toFile(source))
