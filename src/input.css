@@ -286,7 +286,7 @@ image-input {
 
         &::backdrop {
             background: transparent;
-            transition-property: background, display, overlay;
+            transition-property: background-color, display, overlay;
             transition-duration: var(--image-input-dialog-duration);
             transition-timing-function: ease-out;
             transition-behavior: allow-discrete;
