@@ -3103,6 +3103,47 @@ test('AC4.2: failed save does not settle edit() promise, ' +
     }
 })
 
+test('with an image set, the label text shows above the image, and ' +
+    'the image still opens the picker', async t => {
+    document.body.insertAdjacentHTML('beforeend', `
+        <image-input class="label-above-image-test"></image-input>
+    `)
+    const el = await waitFor(
+        'image-input.label-above-image-test'
+    ) as ImageInput
+    const img = el.querySelector('.preview img') as HTMLImageElement
+
+    const loaded = new Promise(resolve => {
+        img.addEventListener('load', resolve, { once: true })
+    })
+    el.setImage(await makeImageFile(200, 100))
+    await loaded
+    // Hit testing only sees what is in the viewport, and nothing at all
+    // while a modal dialog an earlier test left open makes the page inert
+    el.scrollIntoView()
+    document.querySelectorAll('dialog[open]').forEach(dialog => {
+        (dialog as HTMLDialogElement).close()
+    })
+
+    const text = el.querySelector('.prompt-text') as HTMLElement
+    const textRect = text.getBoundingClientRect()
+    const imgRect = img.getBoundingClientRect()
+
+    t.ok(textRect.width > 0 && textRect.height > 0,
+        'the label text should be rendered')
+    t.ok(textRect.bottom <= imgRect.top,
+        'the label text should sit above the image')
+
+    const hit = document.elementFromPoint(
+        imgRect.left + imgRect.width / 2,
+        imgRect.top + imgRect.height / 2
+    )
+    t.ok(el.querySelector('.picker')?.contains(hit),
+        'a click on the image should land on the picker label')
+
+    el.remove()
+})
+
 test('ImageCrop is reachable from the package root', t => {
     t.equal(typeof RootImageCrop, 'function',
         'the root module should export the ImageCrop class')

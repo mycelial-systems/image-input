@@ -41,13 +41,32 @@ image-input {
             outline-offset: 2px;
         }
 
+        /**
+         * With an image, the label text stays, in flow above the
+         * preview. `contain: inline-size` keeps a long label from
+         * widening the box past the image. The `::after` stretches the
+         * label's hit area over the whole box, so a click on the image
+         * (the preview has `pointer-events: none`) still opens the
+         * picker. The picker itself must stay unpositioned, so the
+         * `::after` is sized against the box.
+         */
         &.has-image .picker {
-            position: absolute;
-            inset: 0;
-            padding: 0;
+            justify-content: flex-start;
+            padding: var(--image-input-overlay-padding);
+            contain: inline-size;
+
+            &::after {
+                content: "";
+                position: absolute;
+                inset: 0;
+            }
         }
 
         &.has-image .prompt {
+            align-items: flex-start;
+        }
+
+        &.has-image .prompt-icon {
             display: none;
         }
 

@@ -205,8 +205,8 @@ is the same as setting the attribute in HTML.
 * `required` -- Boolean. Marks the inner file input as required for
   form validation. Satisfied by a picked file or a stored `src`. See
   [Stored images](#stored-images) below.
-* `label` -- Prompt text shown in the empty box, and used as the file
-  input's `aria-label`. Defaults to `Drop an image, or click to
+* `label` -- Prompt text shown in the empty box, and above the image
+  once one is set. Also used as the file input's `aria-label`. Defaults to `Drop an image, or click to
   choose one`.
 * `crop` -- Locks the crop dialog's rect to a fixed shape, instead of
   the default free-form crop. Forwarded as-is to the `<image-crop>`

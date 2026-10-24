@@ -31,10 +31,11 @@ The component never gives it a width, height or aspect ratio; see
 `<input type="file">`. It wraps only the input, not the whole Box: a
 `<label>` may not contain labelable descendants other than its own
 control, and the Overlay's buttons are labelable. Once an image is set,
-the Picker stretches to fill the Box so a click on the preview reopens
-the file dialog.
+the Picker's hit area stretches over the whole Box, so a click on the
+preview reopens the file dialog.
 
 **Prompt** (`.prompt`) -- The icon and text shown inside an empty Box.
+With an image, only the text shows, above the preview.
 The text comes from the `label` attribute, defaulting to
 `ImageInput.DEFAULT_LABEL`, and doubles as the file input's
 `aria-label`.
